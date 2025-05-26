@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -7,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
 const getEmployeeAttendanceStatus = (employeeId: string) => {
   const today = new Date().toDateString();
@@ -175,3 +176,4 @@ export default function AttendancePage() {
     </div>
   );
 }
+
