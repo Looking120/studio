@@ -1,18 +1,32 @@
 
 "use client";
 
-import React from 'react';
-import { mockAttendanceSummary, mockEmployees, mockActivityLogs, Employee } from '@/lib/data';
+import React, { useState, useEffect } from 'react';
+import { mockEmployees, mockActivityLogs, Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const getEmployeeAttendanceStatus = (employeeId: string) => {
+interface EmployeeAttendanceStatus {
+  status: string;
+  time: string;
+}
+
+interface AttendanceSummaryData {
+  checkedInToday: number;
+  absentToday: number;
+  overallAttendancePercentage: number;
+  totalEmployees: number;
+  avgWorkHours: number;
+}
+
+const getEmployeeAttendanceStatus = (employeeId: string, activityLogs: typeof mockActivityLogs): EmployeeAttendanceStatus => {
   const today = new Date().toDateString();
-  const logsToday = mockActivityLogs.filter(
+  const logsToday = activityLogs.filter(
     log => log.employeeId === employeeId && new Date(log.date).toDateString() === today
   );
   const checkInLog = logsToday.find(log => log.activity === 'Checked In' && log.checkInTime);
@@ -37,9 +51,42 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function AttendancePage() {
-  const overallAttendancePercentage = mockAttendanceSummary.totalEmployees > 0 
-    ? (mockAttendanceSummary.checkedInToday / mockAttendanceSummary.totalEmployees) * 100 
-    : 0;
+  const [employeeStatuses, setEmployeeStatuses] = useState<Record<string, EmployeeAttendanceStatus>>({});
+  const [summaryData, setSummaryData] = useState<AttendanceSummaryData | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true); // Component has mounted
+
+    // Calculate employee statuses
+    const statuses: Record<string, EmployeeAttendanceStatus> = {};
+    mockEmployees.forEach(employee => {
+      statuses[employee.id] = getEmployeeAttendanceStatus(employee.id, mockActivityLogs);
+    });
+    setEmployeeStatuses(statuses);
+
+    // Calculate summary data
+    const todayString = new Date().toDateString();
+    const checkedInTodayCount = new Set(
+      mockActivityLogs
+        .filter(log => log.checkInTime && new Date(log.date).toDateString() === todayString)
+        .map(log => log.employeeId)
+    ).size;
+    
+    const totalEmployees = mockEmployees.length;
+    const absentTodayCount = totalEmployees - checkedInTodayCount;
+    const percentage = totalEmployees > 0 ? (checkedInTodayCount / totalEmployees) * 100 : 0;
+
+    setSummaryData({
+      checkedInToday: checkedInTodayCount,
+      absentToday: absentTodayCount,
+      overallAttendancePercentage: percentage,
+      totalEmployees: totalEmployees,
+      avgWorkHours: 7.5, // This was static in mockData, keeping it static for now.
+    });
+
+  }, []);
+
 
   return (
     <div className="space-y-6">
@@ -50,7 +97,7 @@ export default function AttendancePage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockAttendanceSummary.totalEmployees}</div>
+            <div className="text-2xl font-bold">{summaryData ? summaryData.totalEmployees : <Skeleton className="h-8 w-1/2" />}</div>
           </CardContent>
         </Card>
         <Card>
@@ -59,7 +106,7 @@ export default function AttendancePage() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockAttendanceSummary.checkedInToday}</div>
+            <div className="text-2xl font-bold">{summaryData ? summaryData.checkedInToday : <Skeleton className="h-8 w-1/2" />}</div>
           </CardContent>
         </Card>
         <Card>
@@ -68,7 +115,7 @@ export default function AttendancePage() {
             <XCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockAttendanceSummary.totalEmployees - mockAttendanceSummary.checkedInToday}</div>
+            <div className="text-2xl font-bold">{summaryData ? summaryData.absentToday : <Skeleton className="h-8 w-1/2" />}</div>
           </CardContent>
         </Card>
         <Card>
@@ -77,7 +124,7 @@ export default function AttendancePage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockAttendanceSummary.avgWorkHours}h</div>
+            <div className="text-2xl font-bold">{summaryData ? `${summaryData.avgWorkHours}h` : <Skeleton className="h-8 w-1/4" />}</div>
           </CardContent>
         </Card>
       </div>
@@ -98,24 +145,35 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockEmployees.map((employee: Employee) => {
-                  const attendance = getEmployeeAttendanceStatus(employee.id);
-                  return (
-                    <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.name}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          attendance.status === 'Present' ? 'bg-green-100 text-green-700' :
-                          attendance.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {attendance.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>{attendance.time}</TableCell>
+                {!isClient ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-row-${index}`}>
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     </TableRow>
-                  );
-                })}
+                  ))
+                ) : (
+                  mockEmployees.map((employee: Employee) => {
+                    const attendance = employeeStatuses[employee.id] || { status: "Loading...", time: "..." };
+                    return (
+                      <TableRow key={employee.id}>
+                        <TableCell className="font-medium">{employee.name}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            attendance.status === 'Present' ? 'bg-green-100 text-green-700' :
+                            attendance.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
+                            attendance.status === 'Absent' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700' // Loading state
+                          }`}>
+                            {attendance.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>{attendance.time}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </div>
@@ -148,28 +206,38 @@ export default function AttendancePage() {
             <CardDescription>Percentage of employees checked in today.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center h-[300px]">
-            <div className="relative w-32 h-32">
-              <svg className="w-full h-full" viewBox="0 0 36 36">
-                <path className="text-muted"
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none" stroke="currentColor" strokeWidth="2.5" />
-                <path className="text-primary"
-                  strokeDasharray={`${overallAttendancePercentage}, 100`}
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary">{Math.round(overallAttendancePercentage)}%</span>
+            {!summaryData ? (
+              <div className="flex flex-col items-center justify-center w-full h-full">
+                <Skeleton className="w-32 h-32 rounded-full" />
+                <Skeleton className="w-3/4 h-2 mt-4" />
+                <Skeleton className="w-1/2 h-4 mt-2" />
               </div>
-            </div>
-            <Progress value={overallAttendancePercentage} className="w-3/4 mt-4 h-2" />
-            <p className="text-sm text-muted-foreground mt-2">
-              {mockAttendanceSummary.checkedInToday} of {mockAttendanceSummary.totalEmployees} employees are present.
-            </p>
+            ) : (
+              <>
+                <div className="relative w-32 h-32">
+                  <svg className="w-full h-full" viewBox="0 0 36 36">
+                    <path className="text-muted"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none" stroke="currentColor" strokeWidth="2.5" />
+                    <path className="text-primary"
+                      strokeDasharray={`${summaryData.overallAttendancePercentage}, 100`}
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-primary">{Math.round(summaryData.overallAttendancePercentage)}%</span>
+                  </div>
+                </div>
+                <Progress value={summaryData.overallAttendancePercentage} className="w-3/4 mt-4 h-2" />
+                <p className="text-sm text-muted-foreground mt-2">
+                  {summaryData.checkedInToday} of {summaryData.totalEmployees} employees are present.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
