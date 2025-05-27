@@ -1,7 +1,8 @@
+
 "use client";
 
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps";
 import React, { useState, useEffect } from 'react';
+import Map, { Marker, Popup, NavigationControl, FullscreenControl, ScaleControl } from 'react-map-gl';
 
 export interface MapMarkerData {
   id: string;
@@ -9,41 +10,61 @@ export interface MapMarkerData {
   longitude: number;
   title: string;
   description?: string;
-  icon?: React.ReactNode; // Optional custom icon
+  icon?: React.ReactNode;
 }
 
 interface MapComponentProps {
   markers: MapMarkerData[];
   center: { lat: number; lng: number };
   zoom?: number;
-  mapId?: string; // For different map styles if needed
-  apiKey?: string; // Allow passing API key as prop
+  mapStyleUrl?: string;
+  mapboxAccessToken?: string;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ markers, center, zoom = 12, mapId, apiKey }) => {
-  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
-  const [currentApiKey, setCurrentApiKey] = useState<string | null>(null);
+const MapComponent: React.FC<MapComponentProps> = ({
+  markers,
+  center,
+  zoom = 12,
+  mapStyleUrl,
+  mapboxAccessToken, // Renamed from apiKey for clarity
+}) => {
+  const [selectedMarker, setSelectedMarker] = useState<MapMarkerData | null>(null);
+  const [currentAccessToken, setCurrentAccessToken] = useState<string | null>(null);
+  const [viewState, setViewState] = useState({
+    longitude: center.lng,
+    latitude: center.lat,
+    zoom: zoom,
+  });
 
   useEffect(() => {
-    // Try to get API key from prop, then environment variable
-    const envApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (apiKey) {
-      setCurrentApiKey(apiKey);
-    } else if (envApiKey) {
-      setCurrentApiKey(envApiKey);
+    const envAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (mapboxAccessToken) {
+      setCurrentAccessToken(mapboxAccessToken);
+    } else if (envAccessToken) {
+      setCurrentAccessToken(envAccessToken);
     }
-  }, [apiKey]);
+  }, [mapboxAccessToken]);
 
-  if (!currentApiKey) {
+  useEffect(() => {
+    setViewState(prev => ({
+        ...prev,
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom: zoom
+    }));
+  }, [center, zoom])
+
+
+  if (!currentAccessToken) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-muted rounded-lg shadow-md">
         <div className="text-center p-8">
-          <h3 className="text-xl font-semibold text-destructive mb-2">Google Maps API Key Missing</h3>
+          <h3 className="text-xl font-semibold text-destructive mb-2">Mapbox Access Token Missing</h3>
           <p className="text-muted-foreground">
-            Please provide a Google Maps API key either through the 'apiKey' prop or by setting the NEXT_PUBLIC_GOOGLE_MAPS_API_KEY environment variable.
+            Please provide a Mapbox Access Token either through the 'mapboxAccessToken' prop or by setting the NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN environment variable.
           </p>
           <p className="text-sm text-muted-foreground mt-4">
-            Refer to <code className="bg-card px-1 py-0.5 rounded">.env.local.example</code> for setup.
+            Refer to <code className="bg-card px-1 py-0.5 rounded">.env.local.example</code> for setup or visit Mapbox documentation to get an access token.
           </p>
         </div>
       </div>
@@ -51,46 +72,52 @@ const MapComponent: React.FC<MapComponentProps> = ({ markers, center, zoom = 12,
   }
 
   return (
-    <APIProvider apiKey={currentApiKey}>
-      <div style={{ height: "100%", width: "100%", borderRadius: "0.5rem", overflow: "hidden" }}>
-        <Map
-          defaultCenter={center}
-          defaultZoom={zoom}
-          gestureHandling={'greedy'}
-          disableDefaultUI={true}
-          mapId={mapId || 'employtrack-map'} // Default map ID
-          className="rounded-lg shadow-md"
-        >
-          {markers.map((marker) => (
-            <AdvancedMarker
-              key={marker.id}
-              position={{ lat: marker.latitude, lng: marker.longitude }}
-              onClick={() => setSelectedMarkerId(marker.id)}
-            >
-              {marker.icon ? marker.icon : <Pin /* Optional: Add custom Pin props for color, etc. */ />}
-            </AdvancedMarker>
-          ))}
+    <div style={{ height: "100%", width: "100%", borderRadius: "0.5rem", overflow: "hidden" }}>
+      <Map
+        {...viewState}
+        onMove={evt => setViewState(evt.viewState)}
+        mapboxAccessToken={currentAccessToken}
+        mapStyle={mapStyleUrl || "mapbox://styles/mapbox/streets-v12"} // Default Mapbox style
+        style={{ width: '100%', height: '100%' }}
+        attributionControl={false}
+      >
+        <NavigationControl position="top-right" />
+        <FullscreenControl position="top-right" />
+        <ScaleControl />
 
-          {selectedMarkerId && markers.find(m => m.id === selectedMarkerId) && (
-            <InfoWindow
-              position={{ 
-                lat: markers.find(m => m.id === selectedMarkerId)!.latitude, 
-                lng: markers.find(m => m.id === selectedMarkerId)!.longitude 
-              }}
-              onCloseClick={() => setSelectedMarkerId(null)}
-              pixelOffset={[0,-30]}
-            >
-              <div className="p-2">
-                <h4 className="font-semibold text-sm text-popover-foreground">{markers.find(m => m.id === selectedMarkerId)!.title}</h4>
-                {markers.find(m => m.id === selectedMarkerId)!.description && (
-                  <p className="text-xs text-muted-foreground">{markers.find(m => m.id === selectedMarkerId)!.description}</p>
-                )}
-              </div>
-            </InfoWindow>
-          )}
-        </Map>
-      </div>
-    </APIProvider>
+        {markers.map((marker) => (
+          <Marker
+            key={marker.id}
+            longitude={marker.longitude}
+            latitude={marker.latitude}
+            onClick={(e) => {
+              e.originalEvent.stopPropagation();
+              setSelectedMarker(marker);
+            }}
+          >
+            {marker.icon ? marker.icon : <div className="w-6 h-6 bg-primary rounded-full border-2 border-white shadow-md" />}
+          </Marker>
+        ))}
+
+        {selectedMarker && (
+          <Popup
+            longitude={selectedMarker.longitude}
+            latitude={selectedMarker.latitude}
+            onClose={() => setSelectedMarker(null)}
+            closeOnClick={false}
+            anchor="bottom"
+            offset={selectedMarker.icon ? 30 : 15} // Adjust offset based on icon presence/size
+          >
+            <div className="p-1 max-w-xs">
+              <h4 className="font-semibold text-sm text-popover-foreground">{selectedMarker.title}</h4>
+              {selectedMarker.description && (
+                <p className="text-xs text-muted-foreground">{selectedMarker.description}</p>
+              )}
+            </div>
+          </Popup>
+        )}
+      </Map>
+    </div>
   );
 };
 

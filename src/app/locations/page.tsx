@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -24,6 +25,9 @@ export default function LocationsPage() {
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees.filter(e => e.latitude && e.longitude));
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [isSimulating, setIsSimulating] = useState(true);
+  const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 }); // Default to LA
+  const [mapZoom, setMapZoom] = useState(12);
+
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -48,31 +52,41 @@ export default function LocationsPage() {
     return employees.filter(emp => emp.status.toLowerCase() === filter);
   }, [employees, filter]);
 
-  const markers: MapMarkerData[] = filteredEmployees.map(employee => ({
+  const markers: MapMarkerData[] = useMemo(() => filteredEmployees.map(employee => ({
     id: employee.id,
     latitude: employee.latitude!,
     longitude: employee.longitude!,
     title: employee.name,
     description: `${employee.jobTitle} - ${employee.status} (Last seen: ${employee.lastSeen || 'N/A'})`,
     icon: (
-        <div className="relative">
-            <Avatar className="h-8 w-8 border-2 border-background shadow-md">
+        <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
+            <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
                 <AvatarImage src={employee.avatarUrl} alt={employee.name} data-ai-hint="person map" />
                 <AvatarFallback>{employee.name.substring(0,1)}</AvatarFallback>
             </Avatar>
-            {employee.status === 'Active' && <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />}
+            {employee.status === 'Active' && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />}
         </div>
     )
-  }));
+  })), [filteredEmployees]);
 
-  const mapCenter = markers.length > 0 
-    ? { lat: markers[0].latitude, lng: markers[0].longitude } 
-    : { lat: 34.0522, lng: -118.2437 }; // Default to LA if no markers
+  useEffect(() => {
+    if (markers.length > 0) {
+      // Calculate the average coordinates to center the map
+      const avgLat = markers.reduce((sum, m) => sum + m.latitude, 0) / markers.length;
+      const avgLng = markers.reduce((sum, m) => sum + m.longitude, 0) / markers.length;
+      setMapCenter({ lat: avgLat, lng: avgLng });
+      setMapZoom(markers.length === 1 ? 13 : 11); // Zoom in more if only one marker
+    } else {
+      setMapCenter({ lat: 34.0522, lng: -118.2437 }); // Default LA
+      setMapZoom(12);
+    }
+  }, [markers]);
+
 
   return (
-    <div className="h-[calc(100vh-10rem)] flex flex-col gap-4"> {/* Adjust height as needed */}
+    <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> {/* Adjusted height slightly */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between py-4">
           <CardTitle>Employee Live Locations</CardTitle>
           <div className="flex items-center gap-4">
             <RadioGroup defaultValue="active" onValueChange={(value: 'all' | 'active' | 'inactive') => setFilter(value)} className="flex items-center">
@@ -96,8 +110,8 @@ export default function LocationsPage() {
           </div>
         </CardHeader>
       </Card>
-      <div className="flex-grow rounded-lg overflow-hidden shadow-xl">
-        <MapComponent markers={markers} center={mapCenter} zoom={13} />
+      <div className="flex-grow rounded-lg overflow-hidden shadow-xl border">
+        <MapComponent markers={markers} center={mapCenter} zoom={mapZoom} />
       </div>
     </div>
   );
