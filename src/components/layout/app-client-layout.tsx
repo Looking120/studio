@@ -16,6 +16,9 @@ import {
   SidebarTrigger,
   SidebarGroup,
   SidebarGroupLabel,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -63,9 +66,10 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     // const fetchUnreads = async () => {
     //   try {
     //     // Assuming placeholderUser.id is the current logged-in user's ID
-    //     const unreadInfo = await getUnreadMessages(placeholderUser.id);
-    //     setUnreadChatCount(unreadInfo.count); 
-    //     console.log("Unread chat messages:", unreadInfo.count);
+    //     // const unreadInfo = await getUnreadMessages(placeholderUser.id); 
+    //     // setUnreadChatCount(unreadInfo.count); 
+    //     // console.log("Unread chat messages:", unreadInfo.count);
+    //     console.log("Placeholder: Would fetch unread messages.");
     //   } catch (error) {
     //     console.error("Failed to fetch unread messages:", error);
     //   }
@@ -109,7 +113,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     // } catch (error) {
     //   console.error('Sign out failed:', error);
     //   // Show error toast or message
-    //   alert(`Sign out failed: ${error.message}`);
+    //   // alert(`Sign out failed: ${error.message}`);
     // }
     window.location.href = '/'; // Current behavior
   };
@@ -256,3 +260,5 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
