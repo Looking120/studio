@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, Bot } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -22,12 +22,13 @@ import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/locations", label: "Location Tracking", icon: MapPin },
   { href: "/activity", label: "Activity Logs", icon: ListChecks },
   { href: "/attendance", label: "Attendance", icon: BarChart3 },
   { href: "/offices", label: "Office Locations", icon: Building2 },
+  { href: "/chat", label: "Chat", icon: Bot },
 ];
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -39,17 +40,24 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
+  // If it's the login page (now at root '/'), render children directly without main layout chrome
+  if (pathname === "/") {
+    return <>{children}</>;
+  }
+
   const currentPage = navItems.find(item => {
-    if (item.href === "/") return pathname === "/";
+    // For root dashboard, exact match. For others, startsWith.
+    if (item.href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(item.href);
   });
   const pageTitle = currentPage?.label || "EmployTrack";
+
 
   return (
     <SidebarProvider defaultOpen={true} >
       <Sidebar collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="p-4">
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href="/dashboard" className="flex items-center gap-2 group">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-sidebar-primary transition-transform duration-300 group-hover:scale-110">
                 <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 7L12 12M12 12L22 7M12 12V22M12 2V12M17 4.5L7 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -63,7 +71,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
+                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
                   tooltip={{ children: item.label, side: "right", className: "bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border shadow-md" }}
                   className="justify-start"
                   variant="default"
@@ -120,7 +128,13 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Log out</DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => {
+                    // Basic "logout" - redirect to login page
+                    // In a real app, you'd clear auth tokens, etc.
+                    window.location.href = '/'; 
+                  }}>
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

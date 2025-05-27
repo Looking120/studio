@@ -1,81 +1,90 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary } from "@/lib/data";
-import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock } from "lucide-react";
-import Link from "next/link";
 
-export default function DashboardPage() {
-  const summaryData = [
-    { title: "Total Employees", value: mockEmployees.length, icon: Users, href: "/employees", color: "text-blue-500" },
-    { title: "Active Today", value: mockAttendanceSummary.activeToday, icon: CheckCircle, href: "/activity", color: "text-green-500" },
-    { title: "Total Offices", value: mockOffices.length, icon: Building2, href: "/offices", color: "text-purple-500" },
-    { title: "Avg. Work Hours", value: `${mockAttendanceSummary.avgWorkHours}h`, icon: Clock, href: "/attendance", color: "text-orange-500" },
-  ];
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LogIn } from "lucide-react";
+import Link from "next/link";
+import React from "react";
+import { useRouter } from 'next/navigation'; // Import useRouter
+
+export default function LoginPage() {
+  const router = useRouter(); // Initialize router
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    // Placeholder for login logic
+    console.log("Login form submitted");
+    // Here you would typically call an authentication API
+    // For now, redirect to dashboard on submit
+    router.push('/dashboard'); 
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {summaryData.map((item) => (
-          <Link href={item.href} key={item.title} legacyBehavior>
-            <a className="block hover:shadow-lg transition-shadow duration-200 rounded-lg">
-              <Card className="bg-card text-card-foreground hover:bg-primary/10 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                  <item.icon className={`h-5 w-5 ${item.color || 'text-muted-foreground'}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{item.value}</div>
-                  <p className="text-xs text-muted-foreground pt-1">View Details</p>
-                </CardContent>
-              </Card>
-            </a>
-          </Link>
-        ))}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="bg-card text-card-foreground">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ListChecks className="h-5 w-5 text-primary" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mockActivityLogs.slice(0, 5).map(log => (
-              <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
-                <div>
-                  <p className="font-medium text-sm">{log.employeeName}</p>
-                  <p className="text-xs text-muted-foreground">{log.activity} at {log.location}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">{new Date(log.date).toLocaleTimeString()}</p>
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="space-y-2 text-center p-6">
+          <div className="flex justify-center mb-4">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
+                <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 7L12 12M12 12L22 7M12 12V22M12 2V12M17 4.5L7 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <CardTitle className="text-3xl font-bold">Welcome Back!</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Please enter your credentials to sign in.
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="grid gap-6 p-6">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="you@example.com" 
+                required 
+                className="text-base"
+              />
+            </div>
+            <div className="grid gap-2">
+              <div className="flex items-center">
+                <Label htmlFor="password">Password</Label>
+                <Link href="#" className="ml-auto inline-block text-sm text-muted-foreground hover:text-primary hover:underline">
+                  Forgot password?
+                </Link>
               </div>
-            ))}
-            <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
-              View All Activity Logs
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card text-card-foreground">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              Quick Map Overview (HQ)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px] p-0">
-            {/* Simplified map or image placeholder for dashboard. Full map on /locations and /offices */}
-            <div className="w-full h-full bg-muted rounded-b-lg flex items-center justify-center">
-               <img 
-                src={`https://placehold.co/600x300.png?text=Map+View+of+HQ`} 
-                alt="Map placeholder" 
-                data-ai-hint="map office"
-                className="object-cover w-full h-full rounded-b-lg"
-                />
+              <Input 
+                id="password" 
+                type="password" 
+                required 
+                placeholder="••••••••"
+                className="text-base"
+              />
             </div>
           </CardContent>
-        </Card>
-      </div>
+          <CardFooter className="flex flex-col gap-4 p-6 pt-0">
+            <Button className="w-full text-lg py-6" type="submit">
+              <LogIn className="mr-2 h-5 w-5" /> Sign In
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link href="#" className="font-semibold text-primary hover:underline">
+                Sign up here
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }
