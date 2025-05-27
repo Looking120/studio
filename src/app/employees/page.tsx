@@ -81,8 +81,7 @@ export default function EmployeesPage() {
                   <TableCell>{employee.department}</TableCell>
                   <TableCell>{employee.jobTitle}</TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={employee.status === 'Active' ? 'default' : 'secondary'}
-                           className={employee.status === 'Active' ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-500 hover:bg-gray-600 text-white'}>
+                    <Badge variant={employee.status === 'Active' ? 'default' : 'secondary'}>
                       {employee.status}
                     </Badge>
                   </TableCell>

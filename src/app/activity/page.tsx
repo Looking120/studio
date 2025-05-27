@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -85,8 +86,7 @@ export default function ActivityLogsPage() {
                 <TableRow key={log.id}>
                   <TableCell className="font-medium">{log.employeeName}</TableCell>
                   <TableCell>
-                    <Badge variant={log.activity.toLowerCase().includes('in') ? 'default' : 'secondary'} 
-                           className={log.activity.toLowerCase().includes('in') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}>
+                    <Badge variant={log.activity.toLowerCase().includes('in') ? 'default' : 'secondary'}>
                       {log.activity}
                     </Badge>
                   </TableCell>
