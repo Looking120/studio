@@ -14,8 +14,14 @@ import { ListFilter, Search } from 'lucide-react';
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A';
   try {
-    return format(parseISO(dateString), 'MMM d, yyyy, h:mm a');
+    // Attempt to parse, assuming it might be an ISO string already or needs parsing
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) { // Check if date is invalid
+      return 'Invalid Date';
+    }
+    return format(date, 'MMM d, yyyy, h:mm a');
   } catch (error) {
+    console.error("Error formatting date:", dateString, error);
     return 'Invalid Date';
   }
 };
@@ -86,14 +92,14 @@ export default function ActivityLogsPage() {
                 <TableRow key={log.id}>
                   <TableCell className="font-medium">{log.employeeName}</TableCell>
                   <TableCell>
-                    <Badge variant={log.activity.toLowerCase().includes('in') ? 'default' : 'secondary'}>
+                     <Badge variant={log.activity.toLowerCase().includes('checked in') ? 'default' : log.activity.toLowerCase().includes('checked out') ? 'secondary' : 'outline'}>
                       {log.activity}
                     </Badge>
                   </TableCell>
                   <TableCell>{log.location || 'N/A'}</TableCell>
                   <TableCell>{formatDate(log.checkInTime)}</TableCell>
                   <TableCell>{formatDate(log.checkOutTime)}</TableCell>
-                  <TableCell>{format(parseISO(log.date), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>{format(new Date(log.date), 'MMM d, yyyy')}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
