@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, Bot } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare } from "lucide-react"; // Changed Bot to MessageSquare
 import {
   SidebarProvider,
   Sidebar,
@@ -23,12 +23,12 @@ import React, { useEffect, useState } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/employees", label: "Employees", icon: Users },
-  { href: "/locations", label: "Location Tracking", icon: MapPin },
-  { href: "/activity", label: "Activity Logs", icon: ListChecks },
-  { href: "/attendance", label: "Attendance", icon: BarChart3 },
-  { href: "/offices", label: "Office Locations", icon: Building2 },
-  { href: "/chat", label: "Chat", icon: Bot },
+  { href: "/employees", label: "Employés", icon: Users },
+  { href: "/locations", label: "Suivi de Localisation", icon: MapPin },
+  { href: "/activity", label: "Logs d'Activité", icon: ListChecks },
+  { href: "/attendance", label: "Présence", icon: BarChart3 },
+  { href: "/offices", label: "Bureaux", icon: Building2 },
+  { href: "/chat", label: "Messagerie", icon: MessageSquare }, // Changed label and icon
 ];
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -125,15 +125,15 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuItem>Profil</DropdownMenuItem>
+                <DropdownMenuItem>Paramètres</DropdownMenuItem>
                 <DropdownMenuSeparator />
                  <DropdownMenuItem onClick={() => {
                     // Basic "logout" - redirect to login page
                     // In a real app, you'd clear auth tokens, etc.
                     window.location.href = '/'; 
                   }}>
-                  Log out
+                  Se déconnecter
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
