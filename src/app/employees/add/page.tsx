@@ -7,14 +7,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// Label component from ShadCN is used by FormLabel
+// import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { mockEmployees, type Employee } from '@/lib/data';
+// import { mockEmployees, type Employee } from '@/lib/data'; // We'll use the service now
+import { hireEmployee } from '@/services/employee-service';
+import type { Employee } from '@/lib/data';
+
 
 const employeeFormSchema = z.object({
   name: z.string().min(2, { message: "Le nom doit contenir au moins 2 caractères." }),
@@ -41,28 +45,36 @@ export default function AddEmployeePage() {
     },
   });
 
-  const onSubmit = (data: EmployeeFormValues) => {
-    // In a real app, you'd call your API here: POST /api/employees or /api/users/hire
-    console.log('Employee data to save:', data);
+  const onSubmit = async (data: EmployeeFormValues) => {
+    form.clearErrors(); // Clear previous errors
+    try {
+      // Use the hireEmployee service function
+      const newEmployee = await hireEmployee(data); 
+      console.log('Employee data saved via service:', newEmployee);
 
-    // Simulate adding to mockEmployees for demonstration if needed for local state,
-    // but this won't persist across page loads or be shared.
-    // For a real app, API call is crucial.
-    const newEmployee: Employee = {
-      id: `emp${Math.floor(Math.random() * 1000)}`, // Temporary ID
-      ...data,
-      status: 'Active', // Default status
-      avatarUrl: data.avatarUrl || `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`
-    };
-    // This is a local update, will not persist unless mockEmployees is handled by a global state or fetched again.
-    // mockEmployees.push(newEmployee); 
-    // It's better to rely on API and then re-fetch or update cache on the main employees page.
-
-    toast({
-      title: "Employé Ajouté",
-      description: `${data.name} a été ajouté avec succès.`,
-    });
-    router.push('/employees'); // Redirect to the employees list
+      toast({
+        title: "Employé Ajouté",
+        description: `${data.name} a été ajouté avec succès.`,
+      });
+      router.push('/employees'); 
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Erreur d'Ajout",
+            description: `Impossible d'ajouter l'employé. ${error instanceof Error ? error.message : 'Erreur inconnue du serveur.'}`
+        });
+        console.error("Failed to add employee:", error);
+        // Optionally, set form errors if the API returns field-specific errors
+        // if (error.response && error.response.data && error.response.data.errors) {
+        //   const errors = error.response.data.errors;
+        //   Object.keys(errors).forEach((key) => {
+        //     form.setError(key as keyof EmployeeFormValues, {
+        //       type: 'manual',
+        //       message: errors[key].join(', '),
+        //     });
+        //   });
+        // }
+    }
   };
 
   return (

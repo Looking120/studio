@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { ActivityLog } from '@/lib/data'; // Keep type definition
+import type { ActivityLog } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { format } from 'date-fns';
 import { ListFilter, Search, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { fetchAllActivityLogs } from '@/services/activity-service'; // Import the service
 
-const API_BASE_URL = 'https://localhost:7294';
+// API_BASE_URL is now in src/services/api-client.ts
+// const API_BASE_URL = 'https://localhost:7294'; 
 
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
@@ -28,14 +30,15 @@ const formatDate = (dateString?: string | null) => {
   }
 };
 
-async function fetchActivityLogsFromAPI(): Promise<ActivityLog[]> {
-  const response = await fetch(`${API_BASE_URL}/api/activity-logs`);
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`Failed to fetch activity logs: ${response.status} ${errorData}`);
-  }
-  return response.json();
-}
+// The direct API call function is now replaced by the service
+// async function fetchActivityLogsFromAPI(): Promise<ActivityLog[]> {
+//   const response = await fetch(`${API_BASE_URL}/api/activity-logs`);
+//   if (!response.ok) {
+//     const errorData = await response.text();
+//     throw new Error(`Failed to fetch activity logs: ${response.status} ${errorData}`);
+//   }
+//   return response.json();
+// }
 
 export default function ActivityLogsPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -49,13 +52,14 @@ export default function ActivityLogsPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        const data = await fetchActivityLogsFromAPI();
+        // Use the service function here
+        const data = await fetchAllActivityLogs(); 
         setActivityLogs(data);
       } catch (err) {
         if (err instanceof Error) {
           setFetchError(err.message);
         } else {
-          setFetchError('An unknown error occurred');
+          setFetchError('An unknown error occurred while fetching activity logs.');
         }
         setActivityLogs([]); // Clear logs on error
       } finally {
@@ -126,7 +130,8 @@ export default function ActivityLogsPage() {
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            <p className="text-xs mt-2">Ensure the API server at {API_BASE_URL} is running and accessible.</p>
+            {/* Updated message to reflect API client base URL context */}
+            <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible.</p>
           </div>
         )}
         {!fetchError && (
@@ -159,7 +164,13 @@ export default function ActivityLogsPage() {
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell>
                       <TableCell>
-                        <Badge variant={log.activity?.toLowerCase().includes('checked in') ? 'default' : log.activity?.toLowerCase().includes('checked out') ? 'secondary' : 'outline'}>
+                        <Badge 
+                          variant={
+                            log.activity?.toLowerCase().includes('checked in') ? 'default' : 
+                            log.activity?.toLowerCase().includes('checked out') ? 'secondary' : 
+                            'outline'
+                          }
+                        >
                           {log.activity || 'N/A'}
                         </Badge>
                       </TableCell>
