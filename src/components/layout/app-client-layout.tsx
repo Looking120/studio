@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare } from "lucide-react"; // Changed Bot to MessageSquare
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -28,8 +28,17 @@ const navItems = [
   { href: "/activity", label: "Logs d'Activité", icon: ListChecks },
   { href: "/attendance", label: "Présence", icon: BarChart3 },
   { href: "/offices", label: "Bureaux", icon: Building2 },
-  { href: "/chat", label: "Messagerie", icon: MessageSquare }, // Changed label and icon
+  { href: "/chat", label: "Messagerie", icon: MessageSquare },
 ];
+
+// Placeholder user data - replace with actual data from auth context or API
+const placeholderUser = {
+  name: "Utilisateur Modèle",
+  email: "user.modele@example.com",
+  jobTitle: "Manager Principal", // Poste
+  role: "Administrateur", // Rôle
+  avatarUrl: "https://placehold.co/40x40.png?text=UM"
+};
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,17 +49,22 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // If it's the login page (now at root '/'), render children directly without main layout chrome
-  if (pathname === "/") {
+  if (pathname === "/") { // Login page at root
     return <>{children}</>;
   }
 
   const currentPage = navItems.find(item => {
-    // For root dashboard, exact match. For others, startsWith.
     if (item.href === "/dashboard") return pathname === "/dashboard";
+    // For other routes, check if current path starts with the nav item's href.
+    // This handles nested routes like /employees/add under /employees.
     return pathname.startsWith(item.href);
   });
-  const pageTitle = currentPage?.label || "EmployTrack";
+  let pageTitle = currentPage?.label || "EmployTrack";
+
+  // Handle titles for sub-pages not directly in navItems
+  if (pathname === '/employees/add') pageTitle = 'Ajouter un Employé';
+  if (pathname === '/profile') pageTitle = 'Mon Profil';
+  if (pathname === '/settings') pageTitle = 'Paramètres';
 
 
   return (
@@ -89,7 +103,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-sm md:px-6">
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" /> {/* Only on mobile for sheet */}
+            <SidebarTrigger className="md:hidden" />
             <h2 className="text-xl font-semibold text-foreground">
               {pageTitle}
             </h2>
@@ -101,36 +115,47 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 aria-label="Toggle theme"
-                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                title={`Passer en mode ${theme === 'dark' ? 'clair' : 'sombre'}`}
               >
                 {theme === 'dark' ? <Sun className="h-5 w-5 text-foreground" /> : <Moon className="h-5 w-5 text-foreground" />}
               </Button>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="https://placehold.co/40x40.png" alt="User Avatar" data-ai-hint="user avatar" />
-                    <AvatarFallback>ET</AvatarFallback>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={placeholderUser.avatarUrl} alt="User Avatar" data-ai-hint="user avatar" />
+                    <AvatarFallback>{placeholderUser.name.substring(0,2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-64" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">EmployTrack User</p>
+                    <p className="text-sm font-medium leading-none">{placeholderUser.name}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      user@example.com
+                      {placeholderUser.jobTitle} - {placeholderUser.role}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground pt-1">
+                      {placeholderUser.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profil</DropdownMenuItem>
-                <DropdownMenuItem>Paramètres</DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    Profil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Paramètres
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                  <DropdownMenuItem onClick={() => {
-                    // Basic "logout" - redirect to login page
-                    // In a real app, you'd clear auth tokens, etc.
                     window.location.href = '/'; 
                   }}>
                   Se déconnecter
