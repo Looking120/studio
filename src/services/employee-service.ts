@@ -8,12 +8,10 @@ import { mockEmployees } from '@/lib/data'; // Temporary for placeholder
  * Corresponds to: GET /api/employees
  */
 export async function fetchEmployees(): Promise<Employee[]> {
-  console.log('API CALL: GET /api/employees - Placeholder implementation. Returning mock data.');
+  console.log('API CALL: GET /api/employees - Placeholder implementation. Returning mock data for now.');
   // Replace this with your actual fetch call using apiClient:
   // const response = await apiClient('/employees');
   // return parseJsonResponse<Employee[]>(response);
-  
-  // Using mock data for now:
   return Promise.resolve(mockEmployees);
 }
 
@@ -52,15 +50,14 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
  * @param status The new status.
  */
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<Employee> {
-  console.log(`API CALL: PUT /api/employees/${employeeId}/status - Placeholder implementation.`);
+  console.log(`API CALL: PUT /api/employees/${employeeId}/status - Placeholder. New status: ${status}`);
   // Replace with actual fetch:
   // const response = await apiClient(`/employees/${employeeId}/status`, {
   //   method: 'PUT',
-  //   body: JSON.stringify({ status }), // Assuming API expects this format
+  //   body: JSON.stringify({ status }), 
   // });
   // return parseJsonResponse<Employee>(response);
 
-  // Mock implementation for local state update (if needed for UI demo without backend)
   const employeeIndex = mockEmployees.findIndex(emp => emp.id === employeeId);
   if (employeeIndex > -1) {
     mockEmployees[employeeIndex].status = status;
@@ -72,19 +69,18 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
 
 /**
  * Hires a new user/employee.
- * Corresponds to: POST /api/users/hire
+ * Corresponds to: POST /api/users/hire (as per your spec, also listed under /api/users)
  * @param employeeData The data for the new employee.
  */
 export async function hireEmployee(employeeData: Omit<Employee, 'id' | 'status' | 'avatarUrl'> & { avatarUrl?: string }): Promise<Employee> {
-  console.log('API CALL: POST /api/users/hire - Placeholder implementation.');
+  console.log('API CALL: POST /api/users/hire - Placeholder implementation.', employeeData);
   // Replace with actual fetch:
-  // const response = await apiClient('/users/hire', { // Assuming '/users/hire' from your spec
+  // const response = await apiClient('/users/hire', { 
   //   method: 'POST',
   //   body: JSON.stringify(employeeData),
   // });
   // return parseJsonResponse<Employee>(response);
 
-  // Mock implementation:
   const newEmployee: Employee = {
     id: `emp${Math.floor(Math.random() * 10000)}`,
     ...employeeData,
@@ -95,18 +91,16 @@ export async function hireEmployee(employeeData: Omit<Employee, 'id' | 'status' 
   return Promise.resolve(newEmployee);
 }
 
-// --- Location related functions for employees ---
-
 /**
  * Fetches the current location of an employee.
  * Corresponds to: GET /api/employees/{employeeId}/location/current
  * @param employeeId The ID of the employee.
  */
-export async function getCurrentEmployeeLocation(employeeId: string): Promise<any> { // Replace 'any' with actual location type
+export async function getCurrentEmployeeLocation(employeeId: string): Promise<{ latitude: number; longitude: number; lastSeen: string }> {
   console.log(`API CALL: GET /api/employees/${employeeId}/location/current - Placeholder implementation.`);
   // const response = await apiClient(`/employees/${employeeId}/location/current`);
-  // return parseJsonResponse<any>(response);
-  return Promise.resolve({ latitude: 0, longitude: 0, lastSeen: 'Now' }); // Mock response
+  // return parseJsonResponse<{ latitude: number; longitude: number; lastSeen: string }>(response);
+  return Promise.resolve({ latitude: 34.0522, longitude: -118.2437, lastSeen: 'Now' }); // Mock response
 }
 
 /**
@@ -123,16 +117,16 @@ export async function getNearbyEmployees(employeeId: string): Promise<Employee[]
 
 /**
  * Updates the location of an employee.
- * Corresponds to: PUT /api/location/{employeeId}
+ * Corresponds to: PUT /api/location/{employeeId} (also listed under Locations API)
  * @param employeeId The ID of the employee.
  * @param locationData The new location data.
  */
-export async function updateEmployeeLocation(employeeId: string, locationData: { latitude: number; longitude: number }): Promise<any> {
-  console.log(`API CALL: PUT /api/location/${employeeId} - Placeholder implementation.`);
+export async function updateEmployeeLocationApi(employeeId: string, locationData: { latitude: number; longitude: number }): Promise<any> {
+  console.log(`API CALL: PUT /api/location/${employeeId} - Placeholder implementation. Data:`, locationData);
   // const response = await apiClient(`/location/${employeeId}`, {
   //   method: 'PUT',
   //   body: JSON.stringify(locationData),
   // });
-  // return parseJsonResponse<any>(response);
+  // return parseJsonResponse<any>(response); // Or handle no content response
   return Promise.resolve({ success: true });
 }
