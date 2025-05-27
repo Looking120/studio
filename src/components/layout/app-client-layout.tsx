@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
-// import { getUnreadMessages } from "@/services/message-service"; // For unread message count
+// import { getUnreadMessages } from '@/services/message-service'; // For unread message count
 // import { signOut } from "@/services/auth-service"; // For sign out
 
 const navItems = [
@@ -51,7 +51,7 @@ const placeholderUser = {
   email: "alex.dubois@example.com",
   jobTitle: "Product Design Lead",
   role: "Team Lead", 
-  avatarUrl: "https://placehold.co/40x40.png?text=AD" // Updated placeholder to reflect name
+  avatarUrl: "https://placehold.co/120x120.png?text=AD" 
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -69,7 +69,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     //     // const unreadInfo = await getUnreadMessages(placeholderUser.id); 
     //     // setUnreadChatCount(unreadInfo.count); 
     //     // console.log("Unread chat messages:", unreadInfo.count);
-    //     console.log("Placeholder: Would fetch unread messages.");
+    //     console.log("Placeholder: Would fetch unread messages for user:", placeholderUser.id);
     //   } catch (error) {
     //     console.error("Failed to fetch unread messages:", error);
     //   }
@@ -88,7 +88,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       }
       if (item.subItems) {
         for (const subItem of item.subItems) {
-          if (pathname === subItem.href || pathname.startsWith(subItem.href)) {
+          if (pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))) {
             return subItem.label;
           }
         }
@@ -112,8 +112,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     //   window.location.href = '/'; 
     // } catch (error) {
     //   console.error('Sign out failed:', error);
-    //   // Show error toast or message
-    //   // alert(`Sign out failed: ${error.message}`);
+    //   alert(`Sign out failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     // }
     window.location.href = '/'; // Current behavior
   };
@@ -137,27 +136,23 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               item.subItems ? (
                 <SidebarGroup key={`group-${item.label}-${index}`} className="p-0">
                    <SidebarMenuButton
-                      asChild={false} // Not a link itself
-                      isActive={item.subItems.some(sub => pathname.startsWith(sub.href))}
+                      asChild={false} 
+                      isActive={item.subItems.some(sub => sub.href && pathname.startsWith(sub.href))}
                       tooltip={{ children: item.label, side: "right", className: "bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border shadow-md" }}
                       className="justify-start"
                       variant="default"
-                      // onClick={() => { /* Toggle collapse state for sub-menu if desired */ }}
                     >
                       <item.icon className="h-5 w-5" />
                       <span>{item.label}</span>
-                      {/* Add a chevron or indicator for collapsible sub-menu here if needed */}
                     </SidebarMenuButton>
-                    {/* For now, sub-items are always visible. Could be made collapsible later. */}
                     <SidebarMenuSub>
                       {item.subItems.map(subItem => (
                         <SidebarMenuSubItem key={subItem.href}>
                            <SidebarMenuSubButton
                             asChild
-                            isActive={pathname === subItem.href || pathname.startsWith(subItem.href)}
+                            isActive={pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))}
                           >
-                            <Link href={subItem.href}>
-                              {/* <subItem.icon className="h-4 w-4" /> */}
+                            <Link href={subItem.href!}>
                               <span>{subItem.label}</span>
                             </Link>
                           </SidebarMenuSubButton>
@@ -169,7 +164,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                  isActive={pathname === item.href || (item.href !== "/dashboard" && item.href && pathname.startsWith(item.href))}
                   tooltip={{ children: item.label, side: "right", className: "bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border shadow-md" }}
                   className="justify-start"
                   variant="default"
