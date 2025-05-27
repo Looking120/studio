@@ -1,15 +1,18 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { mockEmployees, mockActivityLogs, Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button"; // Added Button
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
-import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays, LogIn, LogOut, FileText } from 'lucide-react'; // Added icons
+import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+// import { checkIn, checkOut, getAttendanceReport } from '@/services/attendance-service'; // Import attendance service
+// import { useToast } from '@/hooks/use-toast'; // For notifications
 
 interface EmployeeAttendanceStatus {
   status: string;
@@ -24,48 +27,51 @@ interface AttendanceSummaryData {
   avgWorkHours: number;
 }
 
-const getEmployeeAttendanceStatus = (employeeId: string, activityLogs: typeof mockActivityLogs): EmployeeAttendanceStatus => {
-  const today = new Date().toDateString();
-  const logsToday = activityLogs.filter(
-    log => log.employeeId === employeeId && new Date(log.date).toDateString() === today
-  );
-  const checkInLog = logsToday.find(log => log.activity === 'Checked In' && log.checkInTime);
-  const checkOutLog = logsToday.find(log => log.activity === 'Checked Out' && log.checkOutTime);
-
-  if (checkInLog && !checkOutLog) return { status: "Present", time: new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-  if (checkInLog && checkOutLog) return { status: "Completed", time: `${new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(checkOutLog.checkOutTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` };
-  return { status: "Absent", time: "N/A" };
-};
-
-const attendanceData = [
-  { day: 'Mon', present: 18, absent: 2 },
-  { day: 'Tue', present: 20, absent: 0 },
-  { day: 'Wed', present: 19, absent: 1 },
-  { day: 'Thu', present: 17, absent: 3 },
-  { day: 'Fri', present: 15, absent: 5 },
-];
-
-const chartConfig = {
-  present: { label: "Present", color: "hsl(var(--chart-2))" },
-  absent: { label: "Absent", color: "hsl(var(--destructive))" },
-} satisfies ChartConfig
+// Placeholder for current user - replace with actual auth context
+const currentUserId = mockEmployees[0]?.id || 'emp001'; 
 
 export default function AttendancePage() {
   const [employeeStatuses, setEmployeeStatuses] = useState<Record<string, EmployeeAttendanceStatus>>({});
   const [summaryData, setSummaryData] = useState<AttendanceSummaryData | null>(null);
   const [isClient, setIsClient] = useState(false);
+  // const { toast } = useToast();
+
+  // This function would ideally fetch data from your activity logs or a dedicated attendance endpoint
+  const getEmployeeAttendanceStatus = (employeeId: string, activityLogs: typeof mockActivityLogs): EmployeeAttendanceStatus => {
+    const today = new Date().toDateString();
+    const logsToday = activityLogs.filter(
+      log => log.employeeId === employeeId && new Date(log.date).toDateString() === today
+    );
+    const checkInLog = logsToday.find(log => log.activity === 'Checked In' && log.checkInTime);
+    const checkOutLog = logsToday.find(log => log.activity === 'Checked Out' && log.checkOutTime);
+
+    if (checkInLog && !checkOutLog) return { status: "Present", time: new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    if (checkInLog && checkOutLog) return { status: "Completed", time: `${new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(checkOutLog.checkOutTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` };
+    return { status: "Absent", time: "N/A" };
+  };
+  
+  const attendanceChartData = [ // Renamed from attendanceData to avoid conflict
+    { day: 'Mon', present: 18, absent: 2 },
+    { day: 'Tue', present: 20, absent: 0 },
+    { day: 'Wed', present: 19, absent: 1 },
+    { day: 'Thu', present: 17, absent: 3 },
+    { day: 'Fri', present: 15, absent: 5 },
+  ];
+
+  const chartConfig = {
+    present: { label: "Present", color: "hsl(var(--chart-2))" }, // Ensure these CSS vars exist
+    absent: { label: "Absent", color: "hsl(var(--destructive))" },
+  } satisfies ChartConfig;
 
   useEffect(() => {
-    setIsClient(true); // Component has mounted
+    setIsClient(true); 
 
-    // Calculate employee statuses
     const statuses: Record<string, EmployeeAttendanceStatus> = {};
     mockEmployees.forEach(employee => {
       statuses[employee.id] = getEmployeeAttendanceStatus(employee.id, mockActivityLogs);
     });
     setEmployeeStatuses(statuses);
 
-    // Calculate summary data
     const todayString = new Date().toDateString();
     const checkedInTodayCount = new Set(
       mockActivityLogs
@@ -82,10 +88,66 @@ export default function AttendancePage() {
       absentToday: absentTodayCount,
       overallAttendancePercentage: percentage,
       totalEmployees: totalEmployees,
-      avgWorkHours: 7.5, // This was static in mockData, keeping it static for now.
+      avgWorkHours: 7.5, 
     });
 
+    // Example: Fetch attendance report for the current user (or a default one)
+    // const fetchReport = async () => {
+    //   try {
+    //     // const report = await getAttendanceReport(currentUserId, { startDate: "2024-01-01", endDate: "2024-12-31"});
+    //     // console.log("Attendance Report for user:", currentUserId, report);
+    //     // Update state with report data if needed for display
+    //     console.log(`Placeholder: Would fetch attendance report for user ${currentUserId}`);
+    //   } catch (error) {
+    //     console.error("Failed to fetch attendance report:", error);
+    //     // toast({ variant: "destructive", title: "Error", description: "Could not fetch attendance report." });
+    //   }
+    // };
+    // fetchReport();
+
   }, []);
+
+  const handleCheckIn = async (employeeId: string) => {
+    console.log(`Placeholder: Check-in for employee ${employeeId}`);
+    // try {
+    //   const result = await checkIn(employeeId, { location: "Auto-detected or Main Office" });
+    //   console.log("Check-in successful:", result);
+    //   // Update employeeStatuses or re-fetch data to reflect the change
+    //   toast({ title: "Checked In", description: `Successfully checked in ${employeeId}.` });
+    // } catch (error) {
+    //   console.error("Check-in failed:", error);
+    //   toast({ variant: "destructive", title: "Check-in Failed", description: error.message });
+    // }
+    alert(`Placeholder: Check-in for ${employeeId}`);
+  };
+
+  const handleCheckOut = async (employeeId: string) => {
+    console.log(`Placeholder: Check-out for employee ${employeeId}`);
+    // try {
+    //   const result = await checkOut(employeeId, { notes: "End of day" });
+    //   console.log("Check-out successful:", result);
+    //   // Update employeeStatuses or re-fetch data
+    //   toast({ title: "Checked Out", description: `Successfully checked out ${employeeId}.` });
+    // } catch (error) {
+    //   console.error("Check-out failed:", error);
+    //   toast({ variant: "destructive", title: "Check-out Failed", description: error.message });
+    // }
+    alert(`Placeholder: Check-out for ${employeeId}`);
+  };
+  
+  const handleViewReport = async (employeeId: string) => {
+    console.log(`Placeholder: View report for employee ${employeeId}`);
+    // try {
+    // const report = await getAttendanceReport(employeeId); // Add date range if needed
+    // console.log("Attendance Report:", report);
+    // // Display report in a modal or navigate to a report page
+    // toast({ title: "Report Generated", description: `Report for ${employeeId} is ready.` });
+    // } catch (error) {
+    //   console.error("Failed to generate report:", error);
+    //   toast({ variant: "destructive", title: "Report Failed", description: error.message });
+    // }
+    alert(`Placeholder: View report for ${employeeId}`);
+  };
 
 
   return (
@@ -132,7 +194,14 @@ export default function AttendancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/> Daily Attendance Status</CardTitle>
-          <CardDescription>Overview of employee attendance for today.</CardDescription>
+          <CardDescription>Overview of employee attendance for today. 
+            {/* Quick actions for current user: */}
+          </CardDescription>
+           {/* Placeholder for Check-in/out for current user - could be moved to a more prominent spot */}
+           {/* <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleCheckIn(currentUserId)}><LogIn className="mr-2 h-4 w-4"/> Check In</Button>
+                <Button size="sm" variant="outline" onClick={() => handleCheckOut(currentUserId)}><LogOut className="mr-2 h-4 w-4"/> Check Out</Button>
+            </div> */}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto max-h-[400px]">
@@ -142,6 +211,7 @@ export default function AttendancePage() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Time</TableHead>
+                  <TableHead className="text-center">Actions</TableHead> 
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -151,6 +221,7 @@ export default function AttendancePage() {
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-8 w-24" /></TableCell>
                     </TableRow>
                   ))
                 ) : (
@@ -161,15 +232,30 @@ export default function AttendancePage() {
                         <TableCell className="font-medium">{employee.name}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 text-xs rounded-full ${
-                            attendance.status === 'Present' ? 'bg-green-100 text-green-700' :
-                            attendance.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
-                            attendance.status === 'Absent' ? 'bg-red-100 text-red-700' :
-                            'bg-gray-100 text-gray-700' // Loading state
+                            attendance.status === 'Present' ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200' :
+                            attendance.status === 'Completed' ? 'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200' :
+                            attendance.status === 'Absent' ? 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
                           }`}>
                             {attendance.status}
                           </span>
                         </TableCell>
                         <TableCell>{attendance.time}</TableCell>
+                        <TableCell className="text-center space-x-1">
+                          {attendance.status === "Absent" && (
+                            <Button variant="outline" size="xs" onClick={() => handleCheckIn(employee.id)} title="Check In">
+                                <LogIn className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {attendance.status === "Present" && (
+                             <Button variant="outline" size="xs" onClick={() => handleCheckOut(employee.id)} title="Check Out">
+                                <LogOut className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="xs" onClick={() => handleViewReport(employee.id)} title="View Report">
+                            <FileText className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -188,7 +274,7 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent className="h-[300px] p-2">
             <ChartContainer config={chartConfig} className="w-full h-full">
-              <RechartsBarChart data={attendanceData} accessibilityLayer>
+              <RechartsBarChart data={attendanceChartData} accessibilityLayer>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="day" tickLine={false} tickMargin={10} axisLine={false} />
                 <YAxis />
@@ -244,4 +330,3 @@ export default function AttendancePage() {
     </div>
   );
 }
-

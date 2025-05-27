@@ -16,14 +16,34 @@ import { LogIn } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 import { useRouter } from 'next/navigation'; 
+// import { signIn } from '@/services/auth-service'; // Import your auth service
 
 export default function LoginPage() {
   const router = useRouter(); 
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log("Login form submitted");
-    router.push('/dashboard'); 
+    const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
+    const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
+    
+    console.log("Login form submitted with:", { email, password });
+
+    // Example: Call signIn service function
+    // try {
+    //   if (!email || !password) {
+    //     alert("Email and password are required.");
+    //     return;
+    //   }
+    //   const response = await signIn({ email, password });
+    //   console.log('Sign in successful:', response);
+    //   // Store token, user data, etc.
+    //   router.push('/dashboard'); 
+    // } catch (error) {
+    //   console.error('Sign in failed:', error);
+    //   // Display error message to the user, e.g., using a toast
+    //   alert(`Login failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    // }
+    router.push('/dashboard'); // Remove this line once API call is implemented
   };
 
   return (
@@ -47,6 +67,7 @@ export default function LoginPage() {
               <Label htmlFor="email">Email Address</Label>
               <Input 
                 id="email" 
+                name="email" // Added name attribute
                 type="email" 
                 placeholder="you@example.com" 
                 required 
@@ -62,6 +83,7 @@ export default function LoginPage() {
               </div>
               <Input 
                 id="password" 
+                name="password" // Added name attribute
                 type="password" 
                 required 
                 placeholder="••••••••"
@@ -75,7 +97,7 @@ export default function LoginPage() {
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <Link href="#" className="font-semibold text-primary hover:underline">
+              <Link href="/signup" className="font-semibold text-primary hover:underline">
                 Sign up here
               </Link>
             </p>

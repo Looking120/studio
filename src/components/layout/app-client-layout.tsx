@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings, LogOut, Building } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -14,12 +14,16 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
+// import { getUnreadMessages } from "@/services/message-service"; // For unread message count
+// import { signOut } from "@/services/auth-service"; // For sign out
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,43 +32,87 @@ const navItems = [
   { href: "/activity", label: "Logs d'Activité", icon: ListChecks },
   { href: "/attendance", label: "Présence", icon: BarChart3 },
   { href: "/offices", label: "Bureaux", icon: Building2 },
-  { href: "/chat", label: "Messagerie", icon: MessageSquare },
+  { 
+    label: "Organisation", icon: Building, subItems: [
+      { href: "/organization/departments", label: "Départements", icon: Users /* Placeholder icon */ },
+      { href: "/organization/positions", label: "Postes", icon: Users /* Placeholder icon */ },
+    ] 
+  },
+  { href: "/chat", label: "Messagerie", icon: MessageSquare, notificationKey: "chat" },
 ];
 
 // Placeholder user data - replace with actual data from auth context or API
 const placeholderUser = {
-  name: "Utilisateur Modèle",
-  email: "user.modele@example.com",
-  jobTitle: "Manager Principal", // Poste
-  role: "Administrateur", // Rôle
-  avatarUrl: "https://placehold.co/40x40.png?text=UM"
+  id: "user123", // Added ID for service calls
+  name: "Alex Dubois", 
+  email: "alex.dubois@example.com",
+  jobTitle: "Product Design Lead",
+  role: "Team Lead", 
+  avatarUrl: "https://placehold.co/40x40.png?text=AD" // Updated placeholder to reflect name
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  // const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
+    // Example: Fetch unread messages count
+    // const fetchUnreads = async () => {
+    //   try {
+    //     // Assuming placeholderUser.id is the current logged-in user's ID
+    //     const unreadInfo = await getUnreadMessages(placeholderUser.id);
+    //     setUnreadChatCount(unreadInfo.count); 
+    //     console.log("Unread chat messages:", unreadInfo.count);
+    //   } catch (error) {
+    //     console.error("Failed to fetch unread messages:", error);
+    //   }
+    // };
+    // fetchUnreads();
   }, []);
 
-  if (pathname === "/") { // Login page at root
+  if (pathname === "/" || pathname === "/signup") { // Login and Signup pages
     return <>{children}</>;
   }
 
-  const currentPage = navItems.find(item => {
-    if (item.href === "/dashboard") return pathname === "/dashboard";
-    // For other routes, check if current path starts with the nav item's href.
-    // This handles nested routes like /employees/add under /employees.
-    return pathname.startsWith(item.href);
-  });
-  let pageTitle = currentPage?.label || "EmployTrack";
+  const getPageTitle = () => {
+    for (const item of navItems) {
+      if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
+        return item.label;
+      }
+      if (item.subItems) {
+        for (const subItem of item.subItems) {
+          if (pathname === subItem.href || pathname.startsWith(subItem.href)) {
+            return subItem.label;
+          }
+        }
+      }
+    }
+    if (pathname === '/employees/add') return 'Ajouter un Employé';
+    if (pathname === '/profile') return 'Mon Profil';
+    if (pathname === '/settings') return 'Paramètres';
+    return "EmployTrack";
+  };
+  
+  let pageTitle = getPageTitle();
 
-  // Handle titles for sub-pages not directly in navItems
-  if (pathname === '/employees/add') pageTitle = 'Ajouter un Employé';
-  if (pathname === '/profile') pageTitle = 'Mon Profil';
-  if (pathname === '/settings') pageTitle = 'Paramètres';
+  const handleSignOut = async () => {
+    console.log("Signing out...");
+    // Example: Call signOut service function
+    // try {
+    //   await signOut();
+    //   console.log('Sign out successful via service');
+    //   // Clear local user state/token
+    //   window.location.href = '/'; 
+    // } catch (error) {
+    //   console.error('Sign out failed:', error);
+    //   // Show error toast or message
+    //   alert(`Sign out failed: ${error.message}`);
+    // }
+    window.location.href = '/'; // Current behavior
+  };
 
 
   return (
@@ -81,7 +129,39 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
-            {navItems.map((item) => (
+            {navItems.map((item, index) => (
+              item.subItems ? (
+                <SidebarGroup key={`group-${item.label}-${index}`} className="p-0">
+                   <SidebarMenuButton
+                      asChild={false} // Not a link itself
+                      isActive={item.subItems.some(sub => pathname.startsWith(sub.href))}
+                      tooltip={{ children: item.label, side: "right", className: "bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border shadow-md" }}
+                      className="justify-start"
+                      variant="default"
+                      // onClick={() => { /* Toggle collapse state for sub-menu if desired */ }}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                      {/* Add a chevron or indicator for collapsible sub-menu here if needed */}
+                    </SidebarMenuButton>
+                    {/* For now, sub-items are always visible. Could be made collapsible later. */}
+                    <SidebarMenuSub>
+                      {item.subItems.map(subItem => (
+                        <SidebarMenuSubItem key={subItem.href}>
+                           <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === subItem.href || pathname.startsWith(subItem.href)}
+                          >
+                            <Link href={subItem.href}>
+                              {/* <subItem.icon className="h-4 w-4" /> */}
+                              <span>{subItem.label}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                </SidebarGroup>
+              ) : (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
@@ -90,12 +170,18 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                   className="justify-start"
                   variant="default"
                 >
-                  <Link href={item.href}>
+                  <Link href={item.href!}>
                     <item.icon className="h-5 w-5" />
                     <span>{item.label}</span>
+                    {/* {item.notificationKey === "chat" && unreadChatCount > 0 && (
+                        <span className="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
+                            {unreadChatCount}
+                        </span>
+                    )} */}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              )
             ))}
           </SidebarMenu>
         </SidebarContent>
@@ -124,8 +210,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={placeholderUser.avatarUrl} alt="User Avatar" data-ai-hint="user avatar" />
-                    <AvatarFallback>{placeholderUser.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={placeholderUser.avatarUrl} alt={placeholderUser.name} data-ai-hint="user avatar" />
+                    <AvatarFallback>{placeholderUser.name.split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -155,9 +241,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                 <DropdownMenuItem onClick={() => {
-                    window.location.href = '/'; 
-                  }}>
+                 <DropdownMenuItem onClick={handleSignOut} className="flex items-center cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
                   Se déconnecter
                 </DropdownMenuItem>
               </DropdownMenuContent>
