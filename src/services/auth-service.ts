@@ -37,7 +37,7 @@ export interface SignUpData {
   email: string;
   password?: string;
   confirmPassword?: string;
-  birthDate?: string;
+  birthDate?: string; // Expected as "YYYY-MM-DDTHH:mm:ss.sssZ" by backend
   phoneNumber?: string;
 }
 
@@ -45,6 +45,21 @@ export interface SignUpResponse {
   message: string;
   userId?: string;
 }
+
+// This interface represents what the signup endpoint *actually* returns
+// which looks like a sign-in response.
+interface ActualSignUpApiResponse {
+  id?: string;
+  userName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  accessToken?: string;
+  durationInMinutes?: number;
+  message?: string; // Adding message here just in case it's sometimes present
+}
+
 
 /**
  * Signs in a user.
@@ -57,20 +72,14 @@ export async function signIn(credentials: { email?: string; password?: string })
       body: JSON.stringify(credentials),
     });
 
-    const rawText = await response.clone().text(); // Clone to read text, then allow parseJsonResponse to read body again
+    const rawText = await response.clone().text();
     console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', rawText);
-
-    // Check if the raw text is an empty object string before parsing
-    if (rawText.trim() === '{}') {
-        console.error('Auth Service - DEBUG: The server sent a JSON response, but it was an empty object {}. An "accessToken" field is expected.');
-        throw new Error('Authentication failed: The server responded with an empty JSON object {}. Expected an "accessToken" field in the JSON response.');
-    }
     
     const parsedRawResponse = await parseJsonResponse<ApiSignInRawResponse>(response);
     console.log('Auth Service - Parsed RAW API JSON response from /api/auth/signin:', parsedRawResponse);
 
     if (!parsedRawResponse) {
-      console.error('Auth Service - DEBUG: parsedRawResponse from parseJsonResponse is null or undefined. This can happen if the server returns 204 No Content or an empty body for a 200 OK.');
+      console.error('Auth Service - DEBUG: parsedRawResponse from parseJsonResponse is null or undefined. This can happen if the server returns 204 No Content or an empty body for a 200 OK. Raw text was:', rawText);
       throw new Error('Authentication failed: No valid JSON data received from server response.');
     }
     
@@ -88,7 +97,6 @@ export async function signIn(credentials: { email?: string; password?: string })
       throw new Error('Authentication failed: Access token received from server is not a valid string or is empty. Access Token: ' + JSON.stringify(parsedRawResponse.accessToken));
     }
     
-    // Adapt the raw API response to the SignInResponse structure expected by the rest of the application
     const appResponse: SignInResponse = {
       token: parsedRawResponse.accessToken,
       user: {
@@ -106,7 +114,7 @@ export async function signIn(credentials: { email?: string; password?: string })
 
   } catch (error) {
     console.error('Auth Service - signIn error:', error);
-    if (error instanceof UnauthorizedError || error instanceof Error) { // Keep throwing specific errors if they are already specific
+    if (error instanceof UnauthorizedError || error instanceof Error) {
       throw error; 
     }
     throw new Error('An unknown error occurred during sign in.');
@@ -127,22 +135,39 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     const rawText = await response.clone().text();
     console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signup:', rawText);
 
-    const parsedResponse = await parseJsonResponse<SignUpResponse>(response);
-    console.log('Auth Service - Parsed JSON response from /api/auth/signup:', parsedResponse);
+    const parsedApiResponse = await parseJsonResponse<ActualSignUpApiResponse>(response);
+    console.log('Auth Service - Parsed JSON response from /api/auth/signup (as ActualSignUpApiResponse):', parsedApiResponse);
 
-    if (!parsedResponse) {
-      console.error('Auth Service - DEBUG (signUp): parsedResponse is null or undefined. Raw text was:', rawText);
+    if (!parsedApiResponse) {
+      console.error('Auth Service - DEBUG (signUp): parsedApiResponse is null or undefined after parseJsonResponse. Raw text was:', rawText);
       throw new Error('Signup failed: No valid JSON data received from server for signup confirmation.');
     }
-    if (typeof parsedResponse !== 'object') {
-      console.error('Auth Service - DEBUG (signUp): parsedResponse is not an object. Parsed response:', parsedResponse, 'Raw text was:', rawText);
+    if (typeof parsedApiResponse !== 'object') {
+      console.error('Auth Service - DEBUG (signUp): parsedApiResponse is not an object after parseJsonResponse. Parsed response:', parsedApiResponse, 'Raw text was:', rawText);
       throw new Error('Signup failed: Server response for signup confirmation was not a JSON object.');
     }
-    if (!parsedResponse.message) {
-        console.error('Auth Service - DEBUG (signUp): The parsed JSON response from signup does not contain a "message" field. Full parsedResponse:', parsedResponse, 'Raw text was:', rawText);
-        throw new Error('Signup failed: No confirmation message received from server.');
+
+    // Check if the response looks like a sign-in response (has accessToken)
+    // OR if it has the originally expected 'message' field for signup confirmation.
+    if (parsedApiResponse.accessToken && typeof parsedApiResponse.accessToken === 'string' && parsedApiResponse.accessToken.trim() !== '') {
+      console.log('Auth Service - INFO (signUp): Signup response contains an accessToken. Treating as successful registration.');
+      // Construct the SignUpResponse that the frontend page expects
+      return {
+        message: "User registered successfully! You might be automatically logged in.", // Provide a generic success message
+        userId: parsedApiResponse.id 
+      };
+    } else if (parsedApiResponse.message && typeof parsedApiResponse.message === 'string') {
+      // This is the originally expected path, if the server sends a direct confirmation message
+      console.log('Auth Service - INFO (signUp): Signup response contains an explicit message field.');
+      return {
+        message: parsedApiResponse.message,
+        userId: parsedApiResponse.id 
+      };
+    } else {
+      // If neither an accessToken nor an explicit message is found
+      console.error('Auth Service - DEBUG (signUp): The parsed JSON response from signup does not contain an "accessToken" or a "message" field. Full parsedResponse:', parsedApiResponse, 'Raw text was:', rawText);
+      throw new Error('Signup failed: No confirmation message or token received in server response.');
     }
-    return parsedResponse;
   } catch (error) {
     console.error('Auth Service - signUp error:', error);
     if (error instanceof Error) {
@@ -151,6 +176,7 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     throw new Error('An unknown error occurred during sign up.');
   }
 }
+
 
 /**
  * Signs out the current user.
@@ -170,7 +196,8 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       serverSignOutOk = true;
       if (response.status !== 204 && response.headers.get("content-length") !== "0") {
         try {
-          const parsed = await parseJsonResponse<{ message?: string }>(response);
+          // Try to parse, but don't fail catastrophically if it's not JSON or has no message
+          const parsed = await response.json().catch(() => null) as { message?: string } | null;
           serverMessage = parsed?.message || "Successfully signed out from server.";
         } catch (e) {
           console.warn("Auth Service: Server sign-out response was OK but body parsing failed or was empty. Error:", e instanceof Error ? e.message : String(e));
@@ -181,6 +208,7 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       }
       console.log(`Auth Service: ${serverMessage}`);
     } else {
+      // For non-OK responses (like 401 if token already expired), don't try to parse as JSON error.
       const errorText = await response.text().catch(() => "Could not read error text from server response."); 
       serverMessage = `Server sign-out attempt failed with status ${response.status}: ${errorText || response.statusText || 'No additional error message from server.'}`;
       console.warn(`Auth Service: ${serverMessage}`);
