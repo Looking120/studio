@@ -1,19 +1,24 @@
 // src/services/organization-service.ts
 import { apiClient, parseJsonResponse } from './api-client';
-import type { Office } from '@/lib/data'; // Assuming Office type might be useful
+import type { Office } from '@/lib/data';
 
 // Define types for Department and Position, adjust as per your API
-interface Department {
+export interface Department {
   id: string;
   name: string;
-  // Add other relevant fields
+  // Add other relevant fields from your API response
+  employeeCount?: number;
+  [key: string]: any;
 }
 
-interface Position {
+export interface Position {
   id: string;
   title: string;
   departmentId?: string;
-  // Add other relevant fields
+  departmentName?: string; // For display if API provides it
+  assignedEmployees?: number;
+  // Add other relevant fields from your API response
+  [key: string]: any;
 }
 
 // --- Office Endpoints ---
@@ -24,13 +29,12 @@ interface Position {
  * @param officeData Data for the new office.
  */
 export async function addOffice(officeData: Omit<Office, 'id'>): Promise<Office> {
-  console.log('API CALL: POST /api/organization/offices - Placeholder. Data:', officeData);
-  // const response = await apiClient('/organization/offices', {
-  //   method: 'POST',
-  //   body: JSON.stringify(officeData),
-  // });
-  // return parseJsonResponse<Office>(response);
-  return Promise.reject(new Error('addOffice not implemented'));
+  console.log('API CALL: POST /api/organization/offices. Data:', officeData);
+  const response = await apiClient('/organization/offices', {
+    method: 'POST',
+    body: JSON.stringify(officeData),
+  });
+  return parseJsonResponse<Office>(response);
 }
 
 /**
@@ -38,10 +42,9 @@ export async function addOffice(officeData: Omit<Office, 'id'>): Promise<Office>
  * Corresponds to: GET /api/organization/offices
  */
 export async function fetchOffices(): Promise<Office[]> {
-  console.log('API CALL: GET /api/organization/offices - Placeholder.');
-  // const response = await apiClient('/organization/offices');
-  // return parseJsonResponse<Office[]>(response);
-  return Promise.resolve([]);
+  console.log('API CALL: GET /api/organization/offices.');
+  const response = await apiClient('/organization/offices');
+  return parseJsonResponse<Office[]>(response);
 }
 
 /**
@@ -50,10 +53,9 @@ export async function fetchOffices(): Promise<Office[]> {
  * @param officeId The ID of the office.
  */
 export async function fetchOfficeById(officeId: string): Promise<Office | null> {
-  console.log(`API CALL: GET /api/organization/offices/${officeId} - Placeholder.`);
-  // const response = await apiClient(`/organization/offices/${officeId}`);
-  // return parseJsonResponse<Office>(response);
-  return Promise.resolve(null);
+  console.log(`API CALL: GET /api/organization/offices/${officeId}.`);
+  const response = await apiClient(`/organization/offices/${officeId}`);
+  return parseJsonResponse<Office>(response);
 }
 
 /**
@@ -63,13 +65,12 @@ export async function fetchOfficeById(officeId: string): Promise<Office | null> 
  * @param officeData The new data for the office.
  */
 export async function updateOffice(officeId: string, officeData: Partial<Office>): Promise<Office> {
-  console.log(`API CALL: PUT /api/organization/offices/${officeId} - Placeholder. Data:`, officeData);
-  // const response = await apiClient(`/organization/offices/${officeId}`, {
-  //   method: 'PUT',
-  //   body: JSON.stringify(officeData),
-  // });
-  // return parseJsonResponse<Office>(response);
-  return Promise.reject(new Error('updateOffice not implemented'));
+  console.log(`API CALL: PUT /api/organization/offices/${officeId}. Data:`, officeData);
+  const response = await apiClient(`/organization/offices/${officeId}`, {
+    method: 'PUT',
+    body: JSON.stringify(officeData),
+  });
+  return parseJsonResponse<Office>(response);
 }
 
 /**
@@ -78,14 +79,12 @@ export async function updateOffice(officeId: string, officeData: Partial<Office>
  * @param officeId The ID of the office to delete.
  */
 export async function deleteOffice(officeId: string): Promise<{ success: boolean; message?: string }> {
-  console.log(`API CALL: DELETE /api/organization/offices/${officeId} - Placeholder.`);
-  // const response = await apiClient(`/organization/offices/${officeId}`, {
-  //   method: 'DELETE',
-  // });
-  // // Handle no content response or specific success message
-  // if (response.status === 204) return { success: true };
-  // return parseJsonResponse<{ success: boolean; message?: string }>(response);
-  return Promise.resolve({ success: true, message: 'Office deleted (mock)' });
+  console.log(`API CALL: DELETE /api/organization/offices/${officeId}.`);
+  const response = await apiClient(`/organization/offices/${officeId}`, {
+    method: 'DELETE',
+  });
+  const result = await parseJsonResponse<{ success: boolean; message?: string }>(response);
+  return result || { success: true, message: 'Office deleted' }; // Handle 204 No Content
 }
 
 // --- Department Endpoints ---
@@ -95,14 +94,13 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
  * Corresponds to: POST /api/organization/departments
  * @param departmentData Data for the new department.
  */
-export async function addDepartment(departmentData: { name: string }): Promise<Department> {
-  console.log('API CALL: POST /api/organization/departments - Placeholder. Data:', departmentData);
-  // const response = await apiClient('/organization/departments', {
-  //   method: 'POST',
-  //   body: JSON.stringify(departmentData),
-  // });
-  // return parseJsonResponse<Department>(response);
-  return Promise.reject(new Error('addDepartment not implemented'));
+export async function addDepartment(departmentData: { name: string; employeeCount?: number }): Promise<Department> {
+  console.log('API CALL: POST /api/organization/departments. Data:', departmentData);
+  const response = await apiClient('/organization/departments', {
+    method: 'POST',
+    body: JSON.stringify(departmentData),
+  });
+  return parseJsonResponse<Department>(response);
 }
 
 /**
@@ -110,10 +108,9 @@ export async function addDepartment(departmentData: { name: string }): Promise<D
  * Corresponds to: GET /api/organization/departments
  */
 export async function fetchDepartments(): Promise<Department[]> {
-  console.log('API CALL: GET /api/organization/departments - Placeholder.');
-  // const response = await apiClient('/organization/departments');
-  // return parseJsonResponse<Department[]>(response);
-  return Promise.resolve([]);
+  console.log('API CALL: GET /api/organization/departments.');
+  const response = await apiClient('/organization/departments');
+  return parseJsonResponse<Department[]>(response);
 }
 
 // --- Position Endpoints ---
@@ -123,14 +120,13 @@ export async function fetchDepartments(): Promise<Department[]> {
  * Corresponds to: POST /api/organization/positions
  * @param positionData Data for the new position.
  */
-export async function addPosition(positionData: { title: string; departmentId?: string }): Promise<Position> {
-  console.log('API CALL: POST /api/organization/positions - Placeholder. Data:', positionData);
-  // const response = await apiClient('/organization/positions', {
-  //   method: 'POST',
-  //   body: JSON.stringify(positionData),
-  // });
-  // return parseJsonResponse<Position>(response);
-  return Promise.reject(new Error('addPosition not implemented'));
+export async function addPosition(positionData: { title: string; departmentId?: string; departmentName?: string; assignedEmployees?: number }): Promise<Position> {
+  console.log('API CALL: POST /api/organization/positions. Data:', positionData);
+  const response = await apiClient('/organization/positions', {
+    method: 'POST',
+    body: JSON.stringify(positionData),
+  });
+  return parseJsonResponse<Position>(response);
 }
 
 /**
@@ -138,10 +134,9 @@ export async function addPosition(positionData: { title: string; departmentId?: 
  * Corresponds to: GET /api/organization/positions
  */
 export async function fetchPositions(): Promise<Position[]> {
-  console.log('API CALL: GET /api/organization/positions - Placeholder.');
-  // const response = await apiClient('/organization/positions');
-  // return parseJsonResponse<Position[]>(response);
-  return Promise.resolve([]);
+  console.log('API CALL: GET /api/organization/positions.');
+  const response = await apiClient('/organization/positions');
+  return parseJsonResponse<Position[]>(response);
 }
 
 /**
@@ -151,11 +146,10 @@ export async function fetchPositions(): Promise<Position[]> {
  * @param assignmentData Data for the assignment (e.g., employeeId, startDate).
  */
 export async function assignPositionToEmployee(positionId: string, assignmentData: { employeeId: string; startDate?: string }): Promise<any> {
-  console.log(`API CALL: PUT /api/organization/positions/${positionId}/assign - Placeholder. Data:`, assignmentData);
-  // const response = await apiClient(`/organization/positions/${positionId}/assign`, {
-  //   method: 'PUT',
-  //   body: JSON.stringify(assignmentData),
-  // });
-  // return parseJsonResponse<any>(response); // Or specific response type
-  return Promise.reject(new Error('assignPositionToEmployee not implemented'));
+  console.log(`API CALL: PUT /api/organization/positions/${positionId}/assign. Data:`, assignmentData);
+  const response = await apiClient(`/organization/positions/${positionId}/assign`, {
+    method: 'PUT',
+    body: JSON.stringify(assignmentData),
+  });
+  return parseJsonResponse<any>(response); // Or specific response type
 }

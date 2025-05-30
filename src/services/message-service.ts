@@ -2,26 +2,31 @@
 import { apiClient, parseJsonResponse } from './api-client';
 
 // Define types for message-related data, adjust as per your API
-interface Message {
+export interface Message {
   id: string;
   senderId: string;
   receiverId?: string; // For direct messages
   conversationId?: string; // For group/channel messages
   content: string;
-  timestamp: string;
-  // Add other relevant fields
+  timestamp: string; // Assuming ISO string, convert to Date object in component if needed
+  // Add other relevant fields from your API response
+  [key: string]: any;
 }
 
-interface Conversation {
+export interface Conversation {
   id: string;
   participants: string[]; // User IDs
   lastMessage?: Message;
-  // Add other relevant fields
+  name?: string; // If conversations can have names
+  // Add other relevant fields from your API response
+  [key: string]: any;
 }
 
-interface UnreadMessagesInfo {
+export interface UnreadMessagesInfo {
   count: number;
   messages?: Message[]; // Optional: if API returns some unread messages
+  // Add other relevant fields from your API response
+  [key: string]: any;
 }
 
 /**
@@ -35,13 +40,12 @@ export async function sendMessage(messageData: {
   conversationId?: string;
   content: string;
 }): Promise<Message> {
-  console.log('API CALL: POST /api/messages/send - Placeholder. Data:', messageData);
-  // const response = await apiClient('/messages/send', {
-  //   method: 'POST',
-  //   body: JSON.stringify(messageData),
-  // });
-  // return parseJsonResponse<Message>(response);
-  return Promise.reject(new Error('sendMessage not implemented'));
+  console.log('API CALL: POST /api/messages/send. Data:', messageData);
+  const response = await apiClient('/messages/send', {
+    method: 'POST',
+    body: JSON.stringify(messageData),
+  });
+  return parseJsonResponse<Message>(response);
 }
 
 /**
@@ -50,13 +54,20 @@ export async function sendMessage(messageData: {
  * @param params Parameters to identify the conversation (e.g., conversationId, userIds).
  */
 export async function getConversationMessages(params: { conversationId?: string; userId1?: string; userId2?: string }): Promise<Message[]> {
-  console.log('API CALL: GET /api/messages/conversation - Placeholder. Params:', params);
-  // let endpoint = '/messages/conversation';
-  // const query = new URLSearchParams(params as any).toString();
-  // if (query) endpoint += `?${query}`;
-  // const response = await apiClient(endpoint);
-  // return parseJsonResponse<Message[]>(response);
-  return Promise.resolve([]);
+  console.log('API CALL: GET /api/messages/conversation. Params:', params);
+  let endpoint = '/messages/conversation';
+  const queryParams = new URLSearchParams();
+  if (params.conversationId) queryParams.append('conversationId', params.conversationId);
+  if (params.userId1) queryParams.append('userId1', params.userId1);
+  if (params.userId2) queryParams.append('userId2', params.userId2);
+  
+  const queryString = queryParams.toString();
+  if (queryString) {
+    endpoint += `?${queryString}`;
+  }
+  
+  const response = await apiClient(endpoint);
+  return parseJsonResponse<Message[]>(response);
 }
 
 /**
@@ -65,10 +76,9 @@ export async function getConversationMessages(params: { conversationId?: string;
  * @param employeeId The ID of the employee.
  */
 export async function getUnreadMessages(employeeId: string): Promise<UnreadMessagesInfo> {
-  console.log(`API CALL: GET /api/messages/${employeeId}/unread - Placeholder.`);
-  // const response = await apiClient(`/messages/${employeeId}/unread`);
-  // return parseJsonResponse<UnreadMessagesInfo>(response);
-  return Promise.resolve({ count: 0 });
+  console.log(`API CALL: GET /api/messages/${employeeId}/unread.`);
+  const response = await apiClient(`/messages/${employeeId}/unread`);
+  return parseJsonResponse<UnreadMessagesInfo>(response);
 }
 
 /**
@@ -77,11 +87,13 @@ export async function getUnreadMessages(employeeId: string): Promise<UnreadMessa
  * @param data Data to identify messages to mark as read (e.g., messageIds, conversationId for user).
  */
 export async function markMessagesAsRead(data: { messageIds?: string[]; conversationId?: string; userId?: string }): Promise<{ success: boolean }> {
-  console.log('API CALL: POST /api/messages/mark-read - Placeholder. Data:', data);
-  // const response = await apiClient('/messages/mark-read', {
-  //   method: 'POST',
-  //   body: JSON.stringify(data),
-  // });
-  // return parseJsonResponse<{ success: boolean }>(response);
-  return Promise.resolve({ success: true });
+  console.log('API CALL: POST /api/messages/mark-read. Data:', data);
+  const response = await apiClient('/messages/mark-read', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  // If API returns 204 No Content, parseJsonResponse will return null.
+  // Adjust if a specific success object is expected.
+  const result = await parseJsonResponse<{ success: boolean }>(response);
+  return result || { success: true };
 }
