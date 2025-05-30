@@ -1,3 +1,4 @@
+
 // src/services/auth-service.ts
 import { apiClient, parseJsonResponse } from './api-client';
 
@@ -19,9 +20,9 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Changed to non-optional
+  password?: string; // Password is essential for signup
+  confirmPassword?: string; // Added for password confirmation
   phoneNumber?: string;
-  // role?: string; // Removed role from here
   [key: string]: any;
 }
 
@@ -70,7 +71,7 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     email: userData.email,
     middleName: userData.middleName,
     phoneNumber: userData.phoneNumber,
-    // Not logging password
+    // Not logging password or confirmPassword
   });
   const response = await apiClient('/auth/signup', {
     method: 'POST',

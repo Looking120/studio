@@ -34,9 +34,20 @@ export default function SignupPage() {
     const userName = (form.elements.namedItem('userName') as HTMLInputElement)?.value;
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
+    const confirmPassword = (form.elements.namedItem('confirmPassword') as HTMLInputElement)?.value;
     const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
     
-    console.log("Attempting signup with user details:", { firstName, lastName, userName, email }); // Avoid logging password in production logs
+    console.log("Attempting signup with user details:", { firstName, lastName, userName, email }); 
+
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Erreur d'Inscription",
+        description: "Les mots de passe ne correspondent pas.",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       if (!firstName || !lastName || !userName || !email || !password) {
@@ -51,7 +62,7 @@ export default function SignupPage() {
         userName, 
         email, 
         password,
-        // role: "Employee", // Removed default role from here
+        confirmPassword // Added confirmPassword
       };
       if (middleName) userData.middleName = middleName;
       if (phoneNumber) userData.phoneNumber = phoneNumber;
@@ -63,7 +74,7 @@ export default function SignupPage() {
         title: "Signup Successful",
         description: response.message || "Account created successfully. You can now log in.",
       });
-      router.push('/'); // Redirect to login page after successful signup
+      router.push('/'); 
     } catch (error) {
       console.error('Sign up failed:', error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during signup.";
@@ -93,7 +104,7 @@ export default function SignupPage() {
           <CardContent className="grid gap-4 p-6 sm:p-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">Prénom</Label>
                 <Input 
                   id="firstName" 
                   name="firstName"
@@ -105,7 +116,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">Nom de famille</Label>
                 <Input 
                   id="lastName" 
                   name="lastName"
@@ -118,7 +129,7 @@ export default function SignupPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="middleName">Middle Name (Optional)</Label>
+              <Label htmlFor="middleName">Deuxième prénom (Optionnel)</Label>
               <Input 
                 id="middleName" 
                 name="middleName"
@@ -129,7 +140,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="userName">Username</Label>
+              <Label htmlFor="userName">Nom d'utilisateur</Label>
               <Input 
                 id="userName" 
                 name="userName"
@@ -141,7 +152,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Adresse Email</Label>
               <Input 
                 id="email" 
                 name="email"
@@ -153,7 +164,7 @@ export default function SignupPage() {
               />
             </div>
              <div className="grid gap-2">
-              <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+              <Label htmlFor="phoneNumber">Numéro de téléphone (Optionnel)</Label>
               <Input 
                 id="phoneNumber" 
                 name="phoneNumber"
@@ -164,7 +175,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Mot de passe</Label>
               <Input 
                 id="password" 
                 name="password"
@@ -175,15 +186,27 @@ export default function SignupPage() {
                 disabled={isLoading}
               />
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Confirmez le mot de passe</Label>
+              <Input 
+                id="confirmPassword" 
+                name="confirmPassword"
+                type="password" 
+                required 
+                placeholder="••••••••"
+                className="text-base py-3"
+                disabled={isLoading}
+              />
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 p-6 sm:p-8 pt-0">
             <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit" disabled={isLoading}>
-              {isLoading ? "Creating Account..." : <><UserPlus className="mr-2 h-5 w-5" /> Sign Up</>}
+              {isLoading ? "Création du compte..." : <><UserPlus className="mr-2 h-5 w-5" /> S'inscrire</>}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
+              Vous avez déjà un compte?{" "}
               <Link href="/" className="font-semibold text-primary hover:underline">
-                Log in here
+                Connectez-vous ici
               </Link>
             </p>
           </CardFooter>
