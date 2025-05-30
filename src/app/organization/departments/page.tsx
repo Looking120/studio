@@ -4,11 +4,19 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // For add/edit form
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchDepartments, addDepartment, type Department, type AddDepartmentPayload } from '@/services/organization-service';
+import { 
+    fetchDepartments, 
+    addDepartment, 
+    updateDepartment,
+    deleteDepartment,
+    type Department, 
+    type AddDepartmentPayload,
+    type UpdateDepartmentPayload
+} from '@/services/organization-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
@@ -24,6 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Label } from '@/components/ui/label';
 
 
 export default function DepartmentsPage() {
@@ -33,9 +42,12 @@ export default function DepartmentsPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // TODO: Add state for managing add/edit dialog if using one
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
+
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [editDepartmentName, setEditDepartmentName] = useState("");
 
 
   const loadDepartments = async () => {
@@ -43,7 +55,7 @@ export default function DepartmentsPage() {
     setError(null);
     try {
       const data = await fetchDepartments();
-      setDepartments(data);
+      setDepartments(data || []); // Ensure it's an array
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
@@ -54,6 +66,7 @@ export default function DepartmentsPage() {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);
       toast({ variant: "destructive", title: "Failed to load departments", description: errorMessage });
+      setDepartments([]);
     } finally {
       setIsLoading(false);
     }
@@ -61,9 +74,9 @@ export default function DepartmentsPage() {
 
   useEffect(() => {
     loadDepartments();
-  }, [toast, router]);
+  }, []);
 
-  const handleAddDepartment = async () => {
+  const handleAddDepartmentSubmit = async () => {
     if (!newDepartmentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
         return;
@@ -71,7 +84,7 @@ export default function DepartmentsPage() {
     const payload: AddDepartmentPayload = { name: newDepartmentName.trim() };
     try {
       const newDepartment = await addDepartment(payload);
-      setDepartments(prev => [...prev, newDepartment]); // Or await loadDepartments();
+      setDepartments(prev => [...prev, newDepartment]);
       toast({ title: "Department Added", description: `${newDepartment.name} was successfully added.` });
       setNewDepartmentName("");
       setShowAddDialog(false);
@@ -88,22 +101,54 @@ export default function DepartmentsPage() {
     }
   };
   
-  const handleEditDepartment = (dept: Department) => {
-    console.log(`Placeholder: Open edit department form for ${dept.name}.`);
-    alert(`Edit department ${dept.name} - functionality to be implemented.`);
-    // Example: You would typically open a dialog pre-filled with dept.name
-    // and then call an updateDepartment service function.
+  const openEditDialog = (dept: Department) => {
+    setEditingDepartment(dept);
+    setEditDepartmentName(dept.name);
+    setShowEditDialog(true);
   };
 
-  const handleDeleteDepartment = (dept: Department) => {
-    // Placeholder: Implement actual delete call to organization-service
-    // try {
-    //   await deleteDepartment(dept.id); // Assuming deleteDepartment exists in service
-    //   setDepartments(prev => prev.filter(d => d.id !== dept.id)); // Or await loadDepartments();
-    //   toast({ title: "Department Deleted" });
-    // } catch (err) { /* ... error handling ... */ }
-    console.log(`Placeholder: Delete department ${dept.id}.`);
-    alert(`Delete department ${dept.name} - functionality to be implemented.`);
+  const handleEditDepartmentSubmit = async () => {
+    if (!editingDepartment || !editDepartmentName.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
+        return;
+    }
+    const payload: UpdateDepartmentPayload = { name: editDepartmentName.trim() };
+    try {
+      const updatedDept = await updateDepartment(editingDepartment.id, payload);
+      setDepartments(prev => prev.map(d => d.id === updatedDept.id ? updatedDept : d));
+      toast({ title: "Department Updated", description: `Department "${updatedDept.name}" was successfully updated.` });
+      setShowEditDialog(false);
+      setEditingDepartment(null);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+        await signOut();
+        router.push('/');
+        return;
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Could not update department.';
+      toast({ variant: "destructive", title: "Failed to update department", description: errorMessage });
+      console.error("Update department failed:", err);
+    }
+  };
+
+
+  const handleDeleteDepartmentConfirm = async (departmentId: string) => {
+    try {
+      await deleteDepartment(departmentId);
+      setDepartments(prev => prev.filter(d => d.id !== departmentId));
+      toast({ title: "Department Deleted", description: `Department was successfully deleted.` });
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+        await signOut();
+        router.push('/');
+        return;
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Could not delete department.';
+      toast({ variant: "destructive", title: "Failed to delete department", description: errorMessage });
+      console.error("Delete department failed:", err);
+    }
   };
 
 
@@ -128,17 +173,19 @@ export default function DepartmentsPage() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="grid gap-4 py-4">
-                    <Input 
-                        id="departmentName"
-                        placeholder="E.g., Engineering, Marketing"
-                        value={newDepartmentName}
-                        onChange={(e) => setNewDepartmentName(e.target.value)}
-                        className="col-span-3"
-                    />
+                    <div className="space-y-2">
+                        <Label htmlFor="newDepartmentName">Department Name</Label>
+                        <Input 
+                            id="newDepartmentName"
+                            placeholder="E.g., Engineering, Marketing"
+                            value={newDepartmentName}
+                            onChange={(e) => setNewDepartmentName(e.target.value)}
+                        />
+                    </div>
                 </div>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => setNewDepartmentName("")}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAddDepartment}>Add Department</AlertDialogAction>
+                    <AlertDialogAction onClick={handleAddDepartmentSubmit}>Add Department</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -192,9 +239,9 @@ export default function DepartmentsPage() {
                     <TableCell className="font-medium">{dept.name}</TableCell>
                     <TableCell>{dept.employeeCount !== undefined ? dept.employeeCount : 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditDepartment(dept)} title="Edit Department">
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(dept)} title="Edit Department">
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
                         </Button>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -212,7 +259,7 @@ export default function DepartmentsPage() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteDepartment(dept)}>Delete</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDeleteDepartmentConfirm(dept.id)}>Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -224,6 +271,35 @@ export default function DepartmentsPage() {
           </div>
         )}
       </CardContent>
+
+      {/* Edit Department Dialog */}
+      <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Edit Department</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Update the name for the department: {editingDepartment?.name}.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="grid gap-4 py-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="editDepartmentName">New Department Name</Label>
+                        <Input 
+                            id="editDepartmentName"
+                            placeholder="E.g., Advanced Engineering"
+                            value={editDepartmentName}
+                            onChange={(e) => setEditDepartmentName(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => { setShowEditDialog(false); setEditingDepartment(null); }}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleEditDepartmentSubmit}>Save Changes</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </Card>
   );
 }
+
+    

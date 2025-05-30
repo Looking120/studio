@@ -20,6 +20,9 @@ export interface AddDepartmentPayload {
   name: string;
   // Add other fields if required by your API for creating a department
 }
+export interface UpdateDepartmentPayload {
+  name: string;
+}
 
 // --- Position Related Types ---
 export interface Position {
@@ -125,9 +128,12 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
     const response = await apiClient(`/organization/offices/${officeId}`, {
       method: 'DELETE',
     });
-    // DELETE might return 204 No Content, or a JSON with a success message
-    if (response.ok) {
-      return { success: true, message: 'Office deleted successfully' };
+    if (response.ok) { // 200 OK, 204 No Content are ok
+        if (response.status === 204) {
+             return { success: true, message: 'Office deleted successfully (No Content).' };
+        }
+        const result = await parseJsonResponse<{ success: boolean; message?: string }>(response).catch(() => null);
+        return result || { success: true, message: 'Office deleted successfully.' };
     }
     // If not ok, try to parse error
     const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete office with status ${response.status}` }));
@@ -175,6 +181,55 @@ export async function fetchDepartments(): Promise<Department[]> {
     throw new Error(`Failed to fetch departments. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+/**
+ * Updates an existing department.
+ * Assumes endpoint PUT /api/organization/departments/{departmentId}
+ * @param departmentId The ID of the department to update.
+ * @param departmentData The new data for the department (e.g., { name: "New Name" }).
+ */
+export async function updateDepartment(departmentId: string, departmentData: UpdateDepartmentPayload): Promise<Department> {
+  console.log(`API CALL: PUT /api/organization/departments/${departmentId}. Data:`, departmentData);
+  try {
+    const response = await apiClient(`/organization/departments/${departmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(departmentData),
+    });
+    return await parseJsonResponse<Department>(response);
+  } catch (error) {
+    console.error(`Error updating department ${departmentId}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to update department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Deletes a department.
+ * Assumes endpoint DELETE /api/organization/departments/{departmentId}
+ * @param departmentId The ID of the department to delete.
+ */
+export async function deleteDepartment(departmentId: string): Promise<{ success: boolean; message?: string }> {
+  console.log(`API CALL: DELETE /api/organization/departments/${departmentId}.`);
+  try {
+    const response = await apiClient(`/organization/departments/${departmentId}`, {
+      method: 'DELETE',
+    });
+    if (response.ok) {
+      if (response.status === 204) {
+        return { success: true, message: 'Department deleted successfully (No Content).' };
+      }
+      const result = await parseJsonResponse<{ success: boolean; message?: string }>(response).catch(() => null);
+      return result || { success: true, message: 'Department deleted successfully.' };
+    }
+    const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete department with status ${response.status}` }));
+    throw new Error(errorData.message || `Failed to delete department ${departmentId}`);
+  } catch (error) {
+    console.error(`Error deleting department ${departmentId}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to delete department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 
 // --- Position Endpoints ---
 
@@ -232,3 +287,5 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
     throw new Error(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+    
