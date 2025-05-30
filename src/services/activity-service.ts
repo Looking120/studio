@@ -1,9 +1,9 @@
 
 // src/services/activity-service.ts
-import type { ActivityLog as FrontendActivityLog } from '@/lib/data'; // Renamed to avoid conflict
+import type { ActivityLog as FrontendActivityLog } from '@/lib/data';
 import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
 
-// Assuming backend DTO might look like this, adjust as needed
+// Backend DTO for ActivityLog (example, adjust to your actual API response)
 interface ApiActivityLogDto {
   id: string;
   employeeId: string;
@@ -11,33 +11,33 @@ interface ApiActivityLogDto {
   description?: string;
   startTime: string; // ISO Date string
   endTime?: string; // ISO Date string
-  // Add other fields that your backend DTO includes and might be useful
   employeeName?: string; // If backend provides it directly
   location?: string;     // If backend provides it
 }
 
-// Payload for logging a new activity
 export interface LogActivityPayload {
   activityType: string; // Should match a value your backend ActivityType enum can parse
   description?: string;
-  location?: string; // If your backend accepts location for LogActivityAsync
+  location?: string;
 }
 
-// Payload for ending an activity (might be empty if backend doesn't need specifics)
 export interface EndActivityPayload {
   notes?: string;
 }
 
-// Helper to map backend ActivityType to a user-friendly string
-// IMPORTANT: Adjust this mapping based on your actual backend ActivityType enum
 const mapActivityTypeToString = (type: string | number): string => {
-  if (typeof type === 'string') return type; // If backend already sends a good string
-  // Example mapping if backend sends numbers
+  if (typeof type === 'string') {
+    // If backend already sends "CheckedIn", "Working", etc.
+    // You might want to normalize or map them to more user-friendly terms if needed
+    // e.g. if (type.toLowerCase() === "checkedin") return "Checked In";
+    return type;
+  }
+  // Example mapping if backend sends numbers that correspond to an enum
   switch (type) {
     case 0: return 'Checked In';
-    case 1: return 'Working';
-    case 2: return 'Break';
-    case 3: return 'Checked Out';
+    case 1: return 'Working'; // Example, adjust to your actual enum
+    case 2: return 'Break';   // Example
+    case 3: return 'Checked Out'; // Example
     default: return `Unknown Activity (${type})`;
   }
 };
@@ -49,41 +49,36 @@ const mapActivityTypeToString = (type: string | number): string => {
  * @param endDate ISO string for the end date.
  */
 export async function fetchActivityLogsByEmployee(employeeId: string, startDate: string, endDate: string): Promise<FrontendActivityLog[]> {
-  console.log(`API CALL: GET /api/activity-logs/${employeeId}?startDate=${startDate}&endDate=${endDate}`);
+  console.log(`API CALL: GET /api/activity-logs/${employeeId}?StartDate=${startDate}&EndDate=${endDate}`);
   if (!employeeId) {
     console.warn("fetchActivityLogsByEmployee called with no employeeId");
     return [];
   }
   try {
-    // Assuming your API takes startDate and endDate as query parameters
-    const response = await apiClient(`/activity-logs/${employeeId}?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
+    // Using StartDate and EndDate to match typical C# model binding for ActivityTimeRangeRequest
+    const response = await apiClient(`/activity-logs/${employeeId}?StartDate=${encodeURIComponent(startDate)}&EndDate=${encodeURIComponent(endDate)}`);
     const logsDto = await parseJsonResponse<ApiActivityLogDto[]>(response);
+
     return (logsDto || []).map(log => ({
       id: log.id,
       employeeId: log.employeeId,
-      employeeName: log.employeeName || 'N/A', // Or fetch separately if needed
+      employeeName: log.employeeName || 'N/A',
       activityType: mapActivityTypeToString(log.activityType),
       description: log.description,
       location: log.location || 'N/A',
       startTime: log.startTime,
       endTime: log.endTime,
-      // Deprecated fields from old ActivityLog type - ensure mapping or removal
-      date: log.startTime, // Or a specific date field if your DTO has one
-      checkInTime: log.startTime,
-      checkOutTime: log.endTime,
-      activity: mapActivityTypeToString(log.activityType) // Keep for compatibility if pages use it
-    })) as FrontendActivityLog[];
+    }));
   } catch (error) {
     console.error(`Error fetching activity logs for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch activity logs for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    // Generic fallback for other errors
+    throw new HttpError(`Failed to fetch activity logs for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
   }
 }
 
 /**
  * Adds a new activity for an employee. (POST /api/activity-logs/{employeeId}/activities)
- * This maps to LogActivityAsync(Guid employeeId, ActivityType activityType, string? description = null)
- * The frontend needs to send what the backend expects for ActivityType.
  * @param employeeId The ID of the employee.
  * @param activityData The data for the new activity.
  */
@@ -95,7 +90,7 @@ export async function addEmployeeActivity(employeeId: string, activityData: LogA
   try {
     const response = await apiClient(`/activity-logs/${employeeId}/activities`, {
       method: 'POST',
-      body: JSON.stringify(activityData), // Backend expects { activityType: "string/enum", description: "string" }
+      body: JSON.stringify(activityData),
     });
     const logDto = await parseJsonResponse<ApiActivityLogDto>(response);
     return {
@@ -107,21 +102,16 @@ export async function addEmployeeActivity(employeeId: string, activityData: LogA
       location: logDto.location || 'N/A',
       startTime: logDto.startTime,
       endTime: logDto.endTime,
-      date: logDto.startTime,
-      checkInTime: logDto.startTime,
-      checkOutTime: logDto.endTime,
-      activity: mapActivityTypeToString(logDto.activityType)
-    } as FrontendActivityLog;
+    };
   } catch (error) {
     console.error(`Error adding activity for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to add activity for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to add activity for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
   }
 }
 
 /**
  * Ends the current activity for an employee. (POST /api/activity-logs/{employeeId}/end-current-activity)
- * Maps to EndCurrentActivityAsync(Guid employeeId)
  * @param employeeId The ID of the employee.
  * @param endActivityData Optional data for ending the activity (may not be needed by backend).
  */
@@ -133,12 +123,11 @@ export async function endCurrentEmployeeActivity(employeeId: string, endActivity
   try {
     const response = await apiClient(`/activity-logs/${employeeId}/end-current-activity`, {
       method: 'POST',
-      body: JSON.stringify(endActivityData || {}), // Send empty object if no data or if backend expects no body
+      body: JSON.stringify(endActivityData || {}),
     });
-    if (response.status === 204 || !response.body) { // Handle No Content or empty response
-        // Potentially refetch the last activity or the employee's status to confirm
+    if (response.status === 204 || !response.body) {
         console.log(`Activity ended for employee ${employeeId}. Backend returned no content.`);
-        return null; // Or fetch updated log
+        return null;
     }
     const logDto = await parseJsonResponse<ApiActivityLogDto>(response);
     return {
@@ -150,14 +139,10 @@ export async function endCurrentEmployeeActivity(employeeId: string, endActivity
       location: logDto.location || 'N/A',
       startTime: logDto.startTime,
       endTime: logDto.endTime,
-      date: logDto.startTime,
-      checkInTime: logDto.startTime,
-      checkOutTime: logDto.endTime,
-      activity: mapActivityTypeToString(logDto.activityType)
-    } as FrontendActivityLog;
+    };
   } catch (error) {
     console.error(`Error ending activity for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to end activity for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to end activity for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
   }
 }

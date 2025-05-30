@@ -11,20 +11,26 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { format } from 'date-fns';
 import { ListFilter, Search, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchActivityLogsByEmployee } from '@/services/activity-service'; // Corrected import
+import { fetchActivityLogsByEmployee } from '@/services/activity-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UnauthorizedError } from '@/services/api-client';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
   try {
     const date = new Date(dateString);
+    // Check if the date is valid. Date.parse returns NaN for invalid dates,
+    // and new Date(invalid_string) results in 'Invalid Date' whose getTime() is NaN.
     if (isNaN(date.getTime())) {
-      const dateParts = dateString.split('T')[0].split('-');
-      if (dateParts.length === 3) {
-        const potentiallyValidDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) -1, parseInt(dateParts[2]));
+      // Attempt to parse as YYYY-MM-DD if it's just a date part
+      const parts = dateString.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+        const day = parseInt(parts[2], 10);
+        const potentiallyValidDate = new Date(year, month, day);
         if (!isNaN(potentiallyValidDate.getTime())) {
           return format(potentiallyValidDate, 'MMM d, yyyy, h:mm a');
         }
@@ -35,9 +41,10 @@ const formatDate = (dateString?: string | null) => {
     return format(date, 'MMM d, yyyy, h:mm a');
   } catch (error) {
     console.error("Error formatting date:", dateString, error);
-    return 'Invalid Date';
+    return 'Invalid Date'; // Or 'N/A' or some other placeholder
   }
 };
+
 
 export default function ActivityLogsPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -53,10 +60,10 @@ export default function ActivityLogsPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        console.log("Attempting to fetch activity logs from service for a specific employee...");
+        console.log("Attempting to fetch activity logs for a specific employee...");
         // TODO: Implement a way to select an employeeId dynamically
         // For now, using a hardcoded employeeId and a default date range
-        const employeeId = "emp001"; // Placeholder - replace with dynamic selection
+        const employeeId = "emp001"; // Placeholder - replace with dynamic selection or from context/props
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(endDate.getDate() - 7); // Fetch logs for the last 7 days
@@ -65,6 +72,7 @@ export default function ActivityLogsPage() {
         console.log("Activity logs fetched for employee:", employeeId, data);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
+        let errorMessage = 'An unknown error occurred while fetching activity logs.';
         if (err instanceof UnauthorizedError) {
           toast({
             variant: "destructive",
@@ -73,17 +81,24 @@ export default function ActivityLogsPage() {
           });
           await signOut();
           router.push('/');
-        } else {
-          console.error("Failed to fetch activity logs:", err);
-          const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching activity logs.';
-          setFetchError(errorMessage);
-          toast({
-            variant: "destructive",
-            title: "Failed to load activity logs",
-            description: errorMessage,
-          });
-          setActivityLogs([]);
+          return; // Important to prevent further processing
+        } else if (err instanceof HttpError) {
+          errorMessage = err.message;
+          if (err.status === 400) {
+            errorMessage = "Failed to load activity logs. There was an issue with the request parameters (e.g., date range or employee ID). Please check and try again. Details: " + err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
         }
+        
+        console.error("Failed to fetch activity logs:", err);
+        setFetchError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Failed to load activity logs",
+          description: errorMessage,
+        });
+        setActivityLogs([]);
       } finally {
         setIsLoading(false);
       }
@@ -195,7 +210,7 @@ export default function ActivityLogsPage() {
                           variant={
                             log.activityType?.toLowerCase().includes('checked in') ? 'default' :
                             log.activityType?.toLowerCase().includes('checked out') ? 'secondary' :
-                            log.activityType?.toLowerCase().includes('break') ? 'outline' : // Example for another type
+                            log.activityType?.toLowerCase().includes('break') ? 'outline' :
                             'outline'
                           }
                         >
