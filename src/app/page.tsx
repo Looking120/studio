@@ -16,7 +16,7 @@ import { LogIn } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
-import { signIn, type SignInResponse } from '@/services/auth-service';
+import { signIn, type SignInResponse } from '@/services/auth-service'; // SignInResponse est maintenant correcte
 import { useToast } from '@/hooks/use-toast';
 import { UnauthorizedError } from "@/services/api-client";
 
@@ -42,20 +42,22 @@ export default function LoginPage() {
 
     try {
       console.log(`Login page - Attempting signIn with email: ${email}`);
-      const response: SignInResponse | null = await signIn({ email, password });
+      const response: SignInResponse | null = await signIn({ email, password }); // Appel correct avec un objet
       console.log('Login page - signIn service call returned:', response);
 
-      // AGGRESSIVE LOGGING TO CHECK THE RESPONSE STRUCTURE
+      // AGGRESSIVE LOGGING TO CHECK THE RESPONSE STRUCTURE (maintenu pour débogage si nécessaire)
       console.log('Login page - DEBUG: Raw response object received in handleSubmit:', JSON.stringify(response, null, 2));
       if (response && typeof response === 'object') {
         console.log('Login page - DEBUG: Keys in response object:', Object.keys(response));
-        console.log('Login page - DEBUG: Value of response.token:', response.token);
+        console.log('Login page - DEBUG: Value of response.token:', response.token); // Devrait être le accessToken renommé
         console.log('Login page - DEBUG: Type of response.token:', typeof response.token);
         console.log('Login page - DEBUG: Value of response.user:', response.user);
       }
       // END AGGRESSIVE LOGGING
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
+        // Le service auth-service.ts a déjà adapté la réponse de l'API,
+        // donc response.token est bien le token et response.user contient les infos utilisateur.
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
@@ -63,20 +65,20 @@ export default function LoginPage() {
         let finalUserRole = 'Employé';
         let finalUserEmail = email;
 
-        const userFromApi = response.user;
+        const userFromApi = response.user; // L'objet user est maintenant correctement fourni par le service
         console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
 
         if (userFromApi && typeof userFromApi === 'object') {
           console.log('Login page - DEBUG: userFromApi.firstName:', userFromApi.firstName);
           console.log('Login page - DEBUG: userFromApi.lastName:', userFromApi.lastName);
-          console.log('Login page - DEBUG: userFromApi.name (fallback):', userFromApi.name);
+          console.log('Login page - DEBUG: userFromApi.name (fallback/constructed):', userFromApi.name);
           console.log('Login page - DEBUG: userFromApi.role:', userFromApi.role);
           console.log('Login page - DEBUG: userFromApi.email:', userFromApi.email);
 
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) {
+          } else if (userFromApi.name) { // Fallback au champ name construit par le service
             displayName = userFromApi.name;
           }
 
@@ -98,7 +100,7 @@ export default function LoginPage() {
         router.push('/dashboard');
       } else {
         setIsLoading(false);
-        console.warn('Login page - Token validation failed. Detailed diagnostics:');
+        console.warn('Login page - Token validation failed in page.tsx. Detailed diagnostics:');
         if (!response) {
           console.warn('Login page - The response object from signIn service is null or undefined.');
         } else {

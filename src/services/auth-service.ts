@@ -2,16 +2,30 @@
 // src/services/auth-service.ts
 import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
+// Interface pour la réponse BRUTE de l'API /api/auth/signin
+interface ApiSignInRawResponse {
+  id: string;
+  userName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  accessToken: string;
+  durationInMinutes: number;
+}
+
+// Interface pour ce que le service signIn retourne à l'application (structure attendue par les composants)
 export interface SignInUser {
   id?: string;
   firstName?: string;
   lastName?: string;
-  name?: string; // Kept for fallback
+  name?: string; // Pour la compatibilité, peut être construit à partir de firstName et lastName
+  userName?: string;
   email: string;
   role: string;
 }
 export interface SignInResponse {
-  token: string;
+  token: string; // L'application s'attend à 'token'
   user: SignInUser;
 }
 
@@ -21,9 +35,9 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Made non-optional
+  password?: string;
   confirmPassword?: string;
-  birthDate?: string; // Expects YYYY-MM-DD string from form
+  birthDate?: string;
   phoneNumber?: string;
 }
 
@@ -43,34 +57,48 @@ export async function signIn(credentials: { email?: string; password?: string })
       body: JSON.stringify(credentials),
     });
 
-    // Log the raw response text before parsing
-    // const rawText = await response.clone().text(); // response.clone() is needed as body can be read once
-    // console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', rawText);
+    const rawText = await response.clone().text();
+    console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', rawText);
 
-    const parsedResponse = await parseJsonResponse<SignInResponse>(response);
-    console.log('Auth Service - Parsed JSON response from /api/auth/signin:', parsedResponse);
+    const parsedRawResponse = await parseJsonResponse<ApiSignInRawResponse>(response);
+    console.log('Auth Service - Parsed RAW API JSON response from /api/auth/signin:', parsedRawResponse);
 
-    if (!parsedResponse) {
-      console.error('Auth Service - DEBUG: parsedResponse from parseJsonResponse is null or undefined. This can happen if the server sent a 204 No Content, or if parseJsonResponse had an issue returning null for an empty 200 OK.');
-      throw new Error('Authentication failed: No valid JSON data received from server response. The server might have sent an empty successful response or a 204 No Content.');
+    if (!parsedRawResponse) {
+      console.error('Auth Service - DEBUG: parsedRawResponse from parseJsonResponse is null or undefined.');
+      throw new Error('Authentication failed: No valid JSON data received from server response.');
     }
     
-    // Specifically check if parsedResponse is an empty object
-    if (typeof parsedResponse === 'object' && parsedResponse !== null && Object.keys(parsedResponse).length === 0) {
-      console.error('Auth Service - DEBUG: The server sent a 200 OK response with an empty JSON object ({}). A "token" field is expected within the JSON response.');
-      throw new Error('Authentication failed: The server responded with an empty JSON object {}. Expected a "token" field in the JSON response.');
+    // Vérification spécifique pour les objets vides
+    if (typeof parsedRawResponse === 'object' && parsedRawResponse !== null && Object.keys(parsedRawResponse).length === 0) {
+      console.error('Auth Service - DEBUG: The server sent a JSON response, but it was an empty object {}. An "accessToken" field is expected.');
+      throw new Error('Authentication failed: The server responded with an empty JSON object {}. Expected an "accessToken" field in the JSON response.');
     }
 
-    if (!parsedResponse.token) {
-      console.error('Auth Service - DEBUG: The server sent a JSON response, but it did not contain a "token" field, or the token was falsy. Full parsed JSON response:', parsedResponse);
-      throw new Error('Authentication failed: The server\'s JSON response did not include a "token" field. Response received: ' + JSON.stringify(parsedResponse));
+    if (!parsedRawResponse.accessToken) {
+      console.error('Auth Service - DEBUG: The server sent a JSON response, but it did not contain an "accessToken" field, or the accessToken was falsy. Full parsed JSON response:', parsedRawResponse);
+      throw new Error('Authentication failed: The server\'s JSON response did not include an "accessToken" field. Response received: ' + JSON.stringify(parsedRawResponse));
     }
-    if (typeof parsedResponse.token !== 'string' || parsedResponse.token.trim() === '') {
-      console.error('Auth Service - DEBUG: parsedResponse.token is present, but it is not a non-empty string. Token value:', parsedResponse.token, 'Type:', typeof parsedResponse.token);
-      throw new Error('Authentication failed: Token received from server is not a valid string or is empty. Token: ' + JSON.stringify(parsedResponse.token));
+    if (typeof parsedRawResponse.accessToken !== 'string' || parsedRawResponse.accessToken.trim() === '') {
+      console.error('Auth Service - DEBUG: parsedRawResponse.accessToken is present, but it is not a non-empty string. Token value:', parsedRawResponse.accessToken, 'Type:', typeof parsedRawResponse.accessToken);
+      throw new Error('Authentication failed: Access token received from server is not a valid string or is empty. Access Token: ' + JSON.stringify(parsedRawResponse.accessToken));
     }
     
-    return parsedResponse;
+    // Adapter la réponse brute de l'API à la structure SignInResponse attendue par le reste de l'application
+    const appResponse: SignInResponse = {
+      token: parsedRawResponse.accessToken,
+      user: {
+        id: parsedRawResponse.id,
+        firstName: parsedRawResponse.firstName,
+        lastName: parsedRawResponse.lastName,
+        name: `${parsedRawResponse.firstName} ${parsedRawResponse.lastName}`,
+        userName: parsedRawResponse.userName,
+        email: parsedRawResponse.email,
+        role: parsedRawResponse.role,
+      }
+    };
+    console.log('Auth Service - Adapted response for the app:', appResponse);
+    return appResponse;
+
   } catch (error) {
     console.error('Auth Service - signIn error:', error);
     if (error instanceof UnauthorizedError) {
@@ -108,7 +136,6 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
   }
 }
 
-
 /**
  * Signs out the current user.
  * Clears local authentication data and optionally attempts to sign out from the server.
@@ -121,32 +148,38 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out...');
+    // On s'attend à ce que apiClient inclue le token dans l'en-tête Authorization
     const response = await apiClient('/auth/signout', { method: 'POST' });
 
     if (response.ok) {
       serverSignOutOk = true;
+      // Essayer de lire le message du corps de la réponse si elle n'est pas vide
       if (response.status !== 204 && response.headers.get("content-length") !== "0") {
         try {
           const parsed = await parseJsonResponse<{ message?: string }>(response);
           serverMessage = parsed?.message || "Successfully signed out from server.";
         } catch (e) {
-          console.warn("Auth Service: Server sign-out response was OK but body parsing failed. Error:", e instanceof Error ? e.message : String(e));
-          serverMessage = "Successfully signed out from server (response body parsing error).";
+          // Le corps n'était pas du JSON valide ou était vide, mais le statut était OK.
+          console.warn("Auth Service: Server sign-out response was OK but body parsing failed or was empty. Error:", e instanceof Error ? e.message : String(e));
+          serverMessage = "Successfully signed out from server (response body issue or empty).";
         }
       } else {
          serverMessage = "Successfully signed out from server (no content).";
       }
       console.log(`Auth Service: ${serverMessage}`);
     } else {
+      // La déconnexion du serveur a échoué (ex: token déjà expiré, donc 401)
       const errorText = await response.text().catch(() => "Could not read error text from server response."); 
       serverMessage = `Server sign-out attempt failed with status ${response.status}: ${errorText || response.statusText || 'No additional error message from server.'}`;
       console.warn(`Auth Service: ${serverMessage}`);
     }
   } catch (error) {
+    // Erreur réseau ou autre pendant la tentative de déconnexion du serveur
     serverMessage = `Error during server sign-out attempt: ${error instanceof Error ? error.message : "Unknown error"}`;
     console.error(`Auth Service: ${serverMessage}`, error);
   }
 
+  // Nettoyage local quoi qu'il arrive
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userName');
