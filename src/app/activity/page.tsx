@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { format } from 'date-fns';
 import { ListFilter, Search, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchAllActivityLogs } from '@/services/activity-service';
+import { fetchActivityLogsByEmployee } from '@/services/activity-service'; // Corrected import
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
@@ -20,12 +20,8 @@ import { signOut } from '@/services/auth-service';
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
   try {
-    // Attempt to parse, assuming it might be ISO or other common formats
     const date = new Date(dateString);
-    // Check if parsing resulted in a valid date
     if (isNaN(date.getTime())) {
-      // If invalid, try to see if it's already just a date part like "YYYY-MM-DD"
-      // and append a time to make it a full parsable datetime for consistent formatting
       const dateParts = dateString.split('T')[0].split('-');
       if (dateParts.length === 3) {
         const potentiallyValidDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) -1, parseInt(dateParts[2]));
@@ -57,9 +53,16 @@ export default function ActivityLogsPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        console.log("Attempting to fetch activity logs from service...");
-        const data = await fetchAllActivityLogs();
-        console.log("Activity logs fetched:", data);
+        console.log("Attempting to fetch activity logs from service for a specific employee...");
+        // TODO: Implement a way to select an employeeId dynamically
+        // For now, using a hardcoded employeeId and a default date range
+        const employeeId = "emp001"; // Placeholder - replace with dynamic selection
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - 7); // Fetch logs for the last 7 days
+
+        const data = await fetchActivityLogsByEmployee(employeeId, startDate.toISOString(), endDate.toISOString());
+        console.log("Activity logs fetched for employee:", employeeId, data);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -90,23 +93,23 @@ export default function ActivityLogsPage() {
 
   const uniqueActivities = useMemo(() => {
     if (isLoading || fetchError || !activityLogs || activityLogs.length === 0) return ['all'];
-    const activities = new Set(activityLogs.map(log => log.activity).filter(Boolean));
+    const activities = new Set(activityLogs.map(log => log.activityType).filter(Boolean));
     return ['all', ...Array.from(activities)];
   }, [activityLogs, isLoading, fetchError]);
-  
+
   const filteredLogs = useMemo(() => {
     if (!activityLogs) return [];
     return activityLogs
     .filter(log =>
       (log.employeeName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (log.activity?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (log.activityType?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
       (log.location?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     )
-    .filter(log => activityFilter === 'all' || log.activity === activityFilter)
+    .filter(log => activityFilter === 'all' || log.activityType === activityFilter)
     .sort((a, b) => {
-        const dateA = a.date ? new Date(a.date).getTime() : 0;
-        const dateB = b.date ? new Date(b.date).getTime() : 0;
-        return dateB - dateA; // Sort descending
+        const dateA = a.startTime ? new Date(a.startTime).getTime() : 0;
+        const dateB = b.startTime ? new Date(b.startTime).getTime() : 0;
+        return dateB - dateA; // Sort descending by start time
     });
   }, [activityLogs, searchTerm, activityFilter]);
 
@@ -127,9 +130,9 @@ export default function ActivityLogsPage() {
               disabled={isLoading || !!fetchError}
             />
           </div>
-          <Select 
-            value={activityFilter} 
-            onValueChange={setActivityFilter} 
+          <Select
+            value={activityFilter}
+            onValueChange={setActivityFilter}
             disabled={isLoading || !!fetchError || uniqueActivities.length <= 1}
           >
             <SelectTrigger className="w-full md:w-[180px]">
@@ -154,7 +157,8 @@ export default function ActivityLogsPage() {
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible.</p>
+            <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible, and that the selected employee has logs in the specified date range.</p>
+            <p className="text-xs mt-1">Currently fetching for a default employee and date range. Implement dynamic selection for better results.</p>
           </div>
         )}
         {!fetchError && (
@@ -163,34 +167,45 @@ export default function ActivityLogsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Employee Name</TableHead>
-                  <TableHead>Activity</TableHead>
+                  <TableHead>Activity Type</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>Check-in Time</TableHead>
-                  <TableHead>Check-out Time</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={`skeleton-${index}`}>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell><Skeleton className="h-5 w-20" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     </TableRow>
                   ))
                 ) : (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell><TableCell>
-                        <Badge 
+                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge
                           variant={
-                            log.activity?.toLowerCase().includes('checked in') ? 'default' : 
-                            log.activity?.toLowerCase().includes('checked out') ? 'secondary' : 
+                            log.activityType?.toLowerCase().includes('checked in') ? 'default' :
+                            log.activityType?.toLowerCase().includes('checked out') ? 'secondary' :
+                            log.activityType?.toLowerCase().includes('break') ? 'outline' : // Example for another type
                             'outline'
                           }
                         >
-                          {log.activity || 'N/A'}
+                          {log.activityType || 'N/A'}
                         </Badge>
-                      </TableCell><TableCell>{log.location || 'N/A'}</TableCell><TableCell>{formatDate(log.checkInTime)}</TableCell><TableCell>{formatDate(log.checkOutTime)}</TableCell><TableCell>{formatDate(log.date)}</TableCell>
+                      </TableCell>
+                      <TableCell>{log.description || 'N/A'}</TableCell>
+                      <TableCell>{log.location || 'N/A'}</TableCell>
+                      <TableCell>{formatDate(log.startTime)}</TableCell>
+                      <TableCell>{formatDate(log.endTime)}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -199,7 +214,7 @@ export default function ActivityLogsPage() {
           </div>
         )}
         {!isLoading && !fetchError && filteredLogs.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">No activity logs found for the current filters.</p>
+          <p className="text-center text-muted-foreground py-8">No activity logs found for the current employee, date range, and filters.</p>
         )}
       </CardContent>
     </Card>
