@@ -20,8 +20,20 @@ import { signOut } from '@/services/auth-service';
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
   try {
+    // Attempt to parse, assuming it might be ISO or other common formats
     const date = new Date(dateString);
+    // Check if parsing resulted in a valid date
     if (isNaN(date.getTime())) {
+      // If invalid, try to see if it's already just a date part like "YYYY-MM-DD"
+      // and append a time to make it a full parsable datetime for consistent formatting
+      const dateParts = dateString.split('T')[0].split('-');
+      if (dateParts.length === 3) {
+        const potentiallyValidDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) -1, parseInt(dateParts[2]));
+        if (!isNaN(potentiallyValidDate.getTime())) {
+          return format(potentiallyValidDate, 'MMM d, yyyy, h:mm a');
+        }
+      }
+      console.warn("Invalid Date encountered in formatDate:", dateString);
       return 'Invalid Date';
     }
     return format(date, 'MMM d, yyyy, h:mm a');
@@ -48,7 +60,7 @@ export default function ActivityLogsPage() {
         console.log("Attempting to fetch activity logs from service...");
         const data = await fetchAllActivityLogs();
         console.log("Activity logs fetched:", data);
-        setActivityLogs(data);
+        setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         if (err instanceof UnauthorizedError) {
           toast({
@@ -77,7 +89,7 @@ export default function ActivityLogsPage() {
   }, [toast, router]);
 
   const uniqueActivities = useMemo(() => {
-    if (isLoading || fetchError || !activityLogs) return ['all'];
+    if (isLoading || fetchError || !activityLogs || activityLogs.length === 0) return ['all'];
     const activities = new Set(activityLogs.map(log => log.activity).filter(Boolean));
     return ['all', ...Array.from(activities)];
   }, [activityLogs, isLoading, fetchError]);
@@ -167,7 +179,7 @@ export default function ActivityLogsPage() {
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-40" /></TableCell> {/* Adjusted skeleton for date column */}
                     </TableRow>
                   ))
                 ) : (
@@ -188,7 +200,7 @@ export default function ActivityLogsPage() {
                       <TableCell>{log.location || 'N/A'}</TableCell>
                       <TableCell>{formatDate(log.checkInTime)}</TableCell>
                       <TableCell>{formatDate(log.checkOutTime)}</TableCell>
-                      <TableCell>{log.date ? format(new Date(log.date), 'MMM d, yyyy') : 'N/A'}</TableCell>
+                      <TableCell>{formatDate(log.date)}</TableCell> {/* Use formatDate for consistency */}
                     </TableRow>
                   ))
                 )}
