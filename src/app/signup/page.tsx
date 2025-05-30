@@ -27,20 +27,35 @@ export default function SignupPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
-    const name = (event.currentTarget.elements.namedItem('name') as HTMLInputElement)?.value;
-    const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
-    const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
+    const form = event.currentTarget;
+    const firstName = (form.elements.namedItem('firstName') as HTMLInputElement)?.value;
+    const lastName = (form.elements.namedItem('lastName') as HTMLInputElement)?.value;
+    const middleName = (form.elements.namedItem('middleName') as HTMLInputElement)?.value;
+    const userName = (form.elements.namedItem('userName') as HTMLInputElement)?.value;
+    const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
+    const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
+    const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
     
-    console.log("Attempting signup with user details:", { name, email }); // Avoid logging password in production logs
+    console.log("Attempting signup with user details:", { firstName, lastName, userName, email }); // Avoid logging password in production logs
 
     try {
-      if (!name || !email || !password) {
-        toast({ variant: "destructive", title: "Error", description: "All fields are required." });
+      if (!firstName || !lastName || !userName || !email || !password) {
+        toast({ variant: "destructive", title: "Error", description: "First name, last name, username, email and password are required." });
         setIsLoading(false);
         return;
       }
       
-      const userData: SignUpData = { name, email, password, role: "Employee" /* Example default role */ };
+      const userData: SignUpData = { 
+        firstName, 
+        lastName, 
+        userName, 
+        email, 
+        password, 
+        role: "Employee", // Example default role
+      };
+      if (middleName) userData.middleName = middleName;
+      if (phoneNumber) userData.phoneNumber = phoneNumber;
+      
       const response: SignUpResponse = await signUp(userData);
       
       console.log('Sign up successful:', response);
@@ -75,14 +90,51 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-6 p-6 sm:p-8">
+          <CardContent className="grid gap-4 p-6 sm:p-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input 
+                  id="firstName" 
+                  name="firstName"
+                  type="text" 
+                  placeholder="Ex: Alex" 
+                  required 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input 
+                  id="lastName" 
+                  name="lastName"
+                  type="text" 
+                  placeholder="Ex: Dubois" 
+                  required 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="middleName">Middle Name (Optional)</Label>
               <Input 
-                id="name" 
-                name="name"
+                id="middleName" 
+                name="middleName"
                 type="text" 
-                placeholder="Ex: Alex Dubois" 
+                placeholder="Ex: Charles" 
+                className="text-base py-3"
+                disabled={isLoading}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="userName">Username</Label>
+              <Input 
+                id="userName" 
+                name="userName"
+                type="text" 
+                placeholder="Ex: alexd" 
                 required 
                 className="text-base py-3"
                 disabled={isLoading}
@@ -96,6 +148,17 @@ export default function SignupPage() {
                 type="email" 
                 placeholder="you@example.com" 
                 required 
+                className="text-base py-3"
+                disabled={isLoading}
+              />
+            </div>
+             <div className="grid gap-2">
+              <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+              <Input 
+                id="phoneNumber" 
+                name="phoneNumber"
+                type="tel" 
+                placeholder="Ex: +1234567890" 
                 className="text-base py-3"
                 disabled={isLoading}
               />

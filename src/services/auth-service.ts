@@ -6,7 +6,7 @@ export interface SignInResponse {
   token: string;
   user: {
     id: string;
-    name: string;
+    name: string; // This might need to change to firstName, lastName if API returns that
     email: string;
     role: string;
     // other user details
@@ -14,10 +14,14 @@ export interface SignInResponse {
 }
 
 export interface SignUpData {
-  name: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  userName: string;
   email: string;
   password?: string;
-  role?: string;
+  phoneNumber?: string;
+  role?: string; // Keep if your API expects a role during signup
   [key: string]: any;
 }
 
@@ -56,7 +60,13 @@ export async function signIn(credentials: { email?: string; username?: string; p
  * @param userData User details for registration.
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
-  console.log('API CALL: POST /api/auth/signup. User data:', { email: userData.email, name: userData.name, role: userData.role });
+  console.log('API CALL: POST /api/auth/signup. User data:', { 
+    email: userData.email, 
+    userName: userData.userName,
+    firstName: userData.firstName, 
+    lastName: userData.lastName, 
+    role: userData.role 
+  });
   const response = await apiClient('/auth/signup', {
     method: 'POST',
     body: JSON.stringify(userData),
