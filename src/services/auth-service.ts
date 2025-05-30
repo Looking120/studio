@@ -2,17 +2,17 @@
 // src/services/auth-service.ts
 import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
+export interface SignInUser {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string; // Kept for fallback
+  email: string;
+  role: string;
+}
 export interface SignInResponse {
   token: string;
-  user: {
-    id?: string;
-    firstName?: string;
-    lastName?: string;
-    name?: string; // Kept for fallback
-    email: string;
-    role: string;
-    // other user details
-  };
+  user: SignInUser;
 }
 
 export interface SignUpData {
@@ -21,16 +21,15 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Made optional to align with previous structure if needed, but should be required for signup
+  password?: string; // Optional to align, but should be required for actual signup
   confirmPassword?: string;
-  birthDate?: string;
+  birthDate?: string; // Expects YYYY-MM-DD string from form
   phoneNumber?: string;
 }
 
 export interface SignUpResponse {
   message: string;
   userId?: string;
-  // other relevant fields
 }
 
 /**
@@ -44,7 +43,7 @@ export async function signIn(credentials: { email?: string; password?: string })
       body: JSON.stringify(credentials),
     });
 
-    // Log raw response text BEFORE parsing
+    // This log is crucial: it shows what the server sent BEFORE JSON parsing.
     // const rawText = await response.clone().text();
     // console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', rawText);
 
@@ -56,7 +55,7 @@ export async function signIn(credentials: { email?: string; password?: string })
       throw new Error('Authentication failed: No valid JSON response received from server. The server might have sent an empty successful response.');
     }
     if (!parsedResponse.token) {
-      console.error('Auth Service - DEBUG: The parsed JSON response from the server did not contain a "token" field, or the token was falsy. Full parsed JSON response:', parsedResponse);
+      console.error('Auth Service - DEBUG: The server sent a JSON response, but it was an empty object {} (or an object without a "token" field). Full parsed JSON response:', parsedResponse);
       throw new Error('Authentication failed: The server\'s JSON response did not include a "token" field. Response received: ' + JSON.stringify(parsedResponse));
     }
     if (typeof parsedResponse.token !== 'string' || parsedResponse.token.trim() === '') {
@@ -70,7 +69,11 @@ export async function signIn(credentials: { email?: string; password?: string })
     if (error instanceof UnauthorizedError) {
       throw error; 
     }
-    throw new Error(error instanceof Error ? error.message : 'An unknown error occurred during sign in.');
+    // Ensure a generic error is thrown if it's not already an Error instance
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('An unknown error occurred during sign in.');
   }
 }
 
@@ -79,9 +82,6 @@ export async function signIn(credentials: { email?: string; password?: string })
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
   console.log('Auth Service: Attempting to sign up user:', userData.userName);
-  // Remove password and confirmPassword before sending if your API doesn't hash/handle them directly but expects them for validation
-  // const { password, confirmPassword, ...dataToSend } = userData; 
-  // For now, sending all as API might handle it.
   try {
     const response = await apiClient('/auth/signup', {
       method: 'POST',
@@ -95,7 +95,10 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     return parsedResponse;
   } catch (error) {
     console.error('Auth Service - signUp error:', error);
-    throw new Error(error instanceof Error ? error.message : 'An unknown error occurred during sign up.');
+    if (error instanceof Error) {
+        throw error;
+    }
+    throw new Error('An unknown error occurred during sign up.');
   }
 }
 
@@ -108,6 +111,7 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
 export async function signOut(): Promise<{ message: string; serverSignOutOk: boolean }> {
   let serverSignOutOk = false;
   let serverMessage = "Server sign-out not attempted or failed.";
+  let finalMessage = "";
 
   try {
     console.log('Auth Service: Attempting server sign-out...');
@@ -115,12 +119,14 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
     if (response.ok) {
       serverSignOutOk = true;
+      // Try to parse response only if it's not a 204 No Content and has a body
       if (response.status !== 204 && response.headers.get("content-length") !== "0") {
         try {
           const parsed = await parseJsonResponse<{ message?: string }>(response);
           serverMessage = parsed?.message || "Successfully signed out from server.";
         } catch (e) {
-          console.warn("Auth Service: Server sign-out response was OK but body parsing failed. Assuming success.", e);
+          // Log parsing error but still consider server sign-out OK if status was OK
+          console.warn("Auth Service: Server sign-out response was OK but body parsing failed. Error:", e instanceof Error ? e.message : String(e));
           serverMessage = "Successfully signed out from server (response body parsing error).";
         }
       } else {
@@ -128,6 +134,7 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       }
       console.log(`Auth Service: ${serverMessage}`);
     } else {
+      // Attempt to read error text if sign-out API call failed
       const errorText = await response.text(); 
       serverMessage = `Server sign-out attempt failed with status ${response.status}: ${errorText || response.statusText || 'No additional error message from server.'}`;
       console.warn(`Auth Service: ${serverMessage}`);
@@ -143,10 +150,13 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
     console.log('Auth Service: Auth token and user info removed from localStorage.');
+    finalMessage = `Local sign-out successful. ${serverMessage}`;
+  } else {
+    finalMessage = `Local storage not available. ${serverMessage}`;
   }
-
+  
   return {
-    message: `Local sign-out successful. ${serverMessage}`,
+    message: finalMessage,
     serverSignOutOk,
   };
 }
