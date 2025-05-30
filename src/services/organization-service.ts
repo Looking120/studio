@@ -1,7 +1,7 @@
 
 // src/services/organization-service.ts
 import type { Office } from '@/lib/data';
-import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
+import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
 
 // --- Office Related Types ---
 export interface AddOfficePayload {
@@ -13,13 +13,22 @@ export interface AddOfficePayload {
 }
 export interface UpdateOfficePayload extends Partial<AddOfficePayload> {}
 
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages?: number; // Optional, if your backend provides it
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
+}
+
 
 // --- Department Related Types ---
 export interface Department {
   id: string;
   name: string;
-  employeeCount?: number;
-  [key: string]: any;
+  employeeCount?: number; // Assuming backend DTO might provide this
 }
 export interface AddDepartmentPayload {
   name: string;
@@ -33,16 +42,15 @@ export interface Position {
   id: string;
   title: string;
   departmentId?: string;
-  departmentName?: string;
-  assignedEmployees?: number;
-  [key: string]: any;
+  departmentName?: string; // Assuming backend DTO might provide this
+  assignedEmployees?: number; // Assuming backend DTO might provide this
 }
 export interface AddPositionPayload {
   title: string;
-  departmentId?: string;
+  departmentId?: string; // Assuming GUID as string
 }
 export interface AssignPositionPayload {
-  employeeId: string;
+  employeeId: string; // Assuming GUID as string
 }
 
 
@@ -55,7 +63,15 @@ export async function addOffice(officeData: AddOfficePayload): Promise<Office> {
       method: 'POST',
       body: JSON.stringify(officeData),
     });
-    return await parseJsonResponse<Office>(response);
+    const officeDto = await parseJsonResponse<any>(response);
+    return {
+        id: officeDto.id,
+        name: officeDto.name,
+        address: officeDto.address,
+        latitude: officeDto.center?.y || officeDto.latitude, // Adapt to your OfficeDto structure
+        longitude: officeDto.center?.x || officeDto.longitude, // Adapt to your OfficeDto structure
+        headcount: officeDto.headcount,
+    } as Office;
   } catch (error) {
     console.error('Error adding office:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -63,12 +79,25 @@ export async function addOffice(officeData: AddOfficePayload): Promise<Office> {
   }
 }
 
-export async function fetchOffices(): Promise<Office[]> {
+export async function fetchOffices(): Promise<PaginatedResult<Office>> {
   console.log('API CALL: GET /api/organization/offices.');
   try {
-    const response = await apiClient('/organization/offices');
-    const offices = await parseJsonResponse<Office[]>(response);
-    return offices || [];
+    // Assuming your API supports pagination query params like ?pageNumber=1&pageSize=10
+    // For now, fetching without specific pagination params, relying on API defaults.
+    const response = await apiClient('/organization/offices'); 
+    const paginatedResultDto = await parseJsonResponse<PaginatedResult<any>>(response);
+    
+    return {
+        ...paginatedResultDto,
+        items: (paginatedResultDto.items || []).map(officeDto => ({
+            id: officeDto.id,
+            name: officeDto.name,
+            address: officeDto.address,
+            latitude: officeDto.center?.y || officeDto.latitude,
+            longitude: officeDto.center?.x || officeDto.longitude,
+            headcount: officeDto.headcount,
+        })) as Office[],
+    };
   } catch (error) {
     console.error('Error fetching offices:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -81,7 +110,16 @@ export async function fetchOfficeById(officeId: string): Promise<Office | null> 
   try {
     const response = await apiClient(`/organization/offices/${officeId}`);
     if (response.status === 404) return null;
-    return await parseJsonResponse<Office | null>(response);
+    const officeDto = await parseJsonResponse<any | null>(response);
+    if (!officeDto) return null;
+    return {
+        id: officeDto.id,
+        name: officeDto.name,
+        address: officeDto.address,
+        latitude: officeDto.center?.y || officeDto.latitude,
+        longitude: officeDto.center?.x || officeDto.longitude,
+        headcount: officeDto.headcount,
+    } as Office;
   } catch (error) {
     console.error(`Error fetching office by ID ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
@@ -96,10 +134,21 @@ export async function updateOffice(officeId: string, officeData: UpdateOfficePay
       method: 'PUT',
       body: JSON.stringify(officeData),
     });
-    return await parseJsonResponse<Office>(response);
+    const officeDto = await parseJsonResponse<any>(response);
+     return {
+        id: officeDto.id,
+        name: officeDto.name,
+        address: officeDto.address,
+        latitude: officeDto.center?.y || officeDto.latitude,
+        longitude: officeDto.center?.x || officeDto.longitude,
+        headcount: officeDto.headcount,
+    } as Office;
   } catch (error) {
     console.error(`Error updating office ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
+    if (error instanceof HttpError && error.status === 404) {
+      throw new Error(`Update failed: The endpoint to update office ${officeId} (PUT /api/organization/offices/${officeId}) was not found on the server (404). Please ensure this endpoint exists.`);
+    }
     throw new Error(`Failed to update office ${officeId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -110,12 +159,13 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
     const response = await apiClient(`/organization/offices/${officeId}`, {
       method: 'DELETE',
     });
-    if (response.ok) {
+    if (response.ok) { // Handles 200, 204
         if (response.status === 204) {
              return { success: true, message: 'Office deleted successfully (No Content).' };
         }
+        // Try to parse if there's a body (e.g., for 200 OK)
         const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
+        if (contentType && contentType.includes("application/json") && response.body) {
             const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
             return result || { success: true, message: 'Office deleted successfully.' };
         }
@@ -124,11 +174,14 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
     // If response is not OK, parseJsonResponse will throw a detailed error.
     // This error will be caught by the outer catch block.
     await parseJsonResponse<any>(response); 
-    // The line below should not be reached if parseJsonResponse throws as expected.
+    // Fallback, should not be reached if parseJsonResponse throws as expected.
     throw new Error(`API request to delete office failed with status ${response.status}, but parseJsonResponse did not throw an error.`);
   } catch (error) {
     console.error(`Error deleting office ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
+    if (error instanceof HttpError && error.status === 404) {
+      throw new Error(`Delete failed: The endpoint to delete office ${officeId} (DELETE /api/organization/offices/${officeId}) was not found on the server (404). Please ensure this endpoint exists.`);
+    }
     throw new Error(`Failed to delete office ${officeId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -142,7 +195,13 @@ export async function addDepartment(departmentData: AddDepartmentPayload): Promi
       method: 'POST',
       body: JSON.stringify(departmentData),
     });
-    return await parseJsonResponse<Department>(response);
+    // Assuming DepartmentDto has 'id' and 'name', and potentially 'employeeCount'
+    const departmentDto = await parseJsonResponse<any>(response);
+    return {
+        id: departmentDto.id,
+        name: departmentDto.name,
+        employeeCount: departmentDto.employeeCount,
+    } as Department;
   } catch (error) {
     console.error('Error adding department:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -154,8 +213,13 @@ export async function fetchDepartments(): Promise<Department[]> {
   console.log('API CALL: GET /api/organization/departments.');
   try {
     const response = await apiClient('/organization/departments');
-    const departments = await parseJsonResponse<Department[]>(response);
-    return departments || [];
+    // Assuming the DTOs have 'id', 'name', 'employeeCount'
+    const departmentDtos = await parseJsonResponse<any[]>(response);
+    return (departmentDtos || []).map(dto => ({
+        id: dto.id,
+        name: dto.name,
+        employeeCount: dto.employeeCount,
+    })) as Department[];
   } catch (error) {
     console.error('Error fetching departments:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -170,12 +234,17 @@ export async function updateDepartment(departmentId: string, departmentData: Upd
       method: 'PUT',
       body: JSON.stringify(departmentData),
     });
-    return await parseJsonResponse<Department>(response);
+    const departmentDto = await parseJsonResponse<any>(response);
+    return {
+        id: departmentDto.id,
+        name: departmentDto.name,
+        employeeCount: departmentDto.employeeCount,
+    } as Department;
   } catch (error) {
     console.error(`Error updating department ${departmentId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
-    if (error instanceof Error && (error.message.includes("status 404") || error.message.toLowerCase().includes("not found"))) {
-        throw new Error(`Update failed: The department update endpoint (PUT /api/organization/departments/${departmentId}) was not found (404). Please ensure this endpoint is available on the backend.`);
+    if (error instanceof HttpError && error.status === 404) {
+        throw new Error(`Update failed: The department update endpoint (PUT /api/organization/departments/${departmentId}) was not found on the server (404). Please ensure this endpoint is available on the backend.`);
     }
     throw new Error(`Failed to update department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -192,26 +261,24 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
       if (response.status === 204) { // HTTP 204 No Content
         return { success: true, message: 'Department deleted successfully.' };
       }
-      // If there's a body (e.g. 200 OK with JSON), try to parse it.
       const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
+      if (contentType && contentType.includes("application/json") && response.body) {
         const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
-        // If parsing fails or result is null, still consider it a success if response was OK.
         return result && typeof result.success === 'boolean' ? result : { success: true, message: 'Department deleted successfully (parsed response).' };
       }
       return { success: true, message: 'Department deleted successfully (non-JSON OK response).' };
     } else {
-      // If response is not OK, parseJsonResponse will throw a detailed error.
-      // This error will be caught by the outer catch block.
+      // Let HttpError from parseJsonResponse propagate
       await parseJsonResponse<any>(response);
-      // The line below should ideally not be reached if parseJsonResponse throws.
-      // Adding a fallback error if parseJsonResponse somehow doesn't throw despite non-OK status.
-      throw new Error(`API request to delete department failed with status ${response.status}, but parseJsonResponse did not throw an error.`);
+      // This line should not be reached if parseJsonResponse throws correctly
+      throw new Error(`API request to delete department ${departmentId} failed with status ${response.status}.`);
     }
   } catch (error) {
     console.error(`Error deleting department ${departmentId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
-    // error.message here should be the detailed one from parseJsonResponse if the API call failed.
+     if (error instanceof HttpError && error.status === 404) {
+        throw new Error(`Delete failed: The department delete endpoint (DELETE /api/organization/departments/${departmentId}) was not found on the server (404). Please ensure this endpoint is available on the backend.`);
+    }
     throw new Error(`Failed to delete department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -226,7 +293,15 @@ export async function addPosition(positionData: AddPositionPayload): Promise<Pos
       method: 'POST',
       body: JSON.stringify(positionData),
     });
-    return await parseJsonResponse<Position>(response);
+    // Assuming PositionDto has 'id', 'title', 'departmentId', 'departmentName', 'assignedEmployees'
+    const positionDto = await parseJsonResponse<any>(response);
+    return {
+        id: positionDto.id,
+        title: positionDto.title,
+        departmentId: positionDto.departmentId,
+        departmentName: positionDto.departmentName,
+        assignedEmployees: positionDto.assignedEmployees,
+    } as Position;
   } catch (error) {
     console.error('Error adding position:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -238,8 +313,14 @@ export async function fetchPositions(): Promise<Position[]> {
   console.log('API CALL: GET /api/organization/positions.');
   try {
     const response = await apiClient('/organization/positions');
-    const positions = await parseJsonResponse<Position[]>(response);
-    return positions || [];
+    const positionDtos = await parseJsonResponse<any[]>(response);
+    return (positionDtos || []).map(dto => ({
+        id: dto.id,
+        title: dto.title,
+        departmentId: dto.departmentId,
+        departmentName: dto.departmentName,
+        assignedEmployees: dto.assignedEmployees,
+    })) as Position[];
   } catch (error) {
     console.error('Error fetching positions:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -248,6 +329,8 @@ export async function fetchPositions(): Promise<Position[]> {
 }
 
 export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<any> {
+  // Note: Your C# code has AssignPositionToDepartmentAsync. This function assumes assigning an employee to a position.
+  // The endpoint /api/organization/positions/{positionId}/assign needs to match this intent on the backend.
   console.log(`API CALL: PUT /api/organization/positions/${positionId}/assign. Data:`, assignmentData);
   try {
     const response = await apiClient(`/organization/positions/${positionId}/assign`, {
@@ -258,7 +341,9 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
   } catch (error) {
     console.error(`Error assigning position ${positionId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
+     if (error instanceof HttpError && error.status === 404) {
+        throw new Error(`Assign position failed: The endpoint (PUT /api/organization/positions/${positionId}/assign) was not found on the server (404).`);
+    }
     throw new Error(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-

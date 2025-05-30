@@ -18,6 +18,17 @@ export class UnauthorizedError extends Error {
 }
 
 /**
+ * Custom error class for general HTTP errors.
+ */
+export class HttpError extends Error {
+  constructor(message: string, public status: number, public responseText: string) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
+
+/**
  * A wrapper around the native fetch function to centralize API calls.
  * It automatically includes an Authorization header if a token is found in localStorage.
  * @param endpoint The API endpoint to call (e.g., '/employees').
@@ -70,7 +81,7 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
     // Handle 401 Unauthorized specifically
     if (response.status === 401) {
       const errorMessage = `API request failed with status 401: Unauthorized. ${responseText.trim() === '' ? 'Server returned an empty error response.' : responseText}`;
-      console.warn(errorMessage); 
+      // console.warn(errorMessage); // Service layer can log this if needed
       throw new UnauthorizedError(errorMessage);
     }
 
@@ -78,19 +89,17 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
     let errorMessage = `API request failed with status ${response.status}`;
     if (responseText.trim() === '') {
       errorMessage += ". The server returned an empty error response.";
-      // The console.error line that was here (line 81 in your log) has been removed.
-      // The error will be thrown and can be logged by the calling service function.
     } else {
       try {
+        // Attempt to parse error response as JSON for more details
         const errorJson = JSON.parse(responseText);
-        errorMessage += `: ${errorJson.message || responseText}`;
-        console.error(`API Error (${response.status}) - JSON Response:`, errorJson);
+        errorMessage += `: ${errorJson.message || errorJson.title || responseText}`; // Use message or title from error JSON if available
       } catch (e) {
+        // If parsing error JSON fails, use the raw text
         errorMessage += `: ${responseText}`;
-        console.error(`API Error (${response.status}) - Non-JSON Response: ${responseText}`);
       }
     }
-    throw new Error(errorMessage);
+    throw new HttpError(errorMessage, response.status, responseText);
   }
 
   // Handle OK responses
