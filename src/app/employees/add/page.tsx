@@ -14,15 +14,16 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { hireEmployee } from '@/services/employee-service';
-import type { Employee } from '@/lib/data';
-
+// Removed type import for Employee from lib/data as hireEmployee service will have its own payload type
 
 const employeeFormSchema = z.object({
-  name: z.string().min(2, { message: "Le nom doit contenir au moins 2 caractères." }),
+  firstName: z.string().min(2, { message: "Le prénom doit contenir au moins 2 caractères." }),
+  lastName: z.string().min(2, { message: "Le nom de famille doit contenir au moins 2 caractères." }),
   email: z.string().email({ message: "Veuillez entrer une adresse email valide." }),
-  department: z.string().min(2, { message: "Le département doit contenir au moins 2 caractères." }),
-  jobTitle: z.string().min(2, { message: "Le poste doit contenir au moins 2 caractères." }),
+  department: z.string().min(2, { message: "Le département doit contenir au moins 2 caractères." }), // Placeholder, likely needs to be DepartmentId
+  jobTitle: z.string().min(2, { message: "Le poste doit contenir au moins 2 caractères." }), // Placeholder, likely needs to be PositionId
   avatarUrl: z.string().url({ message: "Veuillez entrer une URL valide pour l'avatar." }).optional().or(z.literal('')),
+  // TODO: Add more fields required by backend: employeeNumber, address, dateOfBirth, gender, hireDate, etc.
 });
 
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -34,28 +35,48 @@ export default function AddEmployeePage() {
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: {
-      name: '',
+      firstName: '',
+      lastName: '',
       email: '',
-      department: '',
-      jobTitle: '',
+      department: '', // This will likely need to become a selection for DepartmentId
+      jobTitle: '',   // This will likely need to become a selection for PositionId
       avatarUrl: '',
     },
   });
 
   const onSubmit = async (data: EmployeeFormValues) => {
-    form.clearErrors(); 
+    form.clearErrors();
     try {
-      // The 'hireEmployee' service function expects data that fits Omit<Employee, 'id' | 'status' | ...> & { avatarUrl?: string }
-      // Our EmployeeFormValues is compatible.
-      const newEmployee = await hireEmployee(data); 
+      // Construct the payload according to what hireEmployee service now expects
+      // This will evolve as we add more fields to the form
+      const payload = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        department: data.department, // Placeholder, will become departmentId
+        jobTitle: data.jobTitle,     // Placeholder, will become positionId
+        avatarUrl: data.avatarUrl || undefined, // Send undefined if empty to omit
+        // Dummy values for other required fields for now, or fetch/select them
+        // These would ideally come from the form once it's expanded
+        employeeNumber: `EMP-${Math.floor(Math.random() * 10000)}`,
+        address: "123 Main St", // Placeholder
+        phoneNumber: "555-0100", // Placeholder
+        dateOfBirth: new Date(1990,0,1).toISOString(), // Placeholder
+        gender: 0, // Placeholder for enum (e.g., Male)
+        hireDate: new Date().toISOString(), // Placeholder
+        departmentId: "00000000-0000-0000-0000-000000000000", // Placeholder GUID
+        positionId: "00000000-0000-0000-0000-000000000000", // Placeholder GUID
+      };
+
+      const newEmployee = await hireEmployee(payload);
       console.log('Employee data saved via service:', newEmployee);
 
       toast({
         title: "Employé Ajouté",
-        description: `${newEmployee.name} a été ajouté avec succès. ID: ${newEmployee.id}`,
+        description: `${newEmployee.firstName} ${newEmployee.lastName} a été ajouté avec succès.`,
       });
-      form.reset(); // Reset form fields after successful submission
-      router.push('/employees'); 
+      form.reset();
+      router.push('/employees');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite lors de l'ajout de l'employé.";
         toast({
@@ -64,8 +85,6 @@ export default function AddEmployeePage() {
             description: `Impossible d'ajouter l'employé. ${errorMessage}`
         });
         console.error("Failed to add employee:", error);
-        // Handle field-specific errors if your API returns them in a structured way
-        // Example: if (error.response?.data?.errors) { ... form.setError ... }
     }
   };
 
@@ -91,12 +110,25 @@ export default function AddEmployeePage() {
             <CardContent className="space-y-6">
               <FormField
                 control={form.control}
-                name="name"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nom Complet</FormLabel>
+                    <FormLabel>Prénom</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Jean Dupont" {...field} />
+                      <Input placeholder="Ex: Jean" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nom de famille</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Dupont" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -120,7 +152,7 @@ export default function AddEmployeePage() {
                 name="department"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Département</FormLabel>
+                    <FormLabel>Département (Temporaire - sera ID)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Ingénierie" {...field} />
                     </FormControl>
@@ -133,7 +165,7 @@ export default function AddEmployeePage() {
                 name="jobTitle"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Poste</FormLabel>
+                    <FormLabel>Poste (Temporaire - sera ID)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Développeur Senior" {...field} />
                     </FormControl>

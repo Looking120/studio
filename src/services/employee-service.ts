@@ -1,6 +1,6 @@
 
 // src/services/employee-service.ts
-import type { Employee } from '@/lib/data';
+import type { Employee } from '@/lib/data'; // This is the frontend Employee type
 import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
 // Interface for the expected location data from getCurrentEmployeeLocation
@@ -8,8 +8,39 @@ export interface EmployeeLocation {
   latitude: number;
   longitude: number;
   lastSeen: string; // Or Date, adjust as per your API
-  // Add any other relevant fields your API returns
 }
+
+// Define a more specific payload for hiring, aligning with backend C# entities
+export interface HireEmployeePayload {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  email: string;
+  department: string; // Placeholder - will likely become departmentId: string (Guid)
+  jobTitle: string;   // Placeholder - will likely become positionId: string (Guid)
+  avatarUrl?: string;
+  // Fields required by backend Employee entity
+  employeeNumber: string;
+  address: string;
+  phoneNumber: string;
+  dateOfBirth: string; // ISO string "YYYY-MM-DDTHH:mm:ss.sssZ" or "YYYY-MM-DD"
+  gender: number; // Assuming 0 for Male, 1 for Female, etc. as per your Gender enum
+  hireDate: string; // ISO string
+  departmentId: string; // Guid as string
+  positionId: string; // Guid as string
+  // Add other fields as necessary: terminationDate, managerId etc.
+}
+
+// The return type for hireEmployee should ideally match the backend's Employee entity structure.
+// For now, we'll use the frontend Employee type, but it might need adjustment.
+export interface HiredEmployeeResponse extends Employee {
+    // Add any specific fields returned by /api/users/hire if different from frontend Employee
+    // For example, if it returns the full backend Employee structure.
+    // For now, assuming it can be mapped to the frontend Employee type.
+    firstName: string; // Ensure these are part of the response for mapping
+    lastName: string;
+}
+
 
 /**
  * Fetches all employees.
@@ -18,7 +49,14 @@ export async function fetchEmployees(): Promise<Employee[]> {
   console.log('API CALL: GET /api/employees');
   try {
     const response = await apiClient('/employees');
-    return await parseJsonResponse<Employee[]>(response);
+    const employeesData = await parseJsonResponse<any[]>(response); // Use any[] if backend structure is different
+    // Map backend data to frontend Employee type if necessary
+    return employeesData.map(emp => ({
+        ...emp, // Spread raw employee data
+        name: `${emp.firstName || ''} ${emp.lastName || ''}`.trim(), // Construct name if not present
+        status: emp.currentStatus === 0 ? 'Active' : 'Inactive', // Example mapping for status
+        // Ensure other fields match the frontend Employee type
+    })) as Employee[];
   } catch (error) {
     console.error('Error fetching employees:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -35,7 +73,14 @@ export async function fetchEmployeeById(id: string): Promise<Employee | null> {
   try {
     const response = await apiClient(`/employees/${id}`);
     if (response.status === 404) return null;
-    return await parseJsonResponse<Employee | null>(response);
+    const empData = await parseJsonResponse<any | null>(response);
+    if (!empData) return null;
+    // Map backend data to frontend Employee type
+    return {
+        ...empData,
+        name: `${empData.firstName || ''} ${empData.lastName || ''}`.trim(),
+        status: empData.currentStatus === 0 ? 'Active' : 'Inactive',
+    } as Employee;
   } catch (error) {
     console.error(`Error fetching employee by ID ${id}:`, error);
     if (error instanceof UnauthorizedError) throw error;
@@ -49,9 +94,16 @@ export async function fetchEmployeeById(id: string): Promise<Employee | null> {
  */
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<Employee[]> {
   console.log(`API CALL: GET /api/employees/status/${status}`);
+  // Backend expects 'Active' or 'Inactive', or perhaps an enum value. Adjust if needed.
+  const apiStatus = status; // Or map: status === 'Active' ? 0 : 1;
   try {
-    const response = await apiClient(`/employees/status/${status}`);
-    return await parseJsonResponse<Employee[]>(response);
+    const response = await apiClient(`/employees/status/${apiStatus}`);
+    const employeesData = await parseJsonResponse<any[]>(response);
+    return employeesData.map(emp => ({
+        ...emp,
+        name: `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        status: emp.currentStatus === 0 ? 'Active' : 'Inactive',
+    })) as Employee[];
   } catch (error) {
     console.error(`Error fetching employees by status ${status}:`, error);
     if (error instanceof UnauthorizedError) throw error;
@@ -65,13 +117,20 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
  * @param status The new status ('Active' or 'Inactive').
  */
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<Employee> {
-  console.log(`API CALL: PUT /api/employees/${employeeId}/status. New status: ${status}`);
+  // Backend might expect numeric enum for status, e.g., 0 for Active, 1 for Inactive
+  const numericStatus = status === 'Active' ? 0 : 1; // Example mapping
+  console.log(`API CALL: PUT /api/employees/${employeeId}/status. New status: ${status} (numeric: ${numericStatus})`);
   try {
     const response = await apiClient(`/employees/${employeeId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }), // Assuming API expects { "status": "Active" } in body
+      body: JSON.stringify({ status: numericStatus }), // Send numeric status if backend expects it
     });
-    return await parseJsonResponse<Employee>(response);
+    const empData = await parseJsonResponse<any>(response);
+     return {
+        ...empData,
+        name: `${empData.firstName || ''} ${empData.lastName || ''}`.trim(),
+        status: empData.currentStatus === 0 ? 'Active' : 'Inactive',
+    } as Employee;
   } catch (error) {
     console.error(`Error updating employee ${employeeId} status to ${status}:`, error);
     if (error instanceof UnauthorizedError) throw error;
@@ -82,20 +141,28 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
 /**
  * Hires a new user/employee.
  * The backend endpoint is /api/users/hire.
- * @param employeeData The data for the new employee.
- * Expects fields like name, email, department, jobTitle. avatarUrl is optional.
+ * @param employeeData The data for the new employee, based on HireEmployeePayload.
  */
-export async function hireEmployee(employeeData: Omit<Employee, 'id' | 'status' | 'avatarUrl' | 'lastSeen' | 'latitude' | 'longitude'> & { avatarUrl?: string }): Promise<Employee> {
+export async function hireEmployee(employeeData: HireEmployeePayload): Promise<HiredEmployeeResponse> {
   console.log('API CALL: POST /api/users/hire.', employeeData);
   try {
-    // Note: The endpoint is /users/hire as per the user's full API list.
-    // The Employee type from frontend has 'name', while signup had 'firstName', 'lastName'.
-    // Backend /api/users/hire must be able to handle the 'name' field or this needs adjustment.
     const response = await apiClient('/users/hire', {
       method: 'POST',
       body: JSON.stringify(employeeData),
     });
-    return await parseJsonResponse<Employee>(response);
+    // Assuming the response from /api/users/hire is the created Employee object (backend structure)
+    const hiredEmpData = await parseJsonResponse<any>(response);
+    // Map to frontend HiredEmployeeResponse type
+    return {
+        ...hiredEmpData,
+        id: hiredEmpData.id, // ensure id is mapped
+        name: `${hiredEmpData.firstName || ''} ${hiredEmpData.lastName || ''}`.trim(),
+        email: hiredEmpData.email,
+        department: hiredEmpData.department?.name || hiredEmpData.departmentId, // Adjust based on actual response
+        jobTitle: hiredEmpData.position?.title || hiredEmpData.positionId, // Adjust
+        status: hiredEmpData.currentStatus === 0 ? 'Active' : 'Inactive',
+        avatarUrl: hiredEmpData.avatarUrl || '', // If backend provides it
+    } as HiredEmployeeResponse;
   } catch (error) {
     console.error('Error hiring employee:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -127,7 +194,12 @@ export async function getNearbyEmployees(employeeId: string): Promise<Employee[]
   console.log(`API CALL: GET /api/employees/${employeeId}/location/nearby`);
   try {
     const response = await apiClient(`/employees/${employeeId}/location/nearby`);
-    return await parseJsonResponse<Employee[]>(response);
+    const employeesData = await parseJsonResponse<any[]>(response);
+     return employeesData.map(emp => ({
+        ...emp,
+        name: `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+        status: emp.currentStatus === 0 ? 'Active' : 'Inactive',
+    })) as Employee[];
   } catch (error) {
     console.error(`Error fetching nearby employees for ${employeeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
