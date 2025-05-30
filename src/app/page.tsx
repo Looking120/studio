@@ -44,16 +44,38 @@ export default function LoginPage() {
       if (response.token && typeof window !== 'undefined') {
         localStorage.setItem('authToken', response.token);
         console.log('Auth token stored in localStorage.');
+        
         if (response.user) {
-          localStorage.setItem('userName', response.user.name || '');
-          localStorage.setItem('userRole', response.user.role || '');
+          let displayName = '';
+          if (response.user.firstName && response.user.lastName) {
+            displayName = `${response.user.firstName} ${response.user.lastName}`;
+          } else if (response.user.name) {
+            displayName = response.user.name;
+          }
+          localStorage.setItem('userName', displayName.trim() || 'User');
+          localStorage.setItem('userRole', response.user.role || 'Employee');
           localStorage.setItem('userEmail', response.user.email || '');
+          console.log('User info (name, role, email) stored in localStorage.');
+        } else {
+          // Fallback if user object is not present in response
+          localStorage.setItem('userName', 'User');
+          localStorage.setItem('userRole', 'Employee');
+          localStorage.setItem('userEmail', email); // use entered email as a fallback
         }
       } else {
          console.warn('No token received or not in browser environment.');
       }
       
-      toast({ title: "Login Successful", description: `Welcome back, ${response.user?.name || 'User'}!`});
+      let welcomeName = "User";
+      if (response.user) {
+        if (response.user.firstName && response.user.lastName) {
+          welcomeName = `${response.user.firstName} ${response.user.lastName}`;
+        } else if (response.user.name) {
+          welcomeName = response.user.name;
+        }
+      }
+
+      toast({ title: "Login Successful", description: `Welcome back, ${welcomeName.trim() || 'User'}!`});
       router.push('/dashboard'); 
     } catch (error) {
       console.error('Sign in failed:', error);

@@ -7,7 +7,9 @@ export interface SignInResponse {
   token: string;
   user: {
     id: string;
-    name: string; // This might need to change to firstName, lastName if API returns that
+    firstName?: string; // Added for more specific name handling
+    lastName?: string;  // Added for more specific name handling
+    name?: string;      // Kept for fallback or direct use
     email: string;
     role: string;
     // other user details
@@ -20,10 +22,10 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Made optional again to match previous, will make required in component
-  confirmPassword?: string; // Made optional, will make required in component
+  password?: string; 
+  confirmPassword?: string;
   phoneNumber?: string;
-  birthDate?: string; // Added birthDate
+  birthDate?: string; 
   [key: string]: any;
 }
 
@@ -46,12 +48,13 @@ export async function signIn(credentials: { email?: string; username?: string; p
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
   
-  if (typeof window !== 'undefined' && parsedResponse.token) {
-    localStorage.setItem('authToken', parsedResponse.token);
-    console.log('Auth token stored in localStorage.');
-  } else if (typeof window !== 'undefined') {
-    console.warn('No token received from sign-in, or not in browser environment.');
-  }
+  // Storing the token is now handled in the component after successful sign-in
+  // if (typeof window !== 'undefined' && parsedResponse.token) {
+  //   localStorage.setItem('authToken', parsedResponse.token);
+  //   console.log('Auth token stored in localStorage.');
+  // } else if (typeof window !== 'undefined') {
+  //   console.warn('No token received from sign-in, or not in browser environment.');
+  // }
   
   return parsedResponse;
 }
@@ -91,10 +94,12 @@ export async function signOut(): Promise<{ message: string }> {
   
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
-    console.log('Auth token removed from localStorage.');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    console.log('Auth token and user info removed from localStorage.');
   }
 
   const result = await parseJsonResponse<{ message: string }>(response);
   return result || { message: 'Signed out successfully' };
 }
-
