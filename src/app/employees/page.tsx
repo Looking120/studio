@@ -53,6 +53,7 @@ export default function EmployeesPage() {
 
   const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
     const originalEmployees = [...employees];
+    // Optimistic update
     setEmployees(prevEmployees =>
       prevEmployees.map(emp =>
         emp.id === employeeId ? { ...emp, status: newStatus } : emp
@@ -85,7 +86,7 @@ export default function EmployeesPage() {
         (employee.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.department?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-    )
+    );
   }, [employees, searchTerm]);
 
   return (
@@ -156,7 +157,7 @@ export default function EmployeesPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={employee.avatarUrl || `https://placehold.co/40x40.png?text=${employee.name?.substring(0,2)}`} alt={employee.name} data-ai-hint="person portrait" />
+                            <AvatarImage src={employee.avatarUrl || `https://placehold.co/40x40.png?text=${employee.name?.substring(0,2)}`} alt={employee.name || ''} data-ai-hint="person portrait" />
                             <AvatarFallback>{employee.name?.substring(0, 2).toUpperCase() || 'N/A'}</AvatarFallback>
                           </Avatar>
                           <span className="font-medium">{employee.name || 'N/A'}</span>
@@ -166,7 +167,7 @@ export default function EmployeesPage() {
                       <TableCell>{employee.department || 'N/A'}</TableCell>
                       <TableCell>{employee.jobTitle || 'N/A'}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={employee.status === 'Active' ? 'default' : 'outline'}>
+                        <Badge variant={employee.status === 'Active' ? 'default' : 'secondary'}>
                           {employee.status || 'N/A'}
                         </Badge>
                       </TableCell>

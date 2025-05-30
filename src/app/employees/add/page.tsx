@@ -14,8 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { hireEmployee } from '@/services/employee-service';
-// We don't need the Employee type from lib/data if the service handles types internally or returns a compatible type.
-// import type { Employee } from '@/lib/data';
+import type { Employee } from '@/lib/data';
 
 
 const employeeFormSchema = z.object({
@@ -46,8 +45,8 @@ export default function AddEmployeePage() {
   const onSubmit = async (data: EmployeeFormValues) => {
     form.clearErrors(); 
     try {
-      // The 'hireEmployee' service function expects data without id, status, etc.
-      // Our form data (EmployeeFormValues) matches this expectation.
+      // The 'hireEmployee' service function expects data that fits Omit<Employee, 'id' | 'status' | ...> & { avatarUrl?: string }
+      // Our EmployeeFormValues is compatible.
       const newEmployee = await hireEmployee(data); 
       console.log('Employee data saved via service:', newEmployee);
 
@@ -58,7 +57,7 @@ export default function AddEmployeePage() {
       form.reset(); // Reset form fields after successful submission
       router.push('/employees'); 
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
+        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite lors de l'ajout de l'employé.";
         toast({
             variant: "destructive",
             title: "Erreur d'Ajout",
