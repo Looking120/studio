@@ -174,19 +174,13 @@ export default function ActivityLogsPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={`skeleton-${index}`}>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell> {/* Adjusted skeleton for date column */}
+                      <TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell><Skeleton className="h-5 w-20" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell><TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     </TableRow>
                   ))
                 ) : (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell><TableCell>
                         <Badge 
                           variant={
                             log.activity?.toLowerCase().includes('checked in') ? 'default' : 
@@ -196,11 +190,7 @@ export default function ActivityLogsPage() {
                         >
                           {log.activity || 'N/A'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>{log.location || 'N/A'}</TableCell>
-                      <TableCell>{formatDate(log.checkInTime)}</TableCell>
-                      <TableCell>{formatDate(log.checkOutTime)}</TableCell>
-                      <TableCell>{formatDate(log.date)}</TableCell> {/* Use formatDate for consistency */}
+                      </TableCell><TableCell>{log.location || 'N/A'}</TableCell><TableCell>{formatDate(log.checkInTime)}</TableCell><TableCell>{formatDate(log.checkOutTime)}</TableCell><TableCell>{formatDate(log.date)}</TableCell>
                     </TableRow>
                   ))
                 )}
