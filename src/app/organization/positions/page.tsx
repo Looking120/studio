@@ -8,7 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Edit, Trash2, Briefcase, UserCheck, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchPositions, addPosition, assignPositionToEmployee, type Position, type AddPositionPayload, type AssignPositionPayload } from '@/services/organization-service';
+import {
+  fetchPositions,
+  addPosition,
+  assignPositionToEmployee,
+  type Position,
+  type AddPositionPayload,
+  type AssignPositionPayload
+} from '@/services/organization-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
@@ -24,6 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Label } from '@/components/ui/label';
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -32,17 +40,18 @@ export default function PositionsPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // Add state for managing add/edit/assign dialogs
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newPositionTitle, setNewPositionTitle] = useState("");
-  // const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined); // For linking to department
+  // const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined);
 
   const loadPositions = async () => {
     setIsLoading(true);
     setError(null);
     try {
+      console.log("Attempting to fetch positions from service...");
       const data = await fetchPositions();
-      setPositions(data);
+      console.log("Positions fetched:", data);
+      setPositions(data || []);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
@@ -50,31 +59,31 @@ export default function PositionsPage() {
             router.push('/');
             return;
         }
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching positions.';
         setError(errorMessage);
         toast({ variant: "destructive", title: "Failed to load positions", description: errorMessage });
+        setPositions([]);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   useEffect(() => {
     loadPositions();
-    // You might also want to fetch departments here if you need them for a dropdown in the add/edit position form
-  }, [toast, router]);
+  }, []);
 
-  const handleAddPosition = async () => {
+  const handleAddPositionSubmit = async () => {
     if (!newPositionTitle.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Position title cannot be empty." });
         return;
     }
-    const payload: AddPositionPayload = { 
+    const payload: AddPositionPayload = {
         title: newPositionTitle.trim(),
-        // departmentId: selectedDepartmentId // If you add department selection
+        // departmentId: selectedDepartmentId
     };
     try {
       const newPosition = await addPosition(payload);
-      setPositions(prev => [...prev, newPosition]); // Or await loadPositions();
+      setPositions(prev => [...prev, newPosition]);
       toast({ title: "Position Added", description: `${newPosition.title} was successfully added.` });
       setNewPositionTitle("");
       // setSelectedDepartmentId(undefined);
@@ -94,19 +103,26 @@ export default function PositionsPage() {
 
   const handleEditPosition = (pos: Position) => {
     console.log(`Placeholder: Open edit position form for ${pos.title}.`);
-    alert(`Edit position ${pos.title} - functionality to be implemented.`);
+    alert(`Edit position ${pos.title} - functionality to be implemented with a form/dialog.`);
   };
 
-  const handleDeletePosition = (pos: Position) => {
-     console.log(`Placeholder: Delete position ${pos.id}.`);
-     alert(`Delete position ${pos.title} - functionality to be implemented.`);
+  const handleDeletePositionConfirm = async (positionId: string) => {
+     console.log(`Placeholder: Delete position ${positionId}.`);
+     alert(`Delete position ${positionId} - functionality to be implemented.`);
      // Example:
-     // try { await deletePosition(pos.id); setPositions(prev => prev.filter(p => p.id !== pos.id)); toast({ title: "Position Deleted" }); } catch (err) { ... }
+     // try {
+     //   await deletePosition(positionId); // Assuming deletePosition service function exists
+     //   setPositions(prev => prev.filter(p => p.id !== positionId));
+     //   toast({ title: "Position Deleted" });
+     // } catch (err) {
+     //   if (err instanceof UnauthorizedError) { /* ... */ }
+     //   toast({ variant: "destructive", title: "Delete Failed", description: err.message });
+     // }
   };
 
   const handleAssignPosition = (pos: Position) => {
     console.log(`Placeholder: Open assign employee to position ${pos.title} dialog.`);
-    alert(`Assign employee to ${pos.title} - functionality to be implemented.`);
+    alert(`Assign employee to ${pos.title} - functionality to be implemented with a form/dialog.`);
     // Example:
     // const employeeIdToAssign = prompt(`Enter Employee ID to assign to ${pos.title}:`);
     // if (employeeIdToAssign) {
@@ -115,7 +131,10 @@ export default function PositionsPage() {
     //     await assignPositionToEmployee(pos.id, payload);
     //     toast({ title: "Position Assigned" });
     //     loadPositions(); // Refresh data
-    //   } catch (err) { /* ... handle error ... */ }
+    //   } catch (err) {
+    //      if (err instanceof UnauthorizedError) { /* ... */ }
+    //      toast({ variant: "destructive", title: "Assign Failed", description: err.message });
+    //   }
     // }
   };
 
@@ -140,19 +159,21 @@ export default function PositionsPage() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="grid gap-4 py-4">
-                    <Input 
-                        id="positionTitle"
-                        placeholder="E.g., Software Engineer, Marketing Manager"
-                        value={newPositionTitle}
-                        onChange={(e) => setNewPositionTitle(e.target.value)}
-                        className="col-span-3"
-                    />
+                    <div className="space-y-2">
+                        <Label htmlFor="newPositionTitle">Position Title</Label>
+                        <Input
+                            id="newPositionTitle"
+                            placeholder="E.g., Software Engineer, Marketing Manager"
+                            value={newPositionTitle}
+                            onChange={(e) => setNewPositionTitle(e.target.value)}
+                        />
+                    </div>
                     {/* TODO: Add Select component here to choose departmentId from fetched departments */}
                     {/* <Select onValueChange={setSelectedDepartmentId} value={selectedDepartmentId}> ... </Select> */}
                 </div>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => { setNewPositionTitle(""); /* setSelectedDepartmentId(undefined); */ }}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAddPosition}>Add Position</AlertDialogAction>
+                    <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -236,7 +257,7 @@ export default function PositionsPage() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeletePosition(pos)}>Delete</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDeletePositionConfirm(pos.id)}>Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -251,3 +272,5 @@ export default function PositionsPage() {
     </Card>
   );
 }
+
+    

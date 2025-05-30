@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-    fetchDepartments, 
-    addDepartment, 
+import {
+    fetchDepartments,
+    addDepartment,
     updateDepartment,
     deleteDepartment,
-    type Department, 
+    type Department,
     type AddDepartmentPayload,
     type UpdateDepartmentPayload
 } from '@/services/organization-service';
@@ -54,16 +54,22 @@ export default function DepartmentsPage() {
     setIsLoading(true);
     setError(null);
     try {
+      console.log("Attempting to fetch departments from service...");
       const data = await fetchDepartments();
+      console.log("Departments fetched:", data);
       setDepartments(data || []); // Ensure it's an array
     } catch (err) {
       if (err instanceof UnauthorizedError) {
-        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again.",
+        });
         await signOut();
         router.push('/');
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching departments.';
       setError(errorMessage);
       toast({ variant: "destructive", title: "Failed to load departments", description: errorMessage });
       setDepartments([]);
@@ -100,7 +106,7 @@ export default function DepartmentsPage() {
       console.error("Add department failed:", err);
     }
   };
-  
+
   const openEditDialog = (dept: Department) => {
     setEditingDepartment(dept);
     setEditDepartmentName(dept.name);
@@ -175,7 +181,7 @@ export default function DepartmentsPage() {
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="newDepartmentName">Department Name</Label>
-                        <Input 
+                        <Input
                             id="newDepartmentName"
                             placeholder="E.g., Engineering, Marketing"
                             value={newDepartmentName}
@@ -284,7 +290,7 @@ export default function DepartmentsPage() {
                 <div className="grid gap-4 py-4">
                      <div className="space-y-2">
                         <Label htmlFor="editDepartmentName">New Department Name</Label>
-                        <Input 
+                        <Input
                             id="editDepartmentName"
                             placeholder="E.g., Advanced Engineering"
                             value={editDepartmentName}
