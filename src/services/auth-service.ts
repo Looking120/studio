@@ -1,6 +1,6 @@
 
 // src/services/auth-service.ts
-// import { apiClient, parseJsonResponse } from './api-client'; // API calls removed
+import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
 // Define types for auth responses, adjust as per your API
 export interface SignInResponse {
@@ -22,10 +22,10 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; 
-  confirmPassword?: string; 
+  password?: string;
+  confirmPassword?: string;
   phoneNumber?: string;
-  birthDate?: string; 
+  birthDate?: string;
 }
 
 export interface SignUpResponse {
@@ -35,34 +35,30 @@ export interface SignUpResponse {
 }
 
 /**
- * Signs in a user. (MOCKED)
+ * Signs in a user.
  * @param credentials Email and password.
  */
-export async function signIn(credentials: { email?: string; username?: string; password?: string }): Promise<SignInResponse> {
-  console.log('MOCK API CALL: POST /api/auth/signin. Attempting with:', credentials.email || credentials.username);
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Mock successful response
-  const mockUser = {
-    id: 'mockUser123',
-    firstName: 'Mock',
-    lastName: 'AdminUser',
-    email: credentials.email || 'mock@example.com',
-    role: 'Admin', // Or 'Employé' based on credentials for testing
-  };
-  if (credentials.email === 'user@example.com') {
-    mockUser.firstName = 'Mock';
-    mockUser.lastName = 'EmployeeUser';
-    mockUser.role = 'Employé';
+export async function signIn(credentials: { email?: string; password?: string }): Promise<SignInResponse> {
+  console.log('Auth Service: Attempting to sign in with:', credentials.email);
+  try {
+    const response = await apiClient('/auth/signin', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    console.log('Auth Service - Raw response from /api/auth/signin:', response);
+    const parsedResponse = await parseJsonResponse<SignInResponse>(response);
+    console.log('Auth Service - Parsed JSON response from /api/auth/signin:', parsedResponse);
+    if (!parsedResponse || !parsedResponse.token) {
+        throw new Error('Authentication failed: No token received from server response.');
+    }
+    return parsedResponse;
+  } catch (error) {
+    console.error('Auth Service - signIn error:', error);
+    if (error instanceof UnauthorizedError) {
+      throw error; // Re-throw specific error for page to handle
+    }
+    throw new Error(error instanceof Error ? error.message : 'An unknown error occurred during sign in.');
   }
-
-  const mockResponse: SignInResponse = {
-    token: 'mock-jwt-token-' + Date.now(),
-    user: mockUser,
-  };
-  console.log('Mock Auth Service - Returning from signIn:', mockResponse);
-  return Promise.resolve(mockResponse);
 }
 
 /**
@@ -70,41 +66,75 @@ export async function signIn(credentials: { email?: string; username?: string; p
  * @param userData User details for registration.
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
-  console.log('MOCK API CALL: POST /api/auth/signup. User data being sent:', { 
-    firstName: userData.firstName, 
-    lastName: userData.lastName, 
-    userName: userData.userName, 
+  console.log('MOCK API CALL: POST /api/auth/signup. User data being sent:', {
+    firstName: userData.firstName,
+    lastName: userData.lastName,
+    userName: userData.userName,
     email: userData.email,
     middleName: userData.middleName,
     phoneNumber: userData.phoneNumber,
     birthDate: userData.birthDate,
+    // Password is not logged for security
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // To connect this:
+  // const response = await apiClient('/auth/signup', {
+  //   method: 'POST',
+  //   body: JSON.stringify(userData),
+  // });
+  // return parseJsonResponse<SignUpResponse>(response);
+
+  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
   const mockResponse: SignUpResponse = {
-    message: "Inscription réussie (simulation)!",
+    message: `Inscription réussie (simulation) pour ${userData.userName}!`,
     userId: 'mockNewUser-' + Date.now(),
   };
   return Promise.resolve(mockResponse);
 }
 
 /**
- * Signs out the current user. (MOCKED)
+ * Signs out the current user.
+ * Clears local authentication data and optionally attempts to sign out from the server.
  * @returns A promise with the sign-out status.
  */
 export async function signOut(): Promise<{ message: string; serverSignOutOk: boolean }> {
-  console.log('MOCK API CALL: POST /api/auth/signout.');
-  await new Promise(resolve => setTimeout(resolve, 200));
-  
+  let serverSignOutOk = false;
+  let serverMessage = "Server sign-out not attempted or failed.";
+
+  try {
+    // Optional: Call your backend's signout endpoint
+    // const response = await apiClient('/auth/signout', { method: 'POST' });
+    // if (response.ok) {
+    //   serverSignOutOk = true;
+    //   serverMessage = "Successfully signed out from server.";
+    //   console.log('Auth Service: Successfully signed out from server.');
+    // } else {
+    //   const errorText = await response.text();
+    //   serverMessage = `Server sign-out failed: ${response.status} ${errorText || response.statusText}`;
+    //   console.warn(`Auth Service: Server sign-out failed: ${response.status} ${errorText || response.statusText}`);
+    // }
+    // For now, let's simulate a successful server sign out for mock purposes.
+    // Remove this line when connecting to a real backend signout.
+    await new Promise(resolve => setTimeout(resolve, 200));
+    serverSignOutOk = true; 
+    serverMessage = "Server sign-out successful (simulated).";
+    console.log('Auth Service: Server sign-out successful (simulated).');
+
+  } catch (error) {
+    serverMessage = `Error during server sign-out attempt: ${error instanceof Error ? error.message : "Unknown error"}`;
+    console.error(`Auth Service: Error during server sign-out attempt:`, error);
+  }
+
+  // Always clear local storage regardless of server response
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
-    console.log('Auth token and user info removed from localStorage (mock sign out).');
+    console.log('Auth Service: Auth token and user info removed from localStorage.');
   }
 
-  return Promise.resolve({ 
-    message: "Déconnexion locale effectuée (simulation).",
-    serverSignOutOk: true // Simulate server sign out also being ok
-  });
+  return {
+    message: `Local sign-out successful. ${serverMessage}`,
+    serverSignOutOk,
+  };
 }

@@ -14,10 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; 
+import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
-import { signIn, type SignInResponse } from '@/services/auth-service'; 
+import { signIn, type SignInResponse } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
+import { UnauthorizedError } from "@/services/api-client";
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,7 +41,7 @@ export default function LoginPage() {
     }
 
     try {
-      // Call the signIn function from the auth-service
+      console.log(`Login page - Attempting signIn with email: ${email}`);
       const response: SignInResponse | null = await signIn({ email, password });
       console.log('Login page - signIn service call returned:', response);
 
@@ -57,9 +59,9 @@ export default function LoginPage() {
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
-        let finalUserName = 'Utilisateur'; 
-        let finalUserRole = 'Employé';  
-        let finalUserEmail = email;     
+        let finalUserName = 'Utilisateur';
+        let finalUserRole = 'Employé';
+        let finalUserEmail = email;
 
         const userFromApi = response.user;
         console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
@@ -74,28 +76,28 @@ export default function LoginPage() {
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) { 
+          } else if (userFromApi.name) {
             displayName = userFromApi.name;
           }
-          
+
           finalUserName = displayName.trim() || 'Utilisateur';
-          finalUserRole = userFromApi.role || 'Employé'; 
-          finalUserEmail = userFromApi.email || email; 
-          
+          finalUserRole = userFromApi.role || 'Employé';
+          finalUserEmail = userFromApi.email || email;
+
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
           console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using default/fallback user info for storage. User object received:', userFromApi);
         }
-      
+
         localStorage.setItem('userName', finalUserName);
         localStorage.setItem('userRole', finalUserRole);
         localStorage.setItem('userEmail', finalUserEmail);
         console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
-        
-        toast({ title: "Connexion Réussie", description: `Bienvenue, ${finalUserName}!`});
+
+        toast({ title: "Connexion Réussie", description: `Bienvenue, ${finalUserName}!` });
         router.push('/dashboard');
       } else {
-        setIsLoading(false); 
+        setIsLoading(false);
         console.warn('Login page - Token validation failed. Detailed diagnostics:');
         if (!response) {
           console.warn('Login page - The response object from signIn service is null or undefined.');
@@ -115,14 +117,23 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      setIsLoading(false); 
+      setIsLoading(false);
       console.error('Login page - Sign in failed:', error);
-      toast({
-        variant: "destructive",
-        title: "Échec de la Connexion",
-        description: error instanceof Error ? error.message : "Erreur inconnue lors de la connexion."
-      });
+      if (error instanceof UnauthorizedError) {
+        toast({
+            variant: "destructive",
+            title: "Échec de la Connexion",
+            description: "Email ou mot de passe incorrect."
+        });
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Échec de la Connexion",
+            description: error instanceof Error ? error.message : "Erreur inconnue lors de la connexion."
+        });
+      }
     } finally {
+      // Ensure isLoading is set to false in all paths if it was true
       if (isLoading) setIsLoading(false);
     }
   };
