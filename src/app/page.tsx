@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; // Added useState
+import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
 
 // Define the expected structure of the sign-in API response
 interface SignInApiResponse {
@@ -33,8 +33,8 @@ interface SignInApiResponse {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
-  const [isLoading, setIsLoading] = useState(false); // Initialize isLoading state
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,17 +51,18 @@ export default function LoginPage() {
     }
 
     try {
-      // Call the local signIn function
+      // Call the local signIn function (defined at the bottom of this file)
       const response = await signIn({ email, password }); 
       console.log('Login page - signIn service call returned:', response);
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
-        localStorage.setItem('token', response.token);
+        localStorage.setItem('token', response.token); // Using 'token' as key, consistent with fetchApi
         console.log('Login page - Auth token stored in localStorage (key: token).');
 
+        // Extract user details
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email; 
+        let finalUserEmail = email; // Fallback to entered email
 
         const userFromApi = response.user;
         if (userFromApi && typeof userFromApi === 'object') {
@@ -73,9 +74,9 @@ export default function LoginPage() {
             displayName = userFromApi.name;
           }
           
-          finalUserName = displayName.trim() || 'User';
+          finalUserName = displayName.trim() || 'User'; // Ensure not empty
           finalUserRole = userFromApi.role || 'Employee';
-          finalUserEmail = userFromApi.email || email;
+          finalUserEmail = userFromApi.email || email; // Use API email if available
           
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
@@ -103,6 +104,7 @@ export default function LoginPage() {
             console.warn('Login page - "token" field is a string, but it is empty or contains only whitespace.');
           }
         }
+        setIsLoading(false); // Explicitly set loading to false here
         toast({
           variant: "destructive",
           title: "Login Failed",
@@ -111,6 +113,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Sign in failed:', error);
+      setIsLoading(false); // Explicitly set loading to false here
       toast({
         variant: "destructive",
         title: "Login Failed",
@@ -187,14 +190,14 @@ export default function LoginPage() {
 }
 
 // API Configuration and Helper
-const API_BASE_URL = 'https://localhost:7294/api';
+const API_BASE_URL = 'https://localhost:7294/api'; // Ensure this is your correct API base URL
 
 async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promise<T> {
   const token = localStorage.getItem('token'); // Using 'token' as key
 
   const headers = new Headers({
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    'Accept': 'application/json', // Ensure server knows we expect JSON
   });
   if (token) {
     headers.append('Authorization', `Bearer ${token}`);
@@ -203,7 +206,7 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
   const config: RequestInit = {
     method,
     headers,
-    // credentials: 'include', // 'credentials' can cause issues if not configured on server
+    // credentials: 'include', // Removed 'credentials: include' as it might cause issues if not specifically needed and configured on server
   };
 
   if (body) {
@@ -229,9 +232,9 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
     let errorMsg = `Error ${responseStatus}: ${responseStatusText}. Response: ${responseText}`;
     try {
         // Attempt to parse even if not ok, in case server sends problem+json
-        const errorJson = JSON.parse(responseText);
-        errorMsg = errorJson.title || errorJson.message || errorMsg; 
-        if (errorJson.errors) { 
+        const errorJson = JSON.parse(responseText); // Try to parse error response
+        errorMsg = errorJson.title || errorJson.message || errorMsg; // Use title or message from error JSON if available
+        if (errorJson.errors) { // ASP.NET Core often returns validation errors in an 'errors' object
             const validationErrors = Object.values(errorJson.errors).flat().join(', ');
             errorMsg += ` Details: ${validationErrors}`;
         }
@@ -242,6 +245,7 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
     throw new Error(errorMsg);
   }
 
+  // Handle 204 No Content specifically (often for successful DELETE or some PUTs)
   if (responseStatus === 204) { // No Content
     console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} returned 204 No Content. Returning null.`);
     return null as T;
@@ -265,14 +269,14 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
     }
     // For other endpoints, this might be acceptable, but less likely for this app
     console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} was successful (status ${responseStatus}) but Content-Type ('${contentType}') was not application/json. Returning raw text.`);
-    return responseText as unknown as T;
+    return responseText as unknown as T; // This case should be rare for a JSON API
   }
 }
 
 //
-// Auth
+// Auth (as an example if you need to type the response)
 //
-export const signIn = (credentials: { email: string; password: string }) =>
+export const signIn = (credentials: { email: string; password?: string }) => // Password can be optional if you just pass email
   fetchApi<SignInApiResponse>('/auth/signin', 'POST', credentials);
 
 // ... (rest of your API functions: signUp, signOut, getEmployees, etc. remain unchanged)
