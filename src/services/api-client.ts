@@ -78,7 +78,8 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
     let errorMessage = `API request failed with status ${response.status}`;
     if (responseText.trim() === '') {
       errorMessage += ". The server returned an empty error response.";
-      console.error(`API Error (${response.status}): Request failed and server returned an empty response body.`);
+      // The console.error line that was here (line 81 in your log) has been removed.
+      // The error will be thrown and can be logged by the calling service function.
     } else {
       try {
         const errorJson = JSON.parse(responseText);
@@ -105,4 +106,3 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
     throw new Error(`Failed to parse JSON response from a successful request. Status: ${response.status}, URL: ${response.url}`);
   }
 }
-
