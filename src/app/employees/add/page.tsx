@@ -13,17 +13,30 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { hireEmployee } from '@/services/employee-service';
-// Removed type import for Employee from lib/data as hireEmployee service will have its own payload type
+import { hireEmployee, type HireEmployeePayload } from '@/services/employee-service'; // Updated import
 
+// Adjusted Zod schema to align with HireEmployeePayload and backend entities
+// Note: For GUIDs (departmentId, positionId, officeId) and enums (gender),
+// the form will need proper select/radio components eventually.
 const employeeFormSchema = z.object({
   firstName: z.string().min(2, { message: "Le prénom doit contenir au moins 2 caractères." }),
   lastName: z.string().min(2, { message: "Le nom de famille doit contenir au moins 2 caractères." }),
+  middleName: z.string().optional(),
   email: z.string().email({ message: "Veuillez entrer une adresse email valide." }),
-  department: z.string().min(2, { message: "Le département doit contenir au moins 2 caractères." }), // Placeholder, likely needs to be DepartmentId
-  jobTitle: z.string().min(2, { message: "Le poste doit contenir au moins 2 caractères." }), // Placeholder, likely needs to be PositionId
+  
+  employeeNumber: z.string().min(1, { message: "Le numéro d'employé est requis."}),
+  address: z.string().min(5, { message: "L'adresse doit contenir au moins 5 caractères." }),
+  phoneNumber: z.string().min(5, { message: "Le numéro de téléphone est requis." }),
+  dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Date de naissance invalide."}), // Basic validation
+  gender: z.string().min(1, { message: "Le genre est requis (ex: Male, Female, Other)." }), // String as per new schema
+  hireDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Date d'embauche invalide."}),
+  
+  departmentId: z.string().uuid({ message: "L'ID du département doit être un GUID valide." }), // Expecting GUID
+  positionId: z.string().uuid({ message: "L'ID du poste doit être un GUID valide." }),     // Expecting GUID
+  officeId: z.string().uuid({ message: "L'ID du bureau doit être un GUID valide." }),       // Expecting GUID
+
   avatarUrl: z.string().url({ message: "Veuillez entrer une URL valide pour l'avatar." }).optional().or(z.literal('')),
-  // TODO: Add more fields required by backend: employeeNumber, address, dateOfBirth, gender, hireDate, etc.
+  // userId is optional in HireEmployeePayload, not typically set in this form for a *new* employee
 });
 
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -37,9 +50,17 @@ export default function AddEmployeePage() {
     defaultValues: {
       firstName: '',
       lastName: '',
+      middleName: '',
       email: '',
-      department: '', // This will likely need to become a selection for DepartmentId
-      jobTitle: '',   // This will likely need to become a selection for PositionId
+      employeeNumber: `EMP-${Math.floor(1000 + Math.random() * 9000)}`, // Example placeholder
+      address: '',
+      phoneNumber: '',
+      dateOfBirth: '', 
+      gender: '', // Will need a select/radio for Male, Female, Other
+      hireDate: new Date().toISOString().split('T')[0], // Default to today
+      departmentId: '', // Placeholder, should be a select returning GUID
+      positionId: '',   // Placeholder, should be a select returning GUID
+      officeId: '',     // Placeholder, should be a select returning GUID
       avatarUrl: '',
     },
   });
@@ -47,27 +68,27 @@ export default function AddEmployeePage() {
   const onSubmit = async (data: EmployeeFormValues) => {
     form.clearErrors();
     try {
-      // Construct the payload according to what hireEmployee service now expects
-      // This will evolve as we add more fields to the form
-      const payload = {
+      const payload: HireEmployeePayload = {
         firstName: data.firstName,
         lastName: data.lastName,
+        middleName: data.middleName || undefined,
         email: data.email,
-        department: data.department, // Placeholder, will become departmentId
-        jobTitle: data.jobTitle,     // Placeholder, will become positionId
-        avatarUrl: data.avatarUrl || undefined, // Send undefined if empty to omit
-        // Dummy values for other required fields for now, or fetch/select them
-        // These would ideally come from the form once it's expanded
-        employeeNumber: `EMP-${Math.floor(Math.random() * 10000)}`,
-        address: "123 Main St", // Placeholder
-        phoneNumber: "555-0100", // Placeholder
-        dateOfBirth: new Date(1990,0,1).toISOString(), // Placeholder
-        gender: 0, // Placeholder for enum (e.g., Male)
-        hireDate: new Date().toISOString(), // Placeholder
-        departmentId: "00000000-0000-0000-0000-000000000000", // Placeholder GUID
-        positionId: "00000000-0000-0000-0000-000000000000", // Placeholder GUID
+        avatarUrl: data.avatarUrl || undefined,
+        
+        employeeNumber: data.employeeNumber,
+        address: data.address,
+        phoneNumber: data.phoneNumber,
+        dateOfBirth: new Date(data.dateOfBirth).toISOString(), // Ensure ISO format
+        gender: data.gender, // Expecting "Male", "Female", "Other"
+        hireDate: new Date(data.hireDate).toISOString(),   // Ensure ISO format
+        
+        departmentId: data.departmentId, // Expecting GUID from form
+        positionId: data.positionId,     // Expecting GUID from form
+        officeId: data.officeId,         // Expecting GUID from form
+        // userId: undefined, // Not typically set when creating a new employee this way
       };
 
+      console.log("Submitting payload for hireEmployee:", payload);
       const newEmployee = await hireEmployee(payload);
       console.log('Employee data saved via service:', newEmployee);
 
@@ -89,7 +110,7 @@ export default function AddEmployeePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="max-w-3xl mx-auto py-8">
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -103,32 +124,48 @@ export default function AddEmployeePage() {
           </div>
           <CardDescription>
             Remplissez les informations ci-dessous pour ajouter un nouvel employé au système.
+            Les champs marqués d'un * sont obligatoires.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prénom *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Jean" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nom de famille *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Dupont" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
-                name="firstName"
+                name="middleName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Prénom</FormLabel>
+                    <FormLabel>Deuxième prénom (Optionnel)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Jean" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom de famille</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Dupont" {...field} />
+                      <Input placeholder="Ex: Charles" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -139,7 +176,7 @@ export default function AddEmployeePage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse Email</FormLabel>
+                    <FormLabel>Adresse Email *</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="Ex: jean.dupont@example.com" {...field} />
                     </FormControl>
@@ -147,32 +184,133 @@ export default function AddEmployeePage() {
                   </FormItem>
                 )}
               />
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="employeeNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Numéro d'employé *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: EMP001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Numéro de téléphone *</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Ex: 555-0100" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
-                name="department"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Département (Temporaire - sera ID)</FormLabel>
+                    <FormLabel>Adresse complète *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Ingénierie" {...field} />
+                      <Input placeholder="Ex: 123 Rue Principale, Ville, Pays" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="jobTitle"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Poste (Temporaire - sera ID)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Développeur Senior" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dateOfBirth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date de naissance *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Genre * (Ex: Male, Female, Other)</FormLabel>
+                      <FormControl>
+                         {/* TODO: Replace with Select component for Male, Female, Other */}
+                        <Input placeholder="Ex: Male" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hireDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date d'embauche *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <p className="text-sm text-muted-foreground pt-2">IDs Organisationnels (UUID/GUID attendus) - TODO: Remplacer par des sélecteurs</p>
+              <div className="grid md:grid-cols-3 gap-4">
+                 <FormField
+                  control={form.control}
+                  name="departmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Département *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="GUID Département" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="positionId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Poste *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="GUID Poste" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="officeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Bureau *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="GUID Bureau" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="avatarUrl"
@@ -198,3 +336,4 @@ export default function AddEmployeePage() {
     </div>
   );
 }
+
