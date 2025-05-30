@@ -22,11 +22,11 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string;
-  confirmPassword?: string;
+  password?: string; // Made optional as backend might handle this differently
+  confirmPassword?: string; // If your backend requires it
   phoneNumber?: string;
-  birthDate?: string;
-  [key: string]: any;
+  birthDate?: string; // Added birthDate
+  // [key: string]: any; // Removed to be more specific, add fields as needed
 }
 
 export interface SignUpResponse {
@@ -47,16 +47,7 @@ export async function signIn(credentials: { email?: string; username?: string; p
     body: JSON.stringify(credentials),
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
-  
-  // Storing the token and user info should happen in the component calling signIn
-  // For example, after a successful call:
-  // if (typeof window !== 'undefined' && parsedResponse.token) {
-  //   localStorage.setItem('authToken', parsedResponse.token);
-  //   localStorage.setItem('userName', parsedResponse.user?.name || `${parsedResponse.user?.firstName} ${parsedResponse.user?.lastName}`);
-  //   localStorage.setItem('userRole', parsedResponse.user?.role || 'Employee');
-  //   localStorage.setItem('userEmail', parsedResponse.user?.email || '');
-  //   console.log('Auth token and user info could be stored here.');
-  // }
+  console.log('Auth Service - Parsed response from /api/auth/signin:', parsedResponse); // Added log
   
   return parsedResponse;
 }
@@ -100,13 +91,20 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     });
 
     if (response.ok) {
-      // Only parse if the response was OK (e.g. 200, 204).
-      // A 204 No Content is valid for sign-out.
       if (response.status === 204) {
         serverResponseMessage = 'Signed out successfully from server (No Content).';
       } else {
-        const result = await parseJsonResponse<{ message: string }>(response);
-        serverResponseMessage = result?.message || 'Signed out successfully from server.';
+        // Try to parse only if there's content
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            const result = await parseJsonResponse<{ message: string }>(response); // parseJsonResponse handles its own errors now
+            serverResponseMessage = result?.message || 'Signed out successfully from server.';
+        } else if (response.status === 200) { // OK but not JSON
+            serverResponseMessage = 'Signed out successfully from server (non-JSON response).';
+        } else {
+             // This case should ideally not be hit if response.ok is true and not 204 or 200 with JSON.
+            serverResponseMessage = `Signed out successfully from server (status ${response.status}).`;
+        }
       }
       serverSignOutOk = true;
     } else {
@@ -116,9 +114,8 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       if (responseText.trim()) {
         serverResponseMessage += ` Server response: ${responseText}`;
       }
-      console.warn(serverResponseMessage); 
-      // We are not calling parseJsonResponse here for non-OK responses to avoid its specific console.error
-      // if the goal is to suppress that for sign-out failures.
+      console.warn(serverResponseMessage);
+      // Do not re-throw or call parseJsonResponse for non-OK sign-out responses here to avoid generic error handling
     }
   } catch (error) {
     // Network error or other issue with apiClient itself (e.g., fetch failing)

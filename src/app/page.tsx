@@ -48,47 +48,43 @@ export default function LoginPage() {
       }
       const response = await signIn({ email, password });
       
-      console.log('Login page - API signIn raw response object:', response); 
-      if (response && response.user) {
-        console.log('Login page - API signIn response.user object:', response.user);
-      } else {
-        console.log('Login page - API signIn response did NOT contain a "user" object or response itself is null/undefined.');
-      }
+      console.log('Login page - API signIn raw response object (should contain token and user):', response); 
       
-      if (response && response.token && typeof window !== 'undefined') {
-        localStorage.setItem('authToken', response.token);
-        console.log('Login page - Auth token stored in localStorage.');
+      if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('authToken', response.token);
+          console.log('Login page - Auth token stored in localStorage.');
         
-        const userFromApi = response.user;
-        if (userFromApi && typeof userFromApi === 'object') {
-          let displayName = '';
-          if (userFromApi.firstName && userFromApi.lastName) {
-            displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) { // Fallback to 'name' if firstName/lastName are not present
-            displayName = userFromApi.name;
+          const userFromApi = response.user;
+          if (userFromApi && typeof userFromApi === 'object') {
+            console.log('Login page - API signIn response.user object:', userFromApi);
+            let displayName = '';
+            if (userFromApi.firstName && userFromApi.lastName) {
+              displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
+            } else if (userFromApi.name) { 
+              displayName = userFromApi.name;
+            }
+            
+            finalUserName = displayName.trim() || 'User'; 
+            finalUserRole = userFromApi.role || 'Employee'; 
+            finalUserEmail = userFromApi.email || email || 'user@example.com'; 
+            
+            console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
+          } else {
+            console.warn('Login page - User object in API response was missing, not an object, or did not contain expected fields. Using default/fallback user info for storage. User object received:', userFromApi);
           }
+        
+          localStorage.setItem('userName', finalUserName);
+          localStorage.setItem('userRole', finalUserRole);
+          localStorage.setItem('userEmail', finalUserEmail);
+          console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
           
-          finalUserName = displayName.trim() || 'User'; // Default to 'User' if name fields are empty or not found
-          finalUserRole = userFromApi.role || 'Employee'; // Use API role, fallback to 'Employee'
-          finalUserEmail = userFromApi.email || email || 'user@example.com'; // Prioritize API email, then form email, then fallback
-          
-          console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
-        } else {
-          console.warn('Login page - User object in API response was missing, not an object, or did not contain expected fields. Using default/fallback user info for storage.');
-          // Fallbacks initialized above (finalUserName, finalUserRole, finalUserEmail) will be used.
+          toast({ title: "Login Successful", description: `Welcome back, ${finalUserName}!`});
+          router.push('/dashboard'); 
         }
-        
-        // Store derived or default values
-        localStorage.setItem('userName', finalUserName);
-        localStorage.setItem('userRole', finalUserRole);
-        localStorage.setItem('userEmail', finalUserEmail);
-        console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
-        
-        toast({ title: "Login Successful", description: `Welcome back, ${finalUserName}!`});
-        router.push('/dashboard'); 
       } else {
-         console.warn('Login page - No token received from API or not in browser environment. User info not stored from API.');
-         toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No token received from server." });
+         console.warn('Login page - No valid token received from API. Full response object:', response, 'Expected a non-empty "token" string field.');
+         toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No valid token received from server. Please check server logs and API response format." });
       }
       
     } catch (error) {
