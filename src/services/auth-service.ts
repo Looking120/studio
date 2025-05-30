@@ -19,9 +19,9 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string;
+  password?: string; // Changed to non-optional
   phoneNumber?: string;
-  role?: string; // Keep if your API expects a role during signup
+  // role?: string; // Removed role from here
   [key: string]: any;
 }
 
@@ -44,10 +44,13 @@ export async function signIn(credentials: { email?: string; username?: string; p
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
   
+  // You should store the token upon successful login.
+  // For example, in localStorage:
   if (typeof window !== 'undefined' && parsedResponse.token) {
     localStorage.setItem('authToken', parsedResponse.token);
     console.log('Auth token stored in localStorage.');
   } else if (typeof window !== 'undefined') {
+    // This case might occur if the API doesn't return a token or if not in a browser environment.
     console.warn('No token received from sign-in, or not in browser environment.');
   }
   
@@ -60,12 +63,14 @@ export async function signIn(credentials: { email?: string; username?: string; p
  * @param userData User details for registration.
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
-  console.log('API CALL: POST /api/auth/signup. User data:', { 
-    email: userData.email, 
-    userName: userData.userName,
+  console.log('API CALL: POST /api/auth/signup. User data being sent:', { 
     firstName: userData.firstName, 
     lastName: userData.lastName, 
-    role: userData.role 
+    userName: userData.userName, 
+    email: userData.email,
+    middleName: userData.middleName,
+    phoneNumber: userData.phoneNumber,
+    // Not logging password
   });
   const response = await apiClient('/auth/signup', {
     method: 'POST',
@@ -85,11 +90,13 @@ export async function signOut(): Promise<{ message: string }> {
     // No body typically needed, but depends on your API
   });
   
+  // You should remove the stored token upon sign-out.
+  // For example, from localStorage:
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     console.log('Auth token removed from localStorage.');
   }
 
   const result = await parseJsonResponse<{ message: string }>(response);
-  return result || { message: 'Signed out successfully' };
+  return result || { message: 'Signed out successfully' }; // Handle 204 No Content
 }

@@ -50,8 +50,8 @@ export default function SignupPage() {
         lastName, 
         userName, 
         email, 
-        password, 
-        role: "Employee", // Example default role
+        password,
+        // role: "Employee", // Removed default role from here
       };
       if (middleName) userData.middleName = middleName;
       if (phoneNumber) userData.phoneNumber = phoneNumber;
