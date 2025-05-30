@@ -27,10 +27,13 @@ export default function LoginPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
-    const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
-    const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
+    const emailInput = (event.currentTarget.elements.namedItem('email') as HTMLInputElement);
+    const passwordInput = (event.currentTarget.elements.namedItem('password') as HTMLInputElement);
     
-    console.log("Attempting login with:", { email }); 
+    const email = emailInput?.value;
+    const password = passwordInput?.value;
+    
+    console.log("Attempting login with email:", email); 
 
     try {
       if (!email || !password) {
@@ -39,12 +42,18 @@ export default function LoginPage() {
         return;
       }
       const response = await signIn({ email, password });
-      console.log('Sign in successful:', response);
+      console.log('Sign in successful, API response:', response); // Log entire response
       
+      let finalUserName = 'User'; // Default value
+      let finalUserRole = 'Employee'; // Default value
+      let finalUserEmail = email; // Default to entered email
+
       if (response.token && typeof window !== 'undefined') {
         localStorage.setItem('authToken', response.token);
         console.log('Auth token stored in localStorage.');
         
+        console.log('API signIn response.user object:', response.user); // DETAILED LOG
+
         if (response.user) {
           let displayName = '';
           if (response.user.firstName && response.user.lastName) {
@@ -52,30 +61,34 @@ export default function LoginPage() {
           } else if (response.user.name) {
             displayName = response.user.name;
           }
-          localStorage.setItem('userName', displayName.trim() || 'User');
-          localStorage.setItem('userRole', response.user.role || 'Employee');
-          localStorage.setItem('userEmail', response.user.email || '');
-          console.log('User info (name, role, email) stored in localStorage.');
+          
+          finalUserName = displayName.trim() || 'User';
+          finalUserRole = response.user.role || 'Employee';
+          finalUserEmail = response.user.email || email;
+
+          localStorage.setItem('userName', finalUserName);
+          localStorage.setItem('userRole', finalUserRole);
+          localStorage.setItem('userEmail', finalUserEmail);
+          console.log(`Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
         } else {
           // Fallback if user object is not present in response
-          localStorage.setItem('userName', 'User');
-          localStorage.setItem('userRole', 'Employee');
-          localStorage.setItem('userEmail', email); // use entered email as a fallback
+          localStorage.setItem('userName', finalUserName); // Stores default 'User'
+          localStorage.setItem('userRole', finalUserRole); // Stores default 'Employee'
+          localStorage.setItem('userEmail', finalUserEmail); // Stores entered email
+          console.warn('User object not found in signIn response. Using fallbacks for localStorage.');
         }
       } else {
          console.warn('No token received or not in browser environment.');
+         // Still set defaults if no token but signIn was somehow considered successful (unlikely)
+         localStorage.setItem('userName', finalUserName);
+         localStorage.setItem('userRole', finalUserRole);
+         localStorage.setItem('userEmail', finalUserEmail);
       }
       
-      let welcomeName = "User";
-      if (response.user) {
-        if (response.user.firstName && response.user.lastName) {
-          welcomeName = `${response.user.firstName} ${response.user.lastName}`;
-        } else if (response.user.name) {
-          welcomeName = response.user.name;
-        }
-      }
+      // For the welcome toast, prioritize directly from what was intended to be stored.
+      let welcomeName = finalUserName;
 
-      toast({ title: "Login Successful", description: `Welcome back, ${welcomeName.trim() || 'User'}!`});
+      toast({ title: "Login Successful", description: `Welcome back, ${welcomeName}!`});
       router.push('/dashboard'); 
     } catch (error) {
       console.error('Sign in failed:', error);
