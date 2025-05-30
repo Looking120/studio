@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; // Added useState
+import React, { useState } from "react"; 
 import { useRouter } from 'next/navigation'; 
 import { signIn } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ export default function LoginPage() {
     const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
     
-    console.log("Attempting login with:", { email }); // Avoid logging password
+    console.log("Attempting login with:", { email }); 
 
     try {
       if (!email || !password) {
@@ -41,10 +41,14 @@ export default function LoginPage() {
       const response = await signIn({ email, password });
       console.log('Sign in successful:', response);
       
-      // Store token from response.token
       if (response.token && typeof window !== 'undefined') {
         localStorage.setItem('authToken', response.token);
         console.log('Auth token stored in localStorage.');
+        if (response.user) {
+          localStorage.setItem('userName', response.user.name || '');
+          localStorage.setItem('userRole', response.user.role || '');
+          localStorage.setItem('userEmail', response.user.email || '');
+        }
       } else {
          console.warn('No token received or not in browser environment.');
       }

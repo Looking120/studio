@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // Added useRouter
 import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings, LogOut, Building } from "lucide-react";
 import {
   SidebarProvider,
@@ -25,8 +25,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
-// import { getUnreadMessages } from '@/services/message-service'; // For unread message count
-// import { signOut } from "@/services/auth-service"; // For sign out
+import { signOut } from "@/services/auth-service"; 
+// import { getUnreadMessages } from '@/services/message-service'; 
+
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -44,40 +45,58 @@ const navItems = [
   { href: "/chat", label: "Messagerie", icon: MessageSquare, notificationKey: "chat" },
 ];
 
-// Placeholder user data - replace with actual data from auth context or API
-const placeholderUser = {
-  id: "user123", // Added ID for service calls
-  name: "Alex Dubois", 
-  email: "alex.dubois@example.com",
-  jobTitle: "Product Design Lead",
-  role: "Team Lead", 
-  avatarUrl: "https://placehold.co/120x120.png?text=AD" 
+// Default user data, will be overridden by localStorage if available
+const defaultUser = {
+  name: "Utilisateur",
+  email: "utilisateur@example.com",
+  role: "Employé",
+  avatarUrl: "https://placehold.co/120x120.png?text=U" 
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   // const [unreadChatCount, setUnreadChatCount] = useState(0);
 
+  const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
+  const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
+  const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      setLoggedInUserName(localStorage.getItem('userName'));
+      setLoggedInUserRole(localStorage.getItem('userRole'));
+      setLoggedInUserEmail(localStorage.getItem('userEmail'));
+    }
     // Example: Fetch unread messages count
     // const fetchUnreads = async () => {
     //   try {
-    //     // Assuming placeholderUser.id is the current logged-in user's ID
-    //     // const unreadInfo = await getUnreadMessages(placeholderUser.id); 
+    //     // const unreadInfo = await getUnreadMessages("currentUserId"); 
     //     // setUnreadChatCount(unreadInfo.count); 
-    //     // console.log("Unread chat messages:", unreadInfo.count);
-    //     console.log("Placeholder: Would fetch unread messages for user:", placeholderUser.id);
+    //     console.log("Placeholder: Would fetch unread messages for current user");
     //   } catch (error) {
     //     console.error("Failed to fetch unread messages:", error);
     //   }
     // };
     // fetchUnreads();
   }, []);
+  
+  const userToDisplay = {
+    name: loggedInUserName || defaultUser.name,
+    role: loggedInUserRole || defaultUser.role,
+    email: loggedInUserEmail || defaultUser.email,
+    avatarUrl: defaultUser.avatarUrl, // Avatar URL remains placeholder for now
+  };
 
-  if (pathname === "/" || pathname === "/signup") { // Login and Signup pages
+  const getInitials = (name: string | null) => {
+    if (!name) return defaultUser.name.substring(0,1).toUpperCase();
+    return name.split(' ').map(n => n[0]).join('').toUpperCase() || defaultUser.name.substring(0,1).toUpperCase();
+  }
+
+  if (pathname === "/" || pathname === "/signup") { 
     return <>{children}</>;
   }
 
@@ -104,17 +123,28 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     console.log("Signing out...");
-    // Example: Call signOut service function
-    // try {
-    //   await signOut();
-    //   console.log('Sign out successful via service');
-    //   // Clear local user state/token
-    //   window.location.href = '/'; 
-    // } catch (error) {
-    //   console.error('Sign out failed:', error);
-    //   alert(`Sign out failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    // }
-    window.location.href = '/'; // Current behavior
+    try {
+      await signOut();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userEmail');
+      }
+      console.log('Sign out successful, local storage cleared.');
+      router.push('/'); 
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      alert(`Sign out failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Fallback even if API fails
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userEmail');
+      }
+      router.push('/'); 
+    }
   };
 
 
@@ -209,20 +239,20 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={placeholderUser.avatarUrl} alt={placeholderUser.name} data-ai-hint="user avatar" />
-                    <AvatarFallback>{placeholderUser.name.split(' ').map(n => n[0]).join('').toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={userToDisplay.avatarUrl} alt={userToDisplay.name} data-ai-hint="user avatar" />
+                    <AvatarFallback>{getInitials(userToDisplay.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{placeholderUser.name}</p>
+                    <p className="text-sm font-medium leading-none">{userToDisplay.name}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {placeholderUser.jobTitle} - {placeholderUser.role}
+                      {userToDisplay.role}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground pt-1">
-                      {placeholderUser.email}
+                      {userToDisplay.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -255,5 +285,3 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
