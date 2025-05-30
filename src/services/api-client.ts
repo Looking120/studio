@@ -1,3 +1,4 @@
+
 // src/services/api-client.ts
 
 export const API_BASE_URL = 'https://localhost:7294/api';
@@ -22,8 +23,6 @@ export async function apiClient(endpoint: string, options: FetchOptions = {}): P
   };
 
   // Attempt to retrieve the auth token from localStorage
-  // This assumes you store the token after a successful login.
-  // Ensure this code only runs on the client-side.
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('authToken');
     if (token) {
@@ -53,24 +52,40 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) { // No Content
     return null as T;
   }
-  // Try to parse JSON even if response is not ok, as it might contain error details
+  
   const responseText = await response.text();
-  try {
-    const json = JSON.parse(responseText);
-    if (!response.ok) {
-      console.error(`API Error (${response.status}) - JSON Response:`, json);
-      // You might want to throw an error object that includes the parsed JSON
-      throw new Error(`API request failed with status ${response.status}: ${json.message || responseText}`);
+
+  if (!response.ok) {
+    // Handle non-OK responses (errors)
+    let errorMessage = `API request failed with status ${response.status}`;
+    if (responseText.trim() === '') {
+      errorMessage += ". The server returned an empty error response.";
+      console.error(`API Error (${response.status}): Request failed and server returned an empty response body.`);
+    } else {
+      try {
+        const errorJson = JSON.parse(responseText);
+        errorMessage += `: ${errorJson.message || responseText}`;
+        console.error(`API Error (${response.status}) - JSON Response:`, errorJson);
+      } catch (e) {
+        errorMessage += `: ${responseText}`;
+        console.error(`API Error (${response.status}) - Non-JSON Response: ${responseText}`);
+      }
     }
+    throw new Error(errorMessage);
+  }
+
+  // Handle OK responses
+  try {
+    if (responseText.trim() === '' && response.ok) {
+      // If response is OK but body is empty (e.g. a 200 OK with no body, though unusual for JSON APIs)
+      // This case might need specific handling if your API does this.
+      // For now, assuming OK responses with content or 204 for no content.
+      return null as T; 
+    }
+    const json = JSON.parse(responseText);
     return json as T;
   } catch (e) {
-    // If parsing failed, and response was not ok, throw with original text
-    if (!response.ok) {
-        console.error(`API Error (${response.status}) - Non-JSON Response: ${responseText}`);
-        throw new Error(`API request failed with status ${response.status}: ${responseText}`);
-    }
-    // If response was ok but parsing failed (should not happen with well-formed JSON API)
-    console.error('Failed to parse JSON response:', responseText, e);
-    throw new Error('Failed to parse JSON response.');
+    console.error('Failed to parse JSON response for an OK request:', responseText, e);
+    throw new Error('Failed to parse JSON response from a successful request.');
   }
 }
