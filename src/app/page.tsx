@@ -43,7 +43,7 @@ export default function LoginPage() {
       const response: SignInResponse | null = await signIn({ email, password });
       console.log('Login page - signIn service call returned:', response);
 
-      // Aggressive logging to check the response structure
+      // AGGRESSIVE LOGGING TO CHECK THE RESPONSE STRUCTURE
       console.log('Login page - DEBUG: Raw response object received in handleSubmit:', JSON.stringify(response, null, 2));
       if (response && typeof response === 'object') {
         console.log('Login page - DEBUG: Keys in response object:', Object.keys(response));
@@ -51,10 +51,11 @@ export default function LoginPage() {
         console.log('Login page - DEBUG: Type of response.token:', typeof response.token);
         console.log('Login page - DEBUG: Value of response.user:', response.user);
       }
+      // END AGGRESSIVE LOGGING
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
         // IMPORTANT: Use 'authToken' as the key for consistency if apiClient expects that.
-        // If apiClient uses 'token', then use 'token' here. Let's assume 'authToken' for now.
+        // If apiClient uses 'token', then use 'token' here. We are using 'authToken'
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
@@ -63,8 +64,15 @@ export default function LoginPage() {
         let finalUserEmail = email;       // Default to input email
 
         const userFromApi = response.user;
+        console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
+
         if (userFromApi && typeof userFromApi === 'object') {
-          console.log('Login page - API response.user object:', JSON.stringify(userFromApi, null, 2));
+          console.log('Login page - DEBUG: userFromApi.firstName:', userFromApi.firstName);
+          console.log('Login page - DEBUG: userFromApi.lastName:', userFromApi.lastName);
+          console.log('Login page - DEBUG: userFromApi.name (fallback):', userFromApi.name);
+          console.log('Login page - DEBUG: userFromApi.role:', userFromApi.role);
+          console.log('Login page - DEBUG: userFromApi.email:', userFromApi.email);
+
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
@@ -73,12 +81,12 @@ export default function LoginPage() {
           }
           
           finalUserName = displayName.trim() || 'Utilisateur'; // Ensure no empty string
-          finalUserRole = userFromApi.role || 'Employé';
+          finalUserRole = userFromApi.role || 'Employé'; // Use API role, fallback to 'Employé'
           finalUserEmail = userFromApi.email || email; // Prefer API email if available
           
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
-          console.warn('Login page - User object in API response was missing or not as expected. Using default/fallback user info for storage. User object received:', userFromApi);
+          console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using default/fallback user info for storage. User object received:', userFromApi);
         }
       
         localStorage.setItem('userName', finalUserName);
@@ -89,6 +97,7 @@ export default function LoginPage() {
         toast({ title: "Connexion Réussie", description: `Bienvenue, ${finalUserName}!`});
         router.push('/dashboard');
       } else {
+        setIsLoading(false); 
         console.warn('Login page - Token validation failed. Detailed diagnostics:');
         if (!response) {
           console.warn('Login page - The response object from signIn service is null or undefined.');
@@ -101,7 +110,6 @@ export default function LoginPage() {
             console.warn('Login page - "token" field is a string, but it is empty or contains only whitespace.');
           }
         }
-        setIsLoading(false); 
         toast({
           variant: "destructive",
           title: "Échec de l'Authentification",
@@ -109,17 +117,15 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error('Login page - Sign in failed:', error);
       setIsLoading(false); 
+      console.error('Login page - Sign in failed:', error);
       toast({
         variant: "destructive",
         title: "Échec de la Connexion",
         description: error instanceof Error ? error.message : "Erreur inconnue lors de la connexion."
       });
     } finally {
-      // Ensure isLoading is always set to false, even if redirection occurs before this.
-      // However, if redirection happens, this might not execute if the component unmounts.
-      // The setIsLoading(false) inside the error blocks handles those cases better.
+      // Ensure isLoading is always set to false if it hasn't been already by error/success paths
       if (isLoading) setIsLoading(false);
     }
   };
