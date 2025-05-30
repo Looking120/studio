@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Employee } from '@/lib/data'; 
+import type { Employee } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import { UserPlus, Search, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchEmployees, updateEmployeeStatus as apiUpdateEmployeeStatus } from '@/services/employee-service'; // Import services
+import { fetchEmployees, updateEmployeeStatus as apiUpdateEmployeeStatus } from '@/services/employee-service';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -29,25 +29,29 @@ export default function EmployeesPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
+        console.log("Attempting to fetch employees from service...");
         const data = await fetchEmployees();
+        console.log("Employees fetched:", data);
         setEmployees(data);
       } catch (err) {
-        if (err instanceof Error) {
-          setFetchError(err.message);
-        } else {
-          setFetchError('An unknown error occurred while fetching employees.');
-        }
-        setEmployees([]);
+        console.error("Failed to fetch employees:", err);
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching employees.';
+        setFetchError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Failed to load employees",
+          description: errorMessage,
+        });
+        setEmployees([]); // Clear employees on error
       } finally {
         setIsLoading(false);
       }
     };
     loadEmployees();
-  }, []);
+  }, [toast]);
 
 
   const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
-    // Optimistic update
     const originalEmployees = [...employees];
     setEmployees(prevEmployees =>
       prevEmployees.map(emp =>
@@ -57,29 +61,32 @@ export default function EmployeesPage() {
 
     try {
       await apiUpdateEmployeeStatus(employeeId, newStatus);
-      // If API call is successful, employees state is already updated optimistically.
-      // You might want to re-fetch or update with the actual response if it differs.
       toast({
         title: "Statut Mis à Jour",
         description: `Le statut de l'employé a été changé en ${newStatus}.`,
       });
+      // Optionally re-fetch or update with actual response if it differs significantly
+      // For now, optimistic update is kept.
     } catch (error) {
-      // Revert optimistic update on error
-      setEmployees(originalEmployees);
+      setEmployees(originalEmployees); // Revert optimistic update
+      const errorMessage = error instanceof Error ? error.message : 'Impossible de mettre à jour le statut.';
       toast({
         variant: "destructive",
         title: "Erreur de Mise à Jour",
-        description: `Impossible de mettre à jour le statut de l'employé. ${error instanceof Error ? error.message : ''}`,
+        description: `Impossible de mettre à jour le statut de l'employé. ${errorMessage}`,
       });
       console.error(`Failed to update employee ${employeeId} status to ${newStatus}:`, error);
     }
   };
 
-  const filteredEmployees = useMemo(() => employees.filter(employee =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.department.toLowerCase().includes(searchTerm.toLowerCase())
-  ), [employees, searchTerm]);
+  const filteredEmployees = useMemo(() => {
+    if (!employees) return [];
+    return employees.filter(employee =>
+        (employee.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (employee.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (employee.department?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    )
+  }, [employees, searchTerm]);
 
   return (
     <Card className="shadow-lg">
@@ -105,11 +112,12 @@ export default function EmployeesPage() {
         </div>
       </CardHeader>
       <CardContent>
-        {fetchError && (
+        {fetchError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load employees</p>
             <p className="text-sm">{fetchError}</p>
+            <p className="text-xs mt-2">Please ensure the API server is running and accessible at the configured URL.</p>
           </div>
         )}
         {!fetchError && (
@@ -148,24 +156,25 @@ export default function EmployeesPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={employee.avatarUrl || `https://placehold.co/40x40.png?text=${employee.name.substring(0,2)}`} alt={employee.name} data-ai-hint="person portrait" />
-                            <AvatarFallback>{employee.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            <AvatarImage src={employee.avatarUrl || `https://placehold.co/40x40.png?text=${employee.name?.substring(0,2)}`} alt={employee.name} data-ai-hint="person portrait" />
+                            <AvatarFallback>{employee.name?.substring(0, 2).toUpperCase() || 'N/A'}</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">{employee.name}</span>
+                          <span className="font-medium">{employee.name || 'N/A'}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{employee.email}</TableCell>
-                      <TableCell>{employee.department}</TableCell>
-                      <TableCell>{employee.jobTitle}</TableCell>
+                      <TableCell>{employee.email || 'N/A'}</TableCell>
+                      <TableCell>{employee.department || 'N/A'}</TableCell>
+                      <TableCell>{employee.jobTitle || 'N/A'}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant={employee.status === 'Active' ? 'default' : 'outline'}>
-                          {employee.status}
+                          {employee.status || 'N/A'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         <Select
                           value={employee.status}
                           onValueChange={(value: 'Active' | 'Inactive') => handleStatusChange(employee.id, value)}
+                          disabled={!employee.id}
                         >
                           <SelectTrigger className="w-[120px] h-8 text-xs">
                             <SelectValue placeholder="Changer statut" />

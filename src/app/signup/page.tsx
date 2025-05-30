@@ -14,46 +14,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react"; // Added useState
 import { useRouter } from 'next/navigation';
-// import { signUp } from '@/services/auth-service'; // Import your auth service
-// import { useToast } from '@/hooks/use-toast'; // For showing notifications
+import { signUp } from '@/services/auth-service';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
   const router = useRouter();
-  // const { toast } = useToast();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setIsLoading(true);
     const name = (event.currentTarget.elements.namedItem('name') as HTMLInputElement)?.value;
     const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
     
-    console.log("Signup form submitted with:", { name, email, password });
+    console.log("Attempting signup with:", { name, email }); // Avoid logging password
 
-    // Example: Call signUp service function
-    // try {
-    //   if (!name || !email || !password) {
-    //     alert("All fields are required.");
-    //     return;
-    //   }
-    //   const response = await signUp({ name, email, password /*, other fields if needed */ });
-    //   console.log('Sign up successful:', response);
-    //   toast({
-    //     title: "Signup Successful",
-    //     description: response.message || "You can now log in.",
-    //   });
-    //   router.push('/'); // Redirect to login page
-    // } catch (error) {
-    //   console.error('Sign up failed:', error);
-    //   toast({
-    //     variant: "destructive",
-    //     title: "Signup Failed",
-    //     description: error instanceof Error ? error.message : "Unknown error during signup.",
-    //   });
-    // }
-    alert("Signup functionality not fully implemented yet. Redirecting to login.");
-    router.push('/'); // Placeholder redirect
+    try {
+      if (!name || !email || !password) {
+        toast({ variant: "destructive", title: "Error", description: "All fields are required." });
+        setIsLoading(false);
+        return;
+      }
+      // Adjust userData according to what your signUp service expects
+      const userData = { name, email, password, role: "Employee" /* Example default role */ };
+      const response = await signUp(userData);
+      console.log('Sign up successful:', response);
+      toast({
+        title: "Signup Successful",
+        description: response.message || "Account created. You can now log in.",
+      });
+      router.push('/'); // Redirect to login page after successful signup
+    } catch (error) {
+      console.error('Sign up failed:', error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error during signup.";
+      toast({
+        variant: "destructive",
+        title: "Signup Failed",
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -79,6 +84,7 @@ export default function SignupPage() {
                 placeholder="Ex: Alex Dubois" 
                 required 
                 className="text-base py-3"
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -90,6 +96,7 @@ export default function SignupPage() {
                 placeholder="you@example.com" 
                 required 
                 className="text-base py-3"
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -101,12 +108,13 @@ export default function SignupPage() {
                 required 
                 placeholder="••••••••"
                 className="text-base py-3"
+                disabled={isLoading}
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 p-6 sm:p-8 pt-0">
-            <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit">
-              <UserPlus className="mr-2 h-5 w-5" /> Sign Up
+            <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit" disabled={isLoading}>
+              {isLoading ? "Creating Account..." : <><UserPlus className="mr-2 h-5 w-5" /> Sign Up</>}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}

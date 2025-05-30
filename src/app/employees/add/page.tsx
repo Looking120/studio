@@ -7,17 +7,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Label component from ShadCN is used by FormLabel
-// import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-// import { mockEmployees, type Employee } from '@/lib/data'; // We'll use the service now
 import { hireEmployee } from '@/services/employee-service';
-import type { Employee } from '@/lib/data';
+// We don't need the Employee type from lib/data if the service handles types internally or returns a compatible type.
+// import type { Employee } from '@/lib/data';
 
 
 const employeeFormSchema = z.object({
@@ -46,34 +44,29 @@ export default function AddEmployeePage() {
   });
 
   const onSubmit = async (data: EmployeeFormValues) => {
-    form.clearErrors(); // Clear previous errors
+    form.clearErrors(); 
     try {
-      // Use the hireEmployee service function
+      // The 'hireEmployee' service function expects data without id, status, etc.
+      // Our form data (EmployeeFormValues) matches this expectation.
       const newEmployee = await hireEmployee(data); 
       console.log('Employee data saved via service:', newEmployee);
 
       toast({
         title: "Employé Ajouté",
-        description: `${data.name} a été ajouté avec succès.`,
+        description: `${newEmployee.name} a été ajouté avec succès. ID: ${newEmployee.id}`,
       });
+      form.reset(); // Reset form fields after successful submission
       router.push('/employees'); 
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite.";
         toast({
             variant: "destructive",
             title: "Erreur d'Ajout",
-            description: `Impossible d'ajouter l'employé. ${error instanceof Error ? error.message : 'Erreur inconnue du serveur.'}`
+            description: `Impossible d'ajouter l'employé. ${errorMessage}`
         });
         console.error("Failed to add employee:", error);
-        // Optionally, set form errors if the API returns field-specific errors
-        // if (error.response && error.response.data && error.response.data.errors) {
-        //   const errors = error.response.data.errors;
-        //   Object.keys(errors).forEach((key) => {
-        //     form.setError(key as keyof EmployeeFormValues, {
-        //       type: 'manual',
-        //       message: errors[key].join(', '),
-        //     });
-        //   });
-        // }
+        // Handle field-specific errors if your API returns them in a structured way
+        // Example: if (error.response?.data?.errors) { ... form.setError ... }
     }
   };
 

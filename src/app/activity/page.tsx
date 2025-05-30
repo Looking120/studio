@@ -11,10 +11,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { format } from 'date-fns';
 import { ListFilter, Search, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchAllActivityLogs } from '@/services/activity-service'; // Import the service
-
-// API_BASE_URL is now in src/services/api-client.ts
-// const API_BASE_URL = 'https://localhost:7294'; 
+import { fetchAllActivityLogs } from '@/services/activity-service';
+import { useToast } from '@/hooks/use-toast';
 
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
@@ -30,52 +28,48 @@ const formatDate = (dateString?: string | null) => {
   }
 };
 
-// The direct API call function is now replaced by the service
-// async function fetchActivityLogsFromAPI(): Promise<ActivityLog[]> {
-//   const response = await fetch(`${API_BASE_URL}/api/activity-logs`);
-//   if (!response.ok) {
-//     const errorData = await response.text();
-//     throw new Error(`Failed to fetch activity logs: ${response.status} ${errorData}`);
-//   }
-//   return response.json();
-// }
-
 export default function ActivityLogsPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activityFilter, setActivityFilter] = useState('all');
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       setFetchError(null);
       try {
-        // Use the service function here
-        const data = await fetchAllActivityLogs(); 
+        console.log("Attempting to fetch activity logs from service...");
+        const data = await fetchAllActivityLogs();
+        console.log("Activity logs fetched:", data);
         setActivityLogs(data);
       } catch (err) {
-        if (err instanceof Error) {
-          setFetchError(err.message);
-        } else {
-          setFetchError('An unknown error occurred while fetching activity logs.');
-        }
-        setActivityLogs([]); // Clear logs on error
+        console.error("Failed to fetch activity logs:", err);
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching activity logs.';
+        setFetchError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Failed to load activity logs",
+          description: errorMessage,
+        });
+        setActivityLogs([]);
       } finally {
         setIsLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [toast]);
 
   const uniqueActivities = useMemo(() => {
-    if (isLoading || fetchError) return ['all']; // Default while loading or on error
+    if (isLoading || fetchError || !activityLogs) return ['all'];
     const activities = new Set(activityLogs.map(log => log.activity).filter(Boolean));
     return ['all', ...Array.from(activities)];
   }, [activityLogs, isLoading, fetchError]);
   
   const filteredLogs = useMemo(() => {
+    if (!activityLogs) return [];
     return activityLogs
     .filter(log =>
       (log.employeeName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -86,7 +80,7 @@ export default function ActivityLogsPage() {
     .sort((a, b) => {
         const dateA = a.date ? new Date(a.date).getTime() : 0;
         const dateB = b.date ? new Date(b.date).getTime() : 0;
-        return dateB - dateA;
+        return dateB - dateA; // Sort descending
     });
   }, [activityLogs, searchTerm, activityFilter]);
 
@@ -107,7 +101,11 @@ export default function ActivityLogsPage() {
               disabled={isLoading || !!fetchError}
             />
           </div>
-          <Select value={activityFilter} onValueChange={setActivityFilter} disabled={isLoading || !!fetchError || uniqueActivities.length <= 1}>
+          <Select 
+            value={activityFilter} 
+            onValueChange={setActivityFilter} 
+            disabled={isLoading || !!fetchError || uniqueActivities.length <= 1}
+          >
             <SelectTrigger className="w-full md:w-[180px]">
               <ListFilter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filter by activity" />
@@ -125,12 +123,11 @@ export default function ActivityLogsPage() {
         </div>
       </CardHeader>
       <CardContent>
-        {fetchError && (
+        {fetchError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            {/* Updated message to reflect API client base URL context */}
             <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible.</p>
           </div>
         )}

@@ -3,14 +3,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import MapComponent, { MapMarkerData } from '@/components/map-component';
-import { mockOffices, Office } from '@/lib/data'; // Keep Office type
+import type { Office } from '@/lib/data'; // Keep Office type for structure
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, Users, PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { fetchOffices, addOffice, updateOffice, deleteOffice } from '@/services/organization-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-// TODO: Create a Dialog component for Add/Edit Office
+// TODO: Create Dialog components for Add/Edit Office forms
 
 export default function OfficesPage() {
   const [offices, setOffices] = useState<Office[]>([]);
@@ -28,17 +28,16 @@ export default function OfficesPage() {
         console.log("Attempting to fetch offices from service...");
         const data = await fetchOffices();
         console.log("Offices fetched:", data);
-        // If API returns empty or placeholder, use mock data for now.
-        // Remove this fallback once API is live.
-        setOffices(data && data.length > 0 ? data : mockOffices); 
+        setOffices(data || []); // Ensure offices is an array even if API returns null/undefined
       } catch (err) {
         console.error("Failed to fetch offices:", err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-        setOffices(mockOffices); // Fallback to mock data on error for UI stability
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching offices.';
+        setError(errorMessage);
+        setOffices([]); // Clear offices on error
         toast({
           variant: "destructive",
           title: "Failed to load offices",
-          description: "Displaying mock data. " + (err instanceof Error ? err.message : ''),
+          description: errorMessage,
         });
       } finally {
         setIsLoading(false);
@@ -47,14 +46,17 @@ export default function OfficesPage() {
     loadOffices();
   }, [toast]);
 
-  const markers: MapMarkerData[] = useMemo(() => offices.map(office => ({
-    id: office.id,
-    latitude: office.latitude,
-    longitude: office.longitude,
-    title: office.name,
-    description: `${office.address} (Headcount: ${office.headcount})`,
-    icon: <Building2 className="text-primary h-8 w-8 cursor-pointer transform hover:scale-110 transition-transform" />
-  })), [offices]);
+  const markers: MapMarkerData[] = useMemo(() => {
+    if (!offices) return [];
+    return offices.map(office => ({
+        id: office.id,
+        latitude: office.latitude,
+        longitude: office.longitude,
+        title: office.name,
+        description: `${office.address} (Headcount: ${office.headcount})`,
+        icon: <Building2 className="text-primary h-8 w-8 cursor-pointer transform hover:scale-110 transition-transform" />
+    }));
+  }, [offices]);
 
   useEffect(() => {
     if (markers.length > 0) {
@@ -67,50 +69,66 @@ export default function OfficesPage() {
         setMapCenter({ lat: avgLat, lng: avgLng });
         setMapZoom(3);
       }
-    } else if (!isLoading) { // Only default if not loading and no markers
-        setMapCenter({ lat: 39.8283, lng: -98.5795 }); // Default US center
+    } else if (!isLoading) {
+        setMapCenter({ lat: 39.8283, lng: -98.5795 });
         setMapZoom(3);
     }
   }, [markers, isLoading]);
 
   const handleAddOffice = async () => {
-    // Placeholder: Open a dialog to get office details
-    console.log("Placeholder: Open add office dialog");
-    // const newOfficeData = { name: "New Office", address: "123 New St", latitude: 40, longitude: -70, headcount: 10 };
-    // try {
-    //   const addedOffice = await addOffice(newOfficeData);
-    //   setOffices(prev => [...prev, addedOffice]);
-    //   toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
-    // } catch (err) {
-    //   toast({ variant: "destructive", title: "Failed to add office", description: err.message });
-    // }
-    alert("Add office functionality not fully implemented. This would open a form.");
+    // Placeholder for opening a dialog to get office details
+    // For now, we'll simulate adding a mock office and calling the service
+    const newOfficeData: Omit<Office, 'id'> = { 
+        name: "New Branch " + Math.floor(Math.random() * 100), 
+        address: "123 Placeholder St, City, ST", 
+        latitude: 40.7128 + (Math.random() - 0.5) * 5, // Randomize slightly around NYC
+        longitude: -74.0060 + (Math.random() - 0.5) * 5, 
+        headcount: Math.floor(Math.random() * 50) + 10 
+    };
+    try {
+      // This would normally come from a form
+      const addedOffice = await addOffice(newOfficeData);
+      setOffices(prev => [...prev, addedOffice]);
+      toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Could not add office.';
+      toast({ variant: "destructive", title: "Failed to add office", description: errorMessage });
+      console.error("Add office failed:", err);
+    }
   };
 
   const handleEditOffice = (officeId: string) => {
+    // Placeholder for opening a dialog and then calling updateOffice
     console.log(`Placeholder: Open edit office dialog for ${officeId}`);
-    alert(`Edit office ${officeId} - functionality not fully implemented.`);
-    // Similar to add, but would call updateOffice(officeId, updatedData)
+    const officeToEdit = offices.find(o => o.id === officeId);
+    if (!officeToEdit) return;
+    // Simulate update
+    // const updatedData = { ...officeToEdit, headcount: officeToEdit.headcount + 5 };
+    // updateOffice(officeId, updatedData)
+    //  .then(updated => { setOffices(prev => prev.map(o => o.id === officeId ? updated : o)); toast(...)})
+    //  .catch(err => toast(...));
+    alert(`Edit office ${officeId} - functionality to be fully implemented with a form/dialog.`);
   };
 
   const handleDeleteOffice = async (officeId: string, officeName: string) => {
     if (confirm(`Are you sure you want to delete ${officeName}?`)) {
       console.log(`Attempting to delete office: ${officeId}`);
-      // try {
-      //   await deleteOffice(officeId);
-      //   setOffices(prev => prev.filter(off => off.id !== officeId));
-      //   toast({ title: "Office Deleted", description: `${officeName} was successfully deleted.` });
-      // } catch (err) {
-      //   toast({ variant: "destructive", title: "Failed to delete office", description: err.message });
-      // }
-      alert(`Delete office ${officeId} - functionality not fully implemented.`);
+      try {
+        await deleteOffice(officeId);
+        setOffices(prev => prev.filter(off => off.id !== officeId));
+        toast({ title: "Office Deleted", description: `${officeName} was successfully deleted.` });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Could not delete office.';
+        toast({ variant: "destructive", title: "Failed to delete office", description: errorMessage });
+        console.error("Delete office failed:", err);
+      }
     }
   };
 
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)]">
-      <div className="lg:w-1/3 space-y-4 overflow-y-auto pr-2 pb-4"> {/* Added pb-4 for scroll room */}
+      <div className="lg:w-1/3 space-y-4 overflow-y-auto pr-2 pb-4">
         <Card className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
             <CardHeader className="py-4 flex flex-row items-center justify-between">
                 <CardTitle>Our Offices</CardTitle>
@@ -145,7 +163,7 @@ export default function OfficesPage() {
         {!isLoading && !error && offices.length === 0 && (
              <Card className="shadow-md">
                 <CardContent className="py-6 text-center text-muted-foreground">
-                    No offices found.
+                    No offices found. Click "Add Office" to create one.
                 </CardContent>
             </Card>
         )}
@@ -159,11 +177,11 @@ export default function OfficesPage() {
                   {office.name}
                 </CardTitle>
                 <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)} disabled={!office.id}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteOffice(office.id, office.name)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteOffice(office.id, office.name)} disabled={!office.id}>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>
                     </Button>

@@ -14,36 +14,50 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react"; // Added useState
 import { useRouter } from 'next/navigation'; 
-// import { signIn } from '@/services/auth-service'; // Import your auth service
+import { signIn } from '@/services/auth-service';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter(); 
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setIsLoading(true);
     const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
     
-    console.log("Login form submitted with:", { email, password });
+    console.log("Attempting login with:", { email }); // Avoid logging password
 
-    // Example: Call signIn service function
-    // try {
-    //   if (!email || !password) {
-    //     alert("Email and password are required.");
-    //     return;
-    //   }
-    //   const response = await signIn({ email, password });
-    //   console.log('Sign in successful:', response);
-    //   // Store token, user data, etc.
-    //   router.push('/dashboard'); 
-    // } catch (error) {
-    //   console.error('Sign in failed:', error);
-    //   // Display error message to the user, e.g., using a toast
-    //   alert(`Login failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    // }
-    router.push('/dashboard'); // Remove this line once API call is implemented
+    try {
+      if (!email || !password) {
+        toast({ variant: "destructive", title: "Error", description: "Email and password are required." });
+        setIsLoading(false);
+        return;
+      }
+      const response = await signIn({ email, password });
+      console.log('Sign in successful:', response);
+      
+      // Store token from response.token
+      if (response.token && typeof window !== 'undefined') {
+        localStorage.setItem('authToken', response.token);
+        console.log('Auth token stored in localStorage.');
+      } else {
+         console.warn('No token received or not in browser environment.');
+      }
+      
+      toast({ title: "Login Successful", description: `Welcome back, ${response.user?.name || 'User'}!`});
+      router.push('/dashboard'); 
+    } catch (error) {
+      console.error('Sign in failed:', error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error during login.";
+      toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -51,6 +65,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl border-transparent bg-card/80 backdrop-blur-lg">
         <CardHeader className="space-y-2 text-center p-6 sm:p-8">
           <div className="flex justify-center mb-6">
+            {/* EmployTrack Logo SVG */}
             <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary drop-shadow-lg">
                 <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 7L12 12M12 12L22 7M12 12V22M12 2V12M17 4.5L7 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -67,11 +82,12 @@ export default function LoginPage() {
               <Label htmlFor="email">Email Address</Label>
               <Input 
                 id="email" 
-                name="email" // Added name attribute
+                name="email"
                 type="email" 
                 placeholder="you@example.com" 
                 required 
                 className="text-base py-3"
+                disabled={isLoading}
               />
             </div>
             <div className="grid gap-2">
@@ -83,17 +99,18 @@ export default function LoginPage() {
               </div>
               <Input 
                 id="password" 
-                name="password" // Added name attribute
+                name="password"
                 type="password" 
                 required 
                 placeholder="••••••••"
                 className="text-base py-3"
+                disabled={isLoading}
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 p-6 sm:p-8 pt-0">
-            <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit">
-              <LogIn className="mr-2 h-5 w-5" /> Sign In
+            <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit" disabled={isLoading}>
+              {isLoading ? "Signing In..." : <><LogIn className="mr-2 h-5 w-5" /> Sign In</>}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
