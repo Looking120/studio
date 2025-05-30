@@ -35,7 +35,6 @@ export default function LoginPage() {
     
     console.log("Login page - Attempting login with email:", email); 
 
-    // Initialize with fallback values that will be used if API data is incomplete
     let finalUserName = 'User'; 
     let finalUserRole = 'Employee'; 
     let finalUserEmail = email || 'user@example.com';
@@ -46,18 +45,19 @@ export default function LoginPage() {
         setIsLoading(false);
         return;
       }
-      const response = await signIn({ email, password });
+      const response = await signIn({ email, password }); // This is the parsedResponse from auth-service
       
-      console.log('Login page - API signIn raw response object (should contain token and user):', response); 
-      
+      console.log('Login page - signIn service call returned (this is the parsed response object):', response);
+
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
+        console.log('Login page - Token successfully validated. Token:', response.token.substring(0, 20) + "..."); // Log part of the token
         if (typeof window !== 'undefined') {
           localStorage.setItem('authToken', response.token);
           console.log('Login page - Auth token stored in localStorage.');
         
           const userFromApi = response.user;
           if (userFromApi && typeof userFromApi === 'object') {
-            console.log('Login page - API signIn response.user object:', userFromApi);
+            console.log('Login page - API signIn response.user object:', JSON.stringify(userFromApi, null, 2));
             let displayName = '';
             if (userFromApi.firstName && userFromApi.lastName) {
               displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
@@ -83,12 +83,28 @@ export default function LoginPage() {
           router.push('/dashboard'); 
         }
       } else {
-         console.warn('Login page - No valid token received from API. Full response object:', response, 'Expected a non-empty "token" string field.');
+         console.warn('Login page - Token validation failed. Detailed diagnostics:');
+         if (!response) {
+           console.warn('Login page - The parsed response object itself is null or undefined.');
+           console.warn('Login page - This might happen if the API returned 200 OK with an empty body, or a non-JSON 200 OK response, or if parseJsonResponse returned null for other reasons.');
+         } else {
+           console.warn('Login page - Parsed response object received (raw):', response);
+           console.warn('Login page - Parsed response object (stringified):', JSON.stringify(response, null, 2));
+           if (!response.token) {
+             console.warn('Login page - "token" field is missing or falsy in the parsed response.');
+           } else if (typeof response.token !== 'string') {
+             console.warn(`Login page - "token" field exists, but is not a string. Actual type: ${typeof response.token}, Value:`, response.token);
+           } else if (response.token.trim() === '') {
+             console.warn('Login page - "token" field is a string, but it is empty or contains only whitespace.');
+           } else {
+             console.warn('Login page - "token" field seems to be a non-empty string, but the overall condition failed. Token value for inspection:', response.token);
+           }
+         }
          toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No valid token received from server. Please check server logs and API response format." });
       }
       
     } catch (error) {
-      console.error('Login page - Sign in failed:', error);
+      console.error('Login page - Sign in failed with an exception:', error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error during login.";
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
     } finally {
@@ -160,5 +176,4 @@ export default function LoginPage() {
     </div>
   );
 }
-
     

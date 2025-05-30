@@ -60,6 +60,7 @@ export async function apiClient(endpoint: string, options: FetchOptions = {}): P
  */
 export async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) { // No Content
+    console.warn(`API Info: Request to ${response.url} returned 204 No Content. Returning null.`);
     return null as T;
   }
   
@@ -69,7 +70,7 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
     // Handle 401 Unauthorized specifically
     if (response.status === 401) {
       const errorMessage = `API request failed with status 401: Unauthorized. ${responseText.trim() === '' ? 'Server returned an empty error response.' : responseText}`;
-      console.warn(errorMessage); // Log as warning, as it will be handled by redirecting
+      console.warn(errorMessage); 
       throw new UnauthorizedError(errorMessage);
     }
 
@@ -93,13 +94,15 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
 
   // Handle OK responses
   try {
-    if (responseText.trim() === '' && response.ok) {
+    if (responseText.trim() === '' && response.ok) { // Specifically for 200 OK with empty body
+      console.warn(`API Info: Request to ${response.url} was successful (${response.status} OK) but server returned an empty response body. Returning null as parsed JSON.`);
       return null as T; 
     }
     const json = JSON.parse(responseText);
     return json as T;
   } catch (e) {
-    console.error('Failed to parse JSON response for an OK request:', responseText, e);
-    throw new Error('Failed to parse JSON response from a successful request.');
+    console.error(`Failed to parse JSON response for an OK request. Status: ${response.status}, URL: ${response.url}, Body: "${responseText}"`, e);
+    throw new Error(`Failed to parse JSON response from a successful request. Status: ${response.status}, URL: ${response.url}`);
   }
 }
+
