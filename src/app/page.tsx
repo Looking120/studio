@@ -33,12 +33,12 @@ export default function LoginPage() {
     const email = emailInput?.value;
     const password = passwordInput?.value;
     
-    console.log("Attempting login with email:", email); 
+    console.log("Login page - Attempting login with email:", email); 
 
-    // Initialize with fallback values
+    // Initialize with fallback values that will be used if API data is incomplete
     let finalUserName = 'User'; 
     let finalUserRole = 'Employee'; 
-    let finalUserEmail = email || 'user@example.com'; // Use entered email or a generic fallback if email is null
+    let finalUserEmail = email || 'user@example.com';
 
     try {
       if (!email || !password) {
@@ -47,29 +47,35 @@ export default function LoginPage() {
         return;
       }
       const response = await signIn({ email, password });
-      console.log('Login page - API signIn raw response:', response); 
+      
+      console.log('Login page - API signIn raw response object:', response); 
+      if (response && response.user) {
+        console.log('Login page - API signIn response.user object:', response.user);
+      } else {
+        console.log('Login page - API signIn response did NOT contain a "user" object or response itself is null/undefined.');
+      }
       
       if (response && response.token && typeof window !== 'undefined') {
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage.');
         
-        console.log('Login page - API signIn response.user object:', response.user);
-
         const userFromApi = response.user;
         if (userFromApi && typeof userFromApi === 'object') {
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) {
+          } else if (userFromApi.name) { // Fallback to 'name' if firstName/lastName are not present
             displayName = userFromApi.name;
           }
           
-          finalUserName = displayName.trim() || 'User'; // Default to 'User' if name fields are empty
-          finalUserRole = userFromApi.role || 'Employee'; // Default to 'Employee' if role is missing
+          finalUserName = displayName.trim() || 'User'; // Default to 'User' if name fields are empty or not found
+          finalUserRole = userFromApi.role || 'Employee'; // Use API role, fallback to 'Employee'
           finalUserEmail = userFromApi.email || email || 'user@example.com'; // Prioritize API email, then form email, then fallback
+          
+          console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
-          console.warn('Login page - User object in API response was missing or not an object. Using default user info for storage.');
-          // finalUserName, finalUserRole, finalUserEmail retain their initialized defaults
+          console.warn('Login page - User object in API response was missing, not an object, or did not contain expected fields. Using default/fallback user info for storage.');
+          // Fallbacks initialized above (finalUserName, finalUserRole, finalUserEmail) will be used.
         }
         
         // Store derived or default values
@@ -82,12 +88,7 @@ export default function LoginPage() {
         router.push('/dashboard'); 
       } else {
          console.warn('Login page - No token received from API or not in browser environment. User info not stored from API.');
-         // If login "succeeded" but no token, this is an issue. We might not want to store anything or redirect.
-         // For now, ensure defaults are NOT stored if token is missing.
-         // localStorage.removeItem('userName');
-         // localStorage.removeItem('userRole');
-         // localStorage.removeItem('userEmail');
-         toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No token received." });
+         toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No token received from server." });
       }
       
     } catch (error) {
@@ -163,3 +164,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
