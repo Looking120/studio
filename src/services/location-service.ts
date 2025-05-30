@@ -1,39 +1,39 @@
+
 // src/services/location-service.ts
-import { apiClient, parseJsonResponse } from './api-client';
+// import { apiClient, parseJsonResponse } from './api-client'; // API calls removed
 
 export interface LocationData {
   latitude: number;
   longitude: number;
-  timestamp?: string; // Optional: if your API returns it
-  address?: string; // Optional: if your API returns it
-  // Add other relevant fields from your API response
+  timestamp?: string; 
+  address?: string; 
   [key: string]: any;
 }
 
 /**
- * Updates the location for a specific employee.
- * Corresponds to: PUT /api/location/{employeeId}
+ * Updates the location for a specific employee. (MOCKED)
  * @param employeeId The ID of the employee.
  * @param locationData The new latitude and longitude.
  */
 export async function updateEmployeeLocation(employeeId: string, locationData: { latitude: number; longitude: number }): Promise<any> {
-  console.log(`API CALL: PUT /api/location/${employeeId}. Data:`, locationData);
-  const response = await apiClient(`/location/${employeeId}`, {
-    method: 'PUT',
-    body: JSON.stringify(locationData),
-  });
-  // If API returns 204 No Content, parseJsonResponse will return null.
-  // Adjust if a specific success object is expected.
-  return parseJsonResponse<any>(response); 
+  console.log(`MOCK API CALL: PUT /api/location/${employeeId}. Data:`, locationData);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  return Promise.resolve({ success: true, message: `Location for ${employeeId} updated (mock)` }); 
 }
 
 /**
- * Fetches the location for a specific employee.
- * Corresponds to: GET /api/location/{employeeId}
+ * Fetches the location for a specific employee. (MOCKED)
  * @param employeeId The ID of the employee.
  */
 export async function getEmployeeLocation(employeeId: string): Promise<LocationData | null> {
-  console.log(`API CALL: GET /api/location/${employeeId}.`);
-  const response = await apiClient(`/location/${employeeId}`);
-  return parseJsonResponse<LocationData>(response);
+  console.log(`MOCK API CALL: GET /api/location/${employeeId}.`);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const mockLocation: LocationData = {
+    latitude: 34.0522 + (Math.random() - 0.5) * 0.1,
+    longitude: -118.2437 + (Math.random() - 0.5) * 0.1,
+    timestamp: new Date().toISOString(),
+    address: "Mock Address, Mock City",
+    employeeId: employeeId,
+  };
+  return Promise.resolve(mockLocation);
 }

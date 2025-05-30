@@ -14,15 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; // Added useState
+import React, { useState } from "react"; 
 import { useRouter } from 'next/navigation';
-import { signIn, type SignInResponse } from '@/services/auth-service'; // Ensure SignInResponse is imported if not already
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { signIn, type SignInResponse } from '@/services/auth-service'; 
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
-  const [isLoading, setIsLoading] = useState(false); // Added isLoading state
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,7 +39,7 @@ export default function LoginPage() {
     }
 
     try {
-      // signIn expects an object: { email, password }
+      // Call the signIn function from the auth-service
       const response: SignInResponse | null = await signIn({ email, password });
       console.log('Login page - signIn service call returned:', response);
 
@@ -54,14 +54,12 @@ export default function LoginPage() {
       // END AGGRESSIVE LOGGING
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
-        // IMPORTANT: Use 'authToken' as the key for consistency if apiClient expects that.
-        // If apiClient uses 'token', then use 'token' here. We are using 'authToken'
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
-        let finalUserName = 'Utilisateur'; // Default
-        let finalUserRole = 'Employé';   // Default
-        let finalUserEmail = email;       // Default to input email
+        let finalUserName = 'Utilisateur'; 
+        let finalUserRole = 'Employé';  
+        let finalUserEmail = email;     
 
         const userFromApi = response.user;
         console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
@@ -76,13 +74,13 @@ export default function LoginPage() {
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) { // Fallback to name if firstName/lastName not present
+          } else if (userFromApi.name) { 
             displayName = userFromApi.name;
           }
           
-          finalUserName = displayName.trim() || 'Utilisateur'; // Ensure no empty string
-          finalUserRole = userFromApi.role || 'Employé'; // Use API role, fallback to 'Employé'
-          finalUserEmail = userFromApi.email || email; // Prefer API email if available
+          finalUserName = displayName.trim() || 'Utilisateur';
+          finalUserRole = userFromApi.role || 'Employé'; 
+          finalUserEmail = userFromApi.email || email; 
           
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
@@ -125,7 +123,6 @@ export default function LoginPage() {
         description: error instanceof Error ? error.message : "Erreur inconnue lors de la connexion."
       });
     } finally {
-      // Ensure isLoading is always set to false if it hasn't been already by error/success paths
       if (isLoading) setIsLoading(false);
     }
   };

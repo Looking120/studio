@@ -1,6 +1,6 @@
 
 // src/services/auth-service.ts
-import { apiClient, parseJsonResponse } from './api-client';
+// import { apiClient, parseJsonResponse } from './api-client'; // API calls removed
 
 // Define types for auth responses, adjust as per your API
 export interface SignInResponse {
@@ -35,34 +35,42 @@ export interface SignUpResponse {
 }
 
 /**
- * Signs in a user.
- * Corresponds to: POST /api/auth/signin
+ * Signs in a user. (MOCKED)
  * @param credentials Email and password.
  */
 export async function signIn(credentials: { email?: string; username?: string; password?: string }): Promise<SignInResponse> {
-  console.log('API CALL: POST /api/auth/signin. Attempting with:', credentials.email || credentials.username);
-  const response = await apiClient('/auth/signin', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
+  console.log('MOCK API CALL: POST /api/auth/signin. Attempting with:', credentials.email || credentials.username);
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Log the raw response text BEFORE attempting to parse it as JSON
-  const responseText = await response.clone().text(); // Use clone() so the body can be read again by parseJsonResponse
-  console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', responseText);
+  // Mock successful response
+  const mockUser = {
+    id: 'mockUser123',
+    firstName: 'Mock',
+    lastName: 'AdminUser',
+    email: credentials.email || 'mock@example.com',
+    role: 'Admin', // Or 'Employé' based on credentials for testing
+  };
+  if (credentials.email === 'user@example.com') {
+    mockUser.firstName = 'Mock';
+    mockUser.lastName = 'EmployeeUser';
+    mockUser.role = 'Employé';
+  }
 
-  const parsedResponse = await parseJsonResponse<SignInResponse>(response);
-  console.log('Auth Service - Parsed JSON response from /api/auth/signin:', parsedResponse); 
-  
-  return parsedResponse;
+  const mockResponse: SignInResponse = {
+    token: 'mock-jwt-token-' + Date.now(),
+    user: mockUser,
+  };
+  console.log('Mock Auth Service - Returning from signIn:', mockResponse);
+  return Promise.resolve(mockResponse);
 }
 
 /**
- * Signs up a new user.
- * Corresponds to: POST /api/auth/signup
+ * Signs up a new user. (MOCKED)
  * @param userData User details for registration.
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
-  console.log('API CALL: POST /api/auth/signup. User data being sent:', { 
+  console.log('MOCK API CALL: POST /api/auth/signup. User data being sent:', { 
     firstName: userData.firstName, 
     lastName: userData.lastName, 
     userName: userData.userName, 
@@ -70,73 +78,33 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     middleName: userData.middleName,
     phoneNumber: userData.phoneNumber,
     birthDate: userData.birthDate,
-    // Not logging password or confirmPassword
   });
-  const response = await apiClient('/auth/signup', {
-    method: 'POST',
-    body: JSON.stringify(userData),
-  });
-  return parseJsonResponse<SignUpResponse>(response);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const mockResponse: SignUpResponse = {
+    message: "Inscription réussie (simulation)!",
+    userId: 'mockNewUser-' + Date.now(),
+  };
+  return Promise.resolve(mockResponse);
 }
 
 /**
- * Signs out the current user. Attempts server-side sign-out but prioritizes local cleanup.
- * Corresponds to: POST /api/auth/signout
+ * Signs out the current user. (MOCKED)
  * @returns A promise with the sign-out status.
  */
 export async function signOut(): Promise<{ message: string; serverSignOutOk: boolean }> {
-  console.log('API CALL: POST /api/auth/signout.');
-  let serverSignOutOk = false;
-  let serverResponseMessage = 'Server sign-out status unknown.';
-
-  try {
-    const response = await apiClient('/auth/signout', {
-      method: 'POST',
-    });
-
-    if (response.ok) {
-      if (response.status === 204) {
-        serverResponseMessage = 'Signed out successfully from server (No Content).';
-      } else {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-            const result = await parseJsonResponse<{ message: string }>(response); 
-            serverResponseMessage = result?.message || 'Signed out successfully from server.';
-        } else if (response.status === 200) { 
-            serverResponseMessage = 'Signed out successfully from server (non-JSON response).';
-        } else {
-            serverResponseMessage = `Signed out successfully from server (status ${response.status}).`;
-        }
-      }
-      serverSignOutOk = true;
-    } else {
-      const responseText = await response.text();
-      serverResponseMessage = `Sign out API call failed with status ${response.status}.`;
-      if (responseText.trim()) {
-        serverResponseMessage += ` Server response: ${responseText}`;
-      }
-      console.warn(serverResponseMessage);
-    }
-  } catch (error) {
-    serverResponseMessage = 'Sign out API call failed due to a network or client error.';
-    if (error instanceof Error) {
-      console.error(`Error during sign out API call: ${error.message}`);
-      serverResponseMessage += ` Error: ${error.message}`;
-    } else {
-      console.error('Unknown error during sign out API call:', error);
-    }
-  }
-
+  console.log('MOCK API CALL: POST /api/auth/signout.');
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
-    console.log('Auth token and user info removed from localStorage.');
+    console.log('Auth token and user info removed from localStorage (mock sign out).');
   }
 
-  return { 
-    message: serverSignOutOk ? serverResponseMessage : `Local sign-out successful. ${serverResponseMessage}`,
-    serverSignOutOk 
-  };
+  return Promise.resolve({ 
+    message: "Déconnexion locale effectuée (simulation).",
+    serverSignOutOk: true // Simulate server sign out also being ok
+  });
 }

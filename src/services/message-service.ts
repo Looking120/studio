@@ -1,37 +1,38 @@
-// src/services/message-service.ts
-import { apiClient, parseJsonResponse } from './api-client';
 
-// Define types for message-related data, adjust as per your API
+// src/services/message-service.ts
+// import { apiClient, parseJsonResponse } from './api-client'; // API calls removed
+
 export interface Message {
   id: string;
   senderId: string;
-  receiverId?: string; // For direct messages
-  conversationId?: string; // For group/channel messages
+  receiverId?: string; 
+  conversationId?: string;
   content: string;
-  timestamp: string; // Assuming ISO string, convert to Date object in component if needed
-  // Add other relevant fields from your API response
+  timestamp: string; 
   [key: string]: any;
 }
 
 export interface Conversation {
   id: string;
-  participants: string[]; // User IDs
+  participants: string[]; 
   lastMessage?: Message;
-  name?: string; // If conversations can have names
-  // Add other relevant fields from your API response
+  name?: string; 
   [key: string]: any;
 }
 
 export interface UnreadMessagesInfo {
   count: number;
-  messages?: Message[]; // Optional: if API returns some unread messages
-  // Add other relevant fields from your API response
+  messages?: Message[]; 
   [key: string]: any;
 }
 
+const mockMessages: Message[] = [
+    { id: 'msg1', senderId: 'user1', conversationId: 'conv1', content: 'Hello there! (mock)', timestamp: new Date(Date.now() - 5 * 60000).toISOString() },
+    { id: 'msg2', senderId: 'user2', conversationId: 'conv1', content: 'Hi! How are you? (mock)', timestamp: new Date(Date.now() - 4 * 60000).toISOString() },
+];
+
 /**
- * Sends a message.
- * Corresponds to: POST /api/messages/send
+ * Sends a message. (MOCKED)
  * @param messageData Data for the message to be sent.
  */
 export async function sendMessage(messageData: {
@@ -40,60 +41,49 @@ export async function sendMessage(messageData: {
   conversationId?: string;
   content: string;
 }): Promise<Message> {
-  console.log('API CALL: POST /api/messages/send. Data:', messageData);
-  const response = await apiClient('/messages/send', {
-    method: 'POST',
-    body: JSON.stringify(messageData),
-  });
-  return parseJsonResponse<Message>(response);
+  console.log('MOCK API CALL: POST /api/messages/send. Data:', messageData);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const newMessage: Message = {
+    id: `msg${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    ...messageData,
+  };
+  // mockMessages.push(newMessage); // If you want to modify shared array
+  return Promise.resolve(newMessage);
 }
 
 /**
- * Fetches messages for a specific conversation.
- * Corresponds to: GET /api/messages/conversation (assuming it might take an ID or params)
+ * Fetches messages for a specific conversation. (MOCKED)
  * @param params Parameters to identify the conversation (e.g., conversationId, userIds).
  */
 export async function getConversationMessages(params: { conversationId?: string; userId1?: string; userId2?: string }): Promise<Message[]> {
-  console.log('API CALL: GET /api/messages/conversation. Params:', params);
-  let endpoint = '/messages/conversation';
-  const queryParams = new URLSearchParams();
-  if (params.conversationId) queryParams.append('conversationId', params.conversationId);
-  if (params.userId1) queryParams.append('userId1', params.userId1);
-  if (params.userId2) queryParams.append('userId2', params.userId2);
-  
-  const queryString = queryParams.toString();
-  if (queryString) {
-    endpoint += `?${queryString}`;
+  console.log('MOCK API CALL: GET /api/messages/conversation. Params:', params);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  if (params.conversationId === 'conv1') {
+    return Promise.resolve([...mockMessages]);
   }
-  
-  const response = await apiClient(endpoint);
-  return parseJsonResponse<Message[]>(response);
+  return Promise.resolve([]);
 }
 
 /**
- * Fetches unread messages count or details for an employee.
- * Corresponds to: GET /api/messages/{employeeId}/unread
+ * Fetches unread messages count or details for an employee. (MOCKED)
  * @param employeeId The ID of the employee.
  */
 export async function getUnreadMessages(employeeId: string): Promise<UnreadMessagesInfo> {
-  console.log(`API CALL: GET /api/messages/${employeeId}/unread.`);
-  const response = await apiClient(`/messages/${employeeId}/unread`);
-  return parseJsonResponse<UnreadMessagesInfo>(response);
+  console.log(`MOCK API CALL: GET /api/messages/${employeeId}/unread.`);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const mockUnread: UnreadMessagesInfo = {
+    count: Math.floor(Math.random() * 5), // Random unread count
+  };
+  return Promise.resolve(mockUnread);
 }
 
 /**
- * Marks messages as read.
- * Corresponds to: POST /api/messages/mark-read
+ * Marks messages as read. (MOCKED)
  * @param data Data to identify messages to mark as read (e.g., messageIds, conversationId for user).
  */
 export async function markMessagesAsRead(data: { messageIds?: string[]; conversationId?: string; userId?: string }): Promise<{ success: boolean }> {
-  console.log('API CALL: POST /api/messages/mark-read. Data:', data);
-  const response = await apiClient('/messages/mark-read', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-  // If API returns 204 No Content, parseJsonResponse will return null.
-  // Adjust if a specific success object is expected.
-  const result = await parseJsonResponse<{ success: boolean }>(response);
-  return result || { success: true };
+  console.log('MOCK API CALL: POST /api/messages/mark-read. Data:', data);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  return Promise.resolve({ success: true });
 }
