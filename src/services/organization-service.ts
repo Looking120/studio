@@ -4,8 +4,14 @@ import type { Office } from '@/lib/data';
 import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
 // --- Office Related Types ---
-export interface AddOfficePayload extends Omit<Office, 'id'> {}
-export interface UpdateOfficePayload extends Partial<Omit<Office, 'id'>> {}
+export interface AddOfficePayload { // Changed from Omit<Office, 'id'> to be more specific
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  headcount: number;
+}
+export interface UpdateOfficePayload extends Partial<AddOfficePayload> {}
 
 
 // --- Department Related Types ---
@@ -13,12 +19,10 @@ export interface Department {
   id: string;
   name: string;
   employeeCount?: number;
-  // Add other relevant fields like headOfDepartment based on your actual API response
   [key: string]: any;
 }
 export interface AddDepartmentPayload {
   name: string;
-  // Add other fields if required by your API for creating a department
 }
 export interface UpdateDepartmentPayload {
   name: string;
@@ -31,25 +35,19 @@ export interface Position {
   departmentId?: string;
   departmentName?: string;
   assignedEmployees?: number;
-  // Add other relevant fields based on your actual API response
   [key: string]: any;
 }
 export interface AddPositionPayload {
   title: string;
-  departmentId?: string; // Or whatever your API expects
+  departmentId?: string;
 }
 export interface AssignPositionPayload {
   employeeId: string;
-  // Add other relevant fields like startDate if your API expects them
 }
 
 
 // --- Office Endpoints ---
 
-/**
- * Adds a new office to the organization.
- * @param officeData Data for the new office.
- */
 export async function addOffice(officeData: AddOfficePayload): Promise<Office> {
   console.log('API CALL: POST /api/organization/offices. Data:', officeData);
   try {
@@ -65,15 +63,12 @@ export async function addOffice(officeData: AddOfficePayload): Promise<Office> {
   }
 }
 
-/**
- * Fetches all offices of the organization.
- */
 export async function fetchOffices(): Promise<Office[]> {
   console.log('API CALL: GET /api/organization/offices.');
   try {
     const response = await apiClient('/organization/offices');
     const offices = await parseJsonResponse<Office[]>(response);
-    return offices || []; // Ensure it returns an array even if API sends null
+    return offices || [];
   } catch (error) {
     console.error('Error fetching offices:', error);
     if (error instanceof UnauthorizedError) throw error;
@@ -81,10 +76,6 @@ export async function fetchOffices(): Promise<Office[]> {
   }
 }
 
-/**
- * Fetches a specific office by its ID.
- * @param officeId The ID of the office.
- */
 export async function fetchOfficeById(officeId: string): Promise<Office | null> {
   console.log(`API CALL: GET /api/organization/offices/${officeId}.`);
   try {
@@ -98,11 +89,6 @@ export async function fetchOfficeById(officeId: string): Promise<Office | null> 
   }
 }
 
-/**
- * Updates an existing office.
- * @param officeId The ID of the office to update.
- * @param officeData The new data for the office.
- */
 export async function updateOffice(officeId: string, officeData: UpdateOfficePayload): Promise<Office> {
   console.log(`API CALL: PUT /api/organization/offices/${officeId}. Data:`, officeData);
   try {
@@ -118,24 +104,24 @@ export async function updateOffice(officeId: string, officeData: UpdateOfficePay
   }
 }
 
-/**
- * Deletes an office.
- * @param officeId The ID of the office to delete.
- */
 export async function deleteOffice(officeId: string): Promise<{ success: boolean; message?: string }> {
   console.log(`API CALL: DELETE /api/organization/offices/${officeId}.`);
   try {
     const response = await apiClient(`/organization/offices/${officeId}`, {
       method: 'DELETE',
     });
-    if (response.ok) { // 200 OK, 204 No Content are ok
+    if (response.ok) {
         if (response.status === 204) {
              return { success: true, message: 'Office deleted successfully (No Content).' };
         }
-        const result = await parseJsonResponse<{ success: boolean; message?: string }>(response).catch(() => null);
-        return result || { success: true, message: 'Office deleted successfully.' };
+        // Try to parse JSON only if there's content and it's JSON
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
+            return result || { success: true, message: 'Office deleted successfully.' };
+        }
+        return { success: true, message: 'Office deleted successfully.' };
     }
-    // If not ok, try to parse error
     const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete office with status ${response.status}` }));
     throw new Error(errorData.message || `Failed to delete office ${officeId}`);
   } catch (error) {
@@ -147,10 +133,6 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
 
 // --- Department Endpoints ---
 
-/**
- * Adds a new department to the organization.
- * @param departmentData Data for the new department.
- */
 export async function addDepartment(departmentData: AddDepartmentPayload): Promise<Department> {
   console.log('API CALL: POST /api/organization/departments. Data:', departmentData);
   try {
@@ -166,9 +148,6 @@ export async function addDepartment(departmentData: AddDepartmentPayload): Promi
   }
 }
 
-/**
- * Fetches all departments of the organization.
- */
 export async function fetchDepartments(): Promise<Department[]> {
   console.log('API CALL: GET /api/organization/departments.');
   try {
@@ -182,12 +161,6 @@ export async function fetchDepartments(): Promise<Department[]> {
   }
 }
 
-/**
- * Updates an existing department.
- * Assumes endpoint PUT /api/organization/departments/{departmentId}
- * @param departmentId The ID of the department to update.
- * @param departmentData The new data for the department (e.g., { name: "New Name" }).
- */
 export async function updateDepartment(departmentId: string, departmentData: UpdateDepartmentPayload): Promise<Department> {
   console.log(`API CALL: PUT /api/organization/departments/${departmentId}. Data:`, departmentData);
   try {
@@ -195,19 +168,19 @@ export async function updateDepartment(departmentId: string, departmentData: Upd
       method: 'PUT',
       body: JSON.stringify(departmentData),
     });
+    // parseJsonResponse will throw for non-OK responses, including 404
     return await parseJsonResponse<Department>(response);
   } catch (error) {
     console.error(`Error updating department ${departmentId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
+    // Check if the error message from apiClient (via parseJsonResponse) indicates a 404
+    if (error instanceof Error && (error.message.includes("status 404") || error.message.toLowerCase().includes("not found"))) {
+        throw new Error(`Update failed: The department update endpoint (PUT /api/organization/departments/${departmentId}) was not found (404). Please ensure this endpoint is available on the backend.`);
+    }
     throw new Error(`Failed to update department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-/**
- * Deletes a department.
- * Assumes endpoint DELETE /api/organization/departments/{departmentId}
- * @param departmentId The ID of the department to delete.
- */
 export async function deleteDepartment(departmentId: string): Promise<{ success: boolean; message?: string }> {
   console.log(`API CALL: DELETE /api/organization/departments/${departmentId}.`);
   try {
@@ -215,12 +188,18 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
       method: 'DELETE',
     });
     if (response.ok) {
-      if (response.status === 204) {
-        return { success: true, message: 'Department deleted successfully (No Content).' };
+      if (response.status === 204) { // HTTP 204 No Content
+        return { success: true, message: 'Department deleted successfully.' };
       }
-      const result = await parseJsonResponse<{ success: boolean; message?: string }>(response).catch(() => null);
-      return result || { success: true, message: 'Department deleted successfully.' };
+      // If there's a body, try to parse it, otherwise assume success
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
+        return result || { success: true, message: 'Department deleted successfully.' };
+      }
+      return { success: true, message: 'Department deleted successfully.' };
     }
+    // Handle error responses
     const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete department with status ${response.status}` }));
     throw new Error(errorData.message || `Failed to delete department ${departmentId}`);
   } catch (error) {
@@ -233,10 +212,6 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
 
 // --- Position Endpoints ---
 
-/**
- * Adds a new position to the organization.
- * @param positionData Data for the new position.
- */
 export async function addPosition(positionData: AddPositionPayload): Promise<Position> {
   console.log('API CALL: POST /api/organization/positions. Data:', positionData);
   try {
@@ -252,9 +227,6 @@ export async function addPosition(positionData: AddPositionPayload): Promise<Pos
   }
 }
 
-/**
- * Fetches all positions in the organization.
- */
 export async function fetchPositions(): Promise<Position[]> {
   console.log('API CALL: GET /api/organization/positions.');
   try {
@@ -268,11 +240,6 @@ export async function fetchPositions(): Promise<Position[]> {
   }
 }
 
-/**
- * Assigns a position to an employee or updates an assignment.
- * @param positionId The ID of the position.
- * @param assignmentData Data for the assignment (e.g., employeeId, startDate).
- */
 export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<any> {
   console.log(`API CALL: PUT /api/organization/positions/${positionId}/assign. Data:`, assignmentData);
   try {
@@ -280,12 +247,10 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
       method: 'PUT',
       body: JSON.stringify(assignmentData),
     });
-    return await parseJsonResponse<any>(response); // Adjust response type as needed
+    return await parseJsonResponse<any>(response);
   } catch (error) {
     console.error(`Error assigning position ${positionId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
     throw new Error(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
-
-    
