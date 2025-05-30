@@ -18,7 +18,7 @@ import React, { useState } from "react"; // Added useState
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast'; // Added useToast
 
-// Type for the expected sign-in response structure
+// Define the expected structure of the sign-in API response
 interface SignInApiResponse {
   token: string;
   user: {
@@ -52,18 +52,16 @@ export default function LoginPage() {
 
     try {
       // Call the local signIn function
-      const response = await signIn({ email, password }) as SignInApiResponse; // Assuming signIn returns SignInApiResponse
-      
-      console.log('Login page - API response:', response);
+      const response = await signIn({ email, password }); 
+      console.log('Login page - signIn service call returned:', response);
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
-        // Store token (using 'token' as key, matching user's fetchApi)
         localStorage.setItem('token', response.token);
         console.log('Login page - Auth token stored in localStorage (key: token).');
 
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email; // Fallback to entered email
+        let finalUserEmail = email; 
 
         const userFromApi = response.user;
         if (userFromApi && typeof userFromApi === 'object') {
@@ -94,9 +92,9 @@ export default function LoginPage() {
       } else {
         console.warn('Login page - Token validation failed. Detailed diagnostics:');
         if (!response) {
-          console.warn('Login page - The response object itself is null or undefined.');
+          console.warn('Login page - The response object from signIn service is null or undefined.');
         } else {
-          console.warn('Login page - Response object received (raw):', response);
+          console.warn('Login page - Response object received (raw from signIn):', response);
           if (!response.token) {
             console.warn('Login page - "token" field is missing or falsy in the response.');
           } else if (typeof response.token !== 'string') {
@@ -205,51 +203,69 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
   const config: RequestInit = {
     method,
     headers,
-    // credentials: 'include', // 'credentials' might cause issues with simple local setups if not configured on server
+    // credentials: 'include', // 'credentials' can cause issues if not configured on server
   };
 
   if (body) {
     config.body = JSON.stringify(body);
   }
   
-  console.log(`Calling API: ${method} ${API_BASE_URL}${endpoint}`);
-  if (body) console.log('Request body:', body);
+  console.log(`FETCH_API_DEBUG: Calling API: ${method} ${API_BASE_URL}${endpoint}`);
+  if (body) console.log('FETCH_API_DEBUG: Request body:', body);
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
   
-  const responseText = await response.text(); // Get text for logging, then try to parse
-  console.log(`API Response Status: ${response.status} for ${API_BASE_URL}${endpoint}`);
-  console.log(`API Response Text: ${responseText}`);
+  const responseStatus = response.status;
+  const responseStatusText = response.statusText;
+  const contentType = response.headers.get('content-type');
+  console.log(`FETCH_API_DEBUG: Response Status: ${responseStatus} ${responseStatusText}`);
+  console.log(`FETCH_API_DEBUG: Response Content-Type: ${contentType}`);
+
+  const responseText = await response.text(); // Get text for logging FIRST
+  console.log(`FETCH_API_DEBUG: Raw Response Text for ${API_BASE_URL}${endpoint}: ${responseText}`);
 
 
   if (!response.ok) {
-    let errorMsg = `Error ${response.status}: ${response.statusText}. Response: ${responseText}`;
+    let errorMsg = `Error ${responseStatus}: ${responseStatusText}. Response: ${responseText}`;
     try {
+        // Attempt to parse even if not ok, in case server sends problem+json
         const errorJson = JSON.parse(responseText);
-        // Use specific error message from server if available (e.g., ASP.NET Core problem details)
         errorMsg = errorJson.title || errorJson.message || errorMsg; 
-        if (errorJson.errors) { // For ASP.NET Core validation problem details
+        if (errorJson.errors) { 
             const validationErrors = Object.values(errorJson.errors).flat().join(', ');
             errorMsg += ` Details: ${validationErrors}`;
         }
     } catch (e) {
         // Parsing as JSON failed, stick with the text response
     }
-    console.error("API Error Details:", errorMsg);
+    console.error("FETCH_API_DEBUG: API Error Details:", errorMsg);
     throw new Error(errorMsg);
   }
 
-  if (response.status === 204) { // No Content
+  if (responseStatus === 204) { // No Content
+    console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} returned 204 No Content. Returning null.`);
     return null as T;
   }
 
-  try {
-    return JSON.parse(responseText) as T;
-  } catch (e) {
-    console.error("Failed to parse API response as JSON, even though status was OK. Response Text:", responseText, e);
-    // If response.ok but body is not JSON (or empty and not 204), this could be an issue.
-    // For now, we'll throw an error, as we generally expect JSON from this API.
-    throw new Error("API returned a non-JSON response for a successful request.");
+  // If response.ok and not 204, we expect JSON, especially for /auth/signin
+  if (contentType?.includes('application/json')) {
+    try {
+      const jsonData = JSON.parse(responseText);
+      console.log(`FETCH_API_DEBUG: Parsed JSON Data for ${API_BASE_URL}${endpoint}:`, jsonData);
+      return jsonData as T;
+    } catch (e) {
+      console.error(`FETCH_API_DEBUG: Failed to parse API response as JSON, even though Content-Type was application/json. Status: ${responseStatus}, URL: ${API_BASE_URL}${endpoint}. Error:`, e);
+      throw new Error(`API returned status ${responseStatus} with Content-Type application/json but body was not valid JSON: ${responseText}`);
+    }
+  } else {
+    // If it's for the signin endpoint and not JSON, it's an error
+    if (endpoint === '/auth/signin') {
+        console.error(`FETCH_API_DEBUG: /auth/signin endpoint did NOT return application/json. Content-Type: ${contentType}. Raw Text: ${responseText}`);
+        throw new Error(`API for /auth/signin returned status ${responseStatus} but Content-Type was not application/json. This is required for login. Received: ${responseText}`);
+    }
+    // For other endpoints, this might be acceptable, but less likely for this app
+    console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} was successful (status ${responseStatus}) but Content-Type ('${contentType}') was not application/json. Returning raw text.`);
+    return responseText as unknown as T;
   }
 }
 
@@ -257,15 +273,114 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
 // Auth
 //
 export const signIn = (credentials: { email: string; password: string }) =>
-  fetchApi<SignInApiResponse>('/auth/signin', 'POST', credentials); // Specified return type
+  fetchApi<SignInApiResponse>('/auth/signin', 'POST', credentials);
 
+// ... (rest of your API functions: signUp, signOut, getEmployees, etc. remain unchanged)
 export const signUp = (userData: any) => // TODO: Define SignUpData type
   fetchApi('/auth/signup', 'POST', userData);
 
 export const signOut = () =>
   fetchApi('/auth/signout', 'POST');
 
-// The rest of your API functions (getActivityLogs, getEmployees, etc.) would go here
-// Example:
-// export const getEmployees = () => fetchApi<Employee[]>('/employees', 'GET');
-// Define Employee[] type or import if available elsewhere
+//
+// Employees
+//
+export const getEmployees = () => fetchApi('/employees', 'GET');
+
+export const getEmployeeById = (id: number) =>
+  fetchApi(`/employees/${id}`, 'GET');
+
+export const getEmployeesByStatus = (status: string) =>
+  fetchApi(`/employees/status/${status}`, 'GET');
+
+export const updateEmployeeStatus = (employeeId: number, isActive: boolean) =>
+  fetchApi(`/employees/${employeeId}/status`, 'PUT', { isActive });
+
+export const getEmployeeCurrentLocation = (employeeId: number) =>
+  fetchApi(`/employees/${employeeId}/location/current`, 'GET');
+
+export const getNearbyEmployees = (employeeId: number) =>
+  fetchApi(`/employees/${employeeId}/location/nearby`, 'GET');
+
+//
+// Locations
+//
+export const updateLocation = (employeeId: number, locationData: any) =>
+  fetchApi(`/location/${employeeId}`, 'PUT', locationData);
+
+export const getLocation = (employeeId: number) =>
+  fetchApi(`/location/${employeeId}`, 'GET');
+
+//
+// Messages
+//
+export const sendMessage = (messageData: any) =>
+  fetchApi('/messages/send', 'POST', messageData);
+
+export const getConversations = () =>
+  fetchApi('/messages/conversation', 'GET');
+
+export const getUnreadMessages = (employeeId: number) =>
+  fetchApi(`/messages/${employeeId}/unread`, 'GET');
+
+export const markMessagesRead = (messageIds: number[]) =>
+  fetchApi('/messages/mark-read', 'POST', { messageIds });
+
+//
+// Organizations - Offices
+//
+export const createOffice = (officeData: any) =>
+  fetchApi('/organization/offices', 'POST', officeData);
+
+export const getOffices = () =>
+  fetchApi('/organization/offices', 'GET');
+
+export const getOfficeById = (officeId: number) =>
+  fetchApi(`/organization/offices/${officeId}`, 'GET');
+
+export const updateOffice = (officeId: number, officeData: any) =>
+  fetchApi(`/organization/offices/${officeId}`, 'PUT', officeData);
+
+export const deleteOffice = (officeId: number) =>
+  fetchApi(`/organization/offices/${officeId}`, 'DELETE');
+
+//
+// Organizations - Departments
+//
+export const createDepartment = (departmentData: any) =>
+  fetchApi('/organization/departments', 'POST', departmentData);
+
+export const getDepartments = () =>
+  fetchApi('/organization/departments', 'GET');
+
+//
+// Organizations - Positions
+//
+export const createPosition = (positionData: any) =>
+  fetchApi('/organization/positions', 'POST', positionData);
+
+export const getPositions = () =>
+  fetchApi('/organization/positions', 'GET');
+
+export const assignPosition = (positionId: number, assignData: any) =>
+  fetchApi(`/organization/positions/${positionId}/assign`, 'PUT', assignData);
+
+//
+// Users
+//
+export const hireUser = (userData: any) =>
+  fetchApi('/users/hire', 'POST', userData);
+
+export const getUsers = () =>
+  fetchApi('/users', 'GET');
+
+export const getUserById = (id: string) =>
+  fetchApi(`/users/${id}`, 'GET');
+
+export const deleteUser = (id: string) =>
+  fetchApi(`/users/${id}`, 'DELETE');
+
+export const updateUserRole = (id: string, role: string) =>
+  fetchApi(`/users/${id}/role`, 'PUT', { role });
+
+    
