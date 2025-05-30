@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; // Added useState
+import React, { useState } from "react"; 
 import { useRouter } from 'next/navigation';
-import { signUp } from '@/services/auth-service';
+import { signUp, type SignUpData, type SignUpResponse } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
@@ -31,7 +31,7 @@ export default function SignupPage() {
     const email = (event.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (event.currentTarget.elements.namedItem('password') as HTMLInputElement)?.value;
     
-    console.log("Attempting signup with:", { name, email }); // Avoid logging password
+    console.log("Attempting signup with user details:", { name, email }); // Avoid logging password in production logs
 
     try {
       if (!name || !email || !password) {
@@ -39,18 +39,19 @@ export default function SignupPage() {
         setIsLoading(false);
         return;
       }
-      // Adjust userData according to what your signUp service expects
-      const userData = { name, email, password, role: "Employee" /* Example default role */ };
-      const response = await signUp(userData);
+      
+      const userData: SignUpData = { name, email, password, role: "Employee" /* Example default role */ };
+      const response: SignUpResponse = await signUp(userData);
+      
       console.log('Sign up successful:', response);
       toast({
         title: "Signup Successful",
-        description: response.message || "Account created. You can now log in.",
+        description: response.message || "Account created successfully. You can now log in.",
       });
       router.push('/'); // Redirect to login page after successful signup
     } catch (error) {
       console.error('Sign up failed:', error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error during signup.";
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during signup.";
       toast({
         variant: "destructive",
         title: "Signup Failed",

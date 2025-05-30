@@ -13,6 +13,14 @@ export interface SignInResponse {
   };
 }
 
+export interface SignUpData {
+  name: string;
+  email: string;
+  password?: string;
+  role?: string;
+  [key: string]: any;
+}
+
 export interface SignUpResponse {
   message: string;
   userId?: string;
@@ -25,19 +33,18 @@ export interface SignUpResponse {
  * @param credentials Email and password.
  */
 export async function signIn(credentials: { email?: string; username?: string; password?: string }): Promise<SignInResponse> {
-  console.log('API CALL: POST /api/auth/signin. Credentials:', credentials);
+  console.log('API CALL: POST /api/auth/signin. Attempting with email:', credentials.email);
   const response = await apiClient('/auth/signin', {
     method: 'POST',
     body: JSON.stringify(credentials),
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
   
-  // After successful sign-in, store the token.
-  // Example: localStorage.setItem('authToken', parsedResponse.token);
-  // Ensure this is done on the client-side.
   if (typeof window !== 'undefined' && parsedResponse.token) {
     localStorage.setItem('authToken', parsedResponse.token);
     console.log('Auth token stored in localStorage.');
+  } else if (typeof window !== 'undefined') {
+    console.warn('No token received from sign-in, or not in browser environment.');
   }
   
   return parsedResponse;
@@ -48,8 +55,8 @@ export async function signIn(credentials: { email?: string; username?: string; p
  * Corresponds to: POST /api/auth/signup
  * @param userData User details for registration.
  */
-export async function signUp(userData: any): Promise<SignUpResponse> {
-  console.log('API CALL: POST /api/auth/signup. User data:', userData);
+export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
+  console.log('API CALL: POST /api/auth/signup. User data:', { email: userData.email, name: userData.name, role: userData.role });
   const response = await apiClient('/auth/signup', {
     method: 'POST',
     body: JSON.stringify(userData),
@@ -68,9 +75,6 @@ export async function signOut(): Promise<{ message: string }> {
     // No body typically needed, but depends on your API
   });
   
-  // After successful sign-out, remove the token from storage.
-  // Example: localStorage.removeItem('authToken');
-  // Ensure this is done on the client-side.
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     console.log('Auth token removed from localStorage.');
