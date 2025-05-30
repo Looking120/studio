@@ -30,7 +30,17 @@ export async function signIn(credentials: { email?: string; username?: string; p
     method: 'POST',
     body: JSON.stringify(credentials),
   });
-  return parseJsonResponse<SignInResponse>(response);
+  const parsedResponse = await parseJsonResponse<SignInResponse>(response);
+  
+  // After successful sign-in, store the token.
+  // Example: localStorage.setItem('authToken', parsedResponse.token);
+  // Ensure this is done on the client-side.
+  if (typeof window !== 'undefined' && parsedResponse.token) {
+    localStorage.setItem('authToken', parsedResponse.token);
+    console.log('Auth token stored in localStorage.');
+  }
+  
+  return parsedResponse;
 }
 
 /**
@@ -57,8 +67,15 @@ export async function signOut(): Promise<{ message: string }> {
     method: 'POST',
     // No body typically needed, but depends on your API
   });
-  // If API returns 204 No Content, parseJsonResponse will return null.
-  // Adjust if a specific message is expected even on 204.
+  
+  // After successful sign-out, remove the token from storage.
+  // Example: localStorage.removeItem('authToken');
+  // Ensure this is done on the client-side.
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('authToken');
+    console.log('Auth token removed from localStorage.');
+  }
+
   const result = await parseJsonResponse<{ message: string }>(response);
   return result || { message: 'Signed out successfully' };
 }
