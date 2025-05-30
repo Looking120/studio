@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
 import { signOut } from "@/services/auth-service"; 
+import { useToast } from '@/hooks/use-toast';
 // import { getUnreadMessages } from '@/services/message-service'; 
 
 
@@ -50,7 +51,7 @@ const defaultUser = {
   name: "Utilisateur",
   email: "utilisateur@example.com",
   role: "Employé",
-  avatarUrl: "https://placehold.co/120x120.png?text=U" 
+  avatarUrl: "" // Updated to empty, initials will be used
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -58,6 +59,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { toast } = useToast();
   // const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
@@ -88,12 +90,14 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     name: loggedInUserName || defaultUser.name,
     role: loggedInUserRole || defaultUser.role,
     email: loggedInUserEmail || defaultUser.email,
-    avatarUrl: defaultUser.avatarUrl, // Avatar URL remains placeholder for now
+    avatarUrl: defaultUser.avatarUrl, 
   };
 
   const getInitials = (name: string | null) => {
-    if (!name) return defaultUser.name.substring(0,1).toUpperCase();
-    return name.split(' ').map(n => n[0]).join('').toUpperCase() || defaultUser.name.substring(0,1).toUpperCase();
+    if (!name || name.trim() === "" || name === "User") return "U";
+    const nameParts = name.split(' ').filter(part => part.length > 0);
+    if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
+    return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
   if (pathname === "/" || pathname === "/signup") { 
@@ -123,28 +127,24 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     console.log("Signing out...");
-    try {
-      await signOut();
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userName');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-      }
-      console.log('Sign out successful, local storage cleared.');
-      router.push('/'); 
-    } catch (error) {
-      console.error('Sign out failed:', error);
-      alert(`Sign out failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-      // Fallback even if API fails
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userName');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-      }
-      router.push('/'); 
+    const result = await signOut(); // signOut service function now returns a status object
+  
+    if (result.serverSignOutOk) {
+      toast({
+        title: "Déconnexion Réussie",
+        description: result.message || "Vous avez été déconnecté du serveur.",
+      });
+    } else {
+      toast({
+        variant: "default", // Using default toast for local logout success
+        title: "Déconnexion Locale Effectuée",
+        description: result.message || "Votre session locale a été effacée. La déconnexion du serveur n'a pu être confirmée.",
+      });
+      console.warn(`Server sign-out issue: ${result.message}`);
     }
+    
+    // Redirect to login page regardless of server outcome, as local session is cleared
+    router.push('/'); 
   };
 
 

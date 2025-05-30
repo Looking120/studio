@@ -7,9 +7,9 @@ export interface SignInResponse {
   token: string;
   user: {
     id: string;
-    firstName?: string; // Added for more specific name handling
-    lastName?: string;  // Added for more specific name handling
-    name?: string;      // Kept for fallback or direct use
+    firstName?: string;
+    lastName?: string;
+    name?: string; // Kept for fallback
     email: string;
     role: string;
     // other user details
@@ -22,10 +22,10 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; 
+  password?: string;
   confirmPassword?: string;
   phoneNumber?: string;
-  birthDate?: string; 
+  birthDate?: string;
   [key: string]: any;
 }
 
@@ -41,19 +41,21 @@ export interface SignUpResponse {
  * @param credentials Email and password.
  */
 export async function signIn(credentials: { email?: string; username?: string; password?: string }): Promise<SignInResponse> {
-  console.log('API CALL: POST /api/auth/signin. Attempting with email:', credentials.email);
+  console.log('API CALL: POST /api/auth/signin. Attempting with:', credentials.email || credentials.username);
   const response = await apiClient('/auth/signin', {
     method: 'POST',
     body: JSON.stringify(credentials),
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
   
-  // Storing the token is now handled in the component after successful sign-in
+  // Storing the token and user info should happen in the component calling signIn
+  // For example, after a successful call:
   // if (typeof window !== 'undefined' && parsedResponse.token) {
   //   localStorage.setItem('authToken', parsedResponse.token);
-  //   console.log('Auth token stored in localStorage.');
-  // } else if (typeof window !== 'undefined') {
-  //   console.warn('No token received from sign-in, or not in browser environment.');
+  //   localStorage.setItem('userName', parsedResponse.user?.name || `${parsedResponse.user?.firstName} ${parsedResponse.user?.lastName}`);
+  //   localStorage.setItem('userRole', parsedResponse.user?.role || 'Employee');
+  //   localStorage.setItem('userEmail', parsedResponse.user?.email || '');
+  //   console.log('Auth token and user info could be stored here.');
   // }
   
   return parsedResponse;
@@ -83,15 +85,53 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
 }
 
 /**
- * Signs out the current user.
+ * Signs out the current user. Attempts server-side sign-out but prioritizes local cleanup.
  * Corresponds to: POST /api/auth/signout
+ * @returns A promise with the sign-out status.
  */
-export async function signOut(): Promise<{ message: string }> {
+export async function signOut(): Promise<{ message: string; serverSignOutOk: boolean }> {
   console.log('API CALL: POST /api/auth/signout.');
-  const response = await apiClient('/auth/signout', {
-    method: 'POST',
-  });
-  
+  let serverSignOutOk = false;
+  let serverResponseMessage = 'Server sign-out status unknown.';
+
+  try {
+    const response = await apiClient('/auth/signout', {
+      method: 'POST',
+    });
+
+    if (response.ok) {
+      // Only parse if the response was OK (e.g. 200, 204).
+      // A 204 No Content is valid for sign-out.
+      if (response.status === 204) {
+        serverResponseMessage = 'Signed out successfully from server (No Content).';
+      } else {
+        const result = await parseJsonResponse<{ message: string }>(response);
+        serverResponseMessage = result?.message || 'Signed out successfully from server.';
+      }
+      serverSignOutOk = true;
+    } else {
+      // API call was made but was not successful (e.g., 401 Unauthorized, 500 Server Error)
+      const responseText = await response.text();
+      serverResponseMessage = `Sign out API call failed with status ${response.status}.`;
+      if (responseText.trim()) {
+        serverResponseMessage += ` Server response: ${responseText}`;
+      }
+      console.warn(serverResponseMessage); 
+      // We are not calling parseJsonResponse here for non-OK responses to avoid its specific console.error
+      // if the goal is to suppress that for sign-out failures.
+    }
+  } catch (error) {
+    // Network error or other issue with apiClient itself (e.g., fetch failing)
+    serverResponseMessage = 'Sign out API call failed due to a network or client error.';
+    if (error instanceof Error) {
+      console.error(`Error during sign out API call: ${error.message}`);
+      serverResponseMessage += ` Error: ${error.message}`;
+    } else {
+      console.error('Unknown error during sign out API call:', error);
+    }
+  }
+
+  // Perform local sign-out tasks regardless of API call outcome
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userName');
@@ -100,6 +140,8 @@ export async function signOut(): Promise<{ message: string }> {
     console.log('Auth token and user info removed from localStorage.');
   }
 
-  const result = await parseJsonResponse<{ message: string }>(response);
-  return result || { message: 'Signed out successfully' };
+  return { 
+    message: serverSignOutOk ? serverResponseMessage : `Local sign-out successful. ${serverResponseMessage}`,
+    serverSignOutOk 
+  };
 }
