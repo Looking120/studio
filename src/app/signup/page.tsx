@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react"; 
+import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
 import { signUp, type SignUpData, type SignUpResponse } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,7 @@ export default function SignupPage() {
     const form = event.currentTarget;
     const firstName = (form.elements.namedItem('firstName') as HTMLInputElement)?.value;
     const lastName = (form.elements.namedItem('lastName') as HTMLInputElement)?.value;
-    const birthDate = (form.elements.namedItem('birthDate') as HTMLInputElement)?.value; 
+    let birthDateValue = (form.elements.namedItem('birthDate') as HTMLInputElement)?.value;
     const userName = (form.elements.namedItem('userName') as HTMLInputElement)?.value;
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
@@ -40,7 +40,7 @@ export default function SignupPage() {
     const middleName = (form.elements.namedItem('middleName') as HTMLInputElement)?.value;
     const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
 
-    if (!firstName || !lastName || !userName || !email || !password || !confirmPassword || !birthDate) {
+    if (!firstName || !lastName || !birthDateValue || !userName || !email || !password || !confirmPassword) {
       toast({
         variant: "destructive",
         title: "Erreur d'Inscription",
@@ -60,6 +60,11 @@ export default function SignupPage() {
       return;
     }
 
+    // Convert birthDate to ISO string format if it's just YYYY-MM-DD
+    if (birthDateValue && birthDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      birthDateValue = `${birthDateValue}T00:00:00.000Z`;
+    }
+
     const userData: SignUpData = { 
       firstName, 
       lastName, 
@@ -67,7 +72,7 @@ export default function SignupPage() {
       email, 
       password,
       confirmPassword,
-      birthDate,
+      birthDate: birthDateValue, // Use the potentially transformed value
     };
     if (middleName) userData.middleName = middleName;
     if (phoneNumber) userData.phoneNumber = phoneNumber;
@@ -94,7 +99,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
-      <Card className="w-full max-w-lg shadow-2xl border-transparent bg-card/80 backdrop-blur-lg"> {/* Increased max-w for two columns */}
+      <Card className="w-full max-w-lg shadow-2xl border-transparent bg-card/80 backdrop-blur-lg">
         <CardHeader className="space-y-2 text-center p-6 sm:p-8">
            <div className="flex justify-center mb-6">
              <UserPlus className="h-12 w-12 text-primary drop-shadow-lg" />
@@ -105,7 +110,7 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6 p-6 sm:p-8"> {/* Changed to space-y for vertical spacing of groups */}
+          <CardContent className="space-y-6 p-6 sm:p-8">
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
