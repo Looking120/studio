@@ -31,13 +31,12 @@ export default function SignupPage() {
     const form = event.currentTarget;
     const firstName = (form.elements.namedItem('firstName') as HTMLInputElement)?.value;
     const lastName = (form.elements.namedItem('lastName') as HTMLInputElement)?.value;
-    const birthDate = (form.elements.namedItem('birthDate') as HTMLInputElement)?.value; // Ensure this element exists
+    const birthDate = (form.elements.namedItem('birthDate') as HTMLInputElement)?.value; 
     const userName = (form.elements.namedItem('userName') as HTMLInputElement)?.value;
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
     const confirmPassword = (form.elements.namedItem('confirmPassword') as HTMLInputElement)?.value;
     
-    // Optional fields, ensure they are only added if they have value, or backend handles null/empty.
     const middleName = (form.elements.namedItem('middleName') as HTMLInputElement)?.value;
     const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
 
@@ -68,7 +67,7 @@ export default function SignupPage() {
       email, 
       password,
       confirmPassword,
-      birthDate, // Added birthDate
+      birthDate,
     };
     if (middleName) userData.middleName = middleName;
     if (phoneNumber) userData.phoneNumber = phoneNumber;
@@ -95,7 +94,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
-      <Card className="w-full max-w-md shadow-2xl border-transparent bg-card/80 backdrop-blur-lg">
+      <Card className="w-full max-w-lg shadow-2xl border-transparent bg-card/80 backdrop-blur-lg"> {/* Increased max-w for two columns */}
         <CardHeader className="space-y-2 text-center p-6 sm:p-8">
            <div className="flex justify-center mb-6">
              <UserPlus className="h-12 w-12 text-primary drop-shadow-lg" />
@@ -106,7 +105,8 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4 p-6 sm:p-8">
+          <CardContent className="space-y-6 p-6 sm:p-8"> {/* Changed to space-y for vertical spacing of groups */}
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="firstName">Prénom *</Label>
@@ -133,53 +133,60 @@ export default function SignupPage() {
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="middleName">Deuxième prénom (Optionnel)</Label>
-              <Input 
-                id="middleName" 
-                name="middleName"
-                type="text" 
-                placeholder="Ex: Charles" 
-                className="text-base py-3"
-                disabled={isLoading}
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="middleName">Deuxième prénom (Optionnel)</Label>
+                <Input 
+                  id="middleName" 
+                  name="middleName"
+                  type="text" 
+                  placeholder="Ex: Charles" 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="birthDate">Date de Naissance *</Label>
+                <Input 
+                  name="birthDate" 
+                  id="birthDate" 
+                  type="date" 
+                  required 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="birthDate">Date de Naissance *</Label>
-              <Input 
-                name="birthDate" 
-                id="birthDate" 
-                type="date" 
-                required 
-                className="text-base py-3"
-                disabled={isLoading}
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="userName">Nom d'utilisateur *</Label>
+                <Input 
+                  id="userName" 
+                  name="userName"
+                  type="text" 
+                  placeholder="Ex: alexd" 
+                  required 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Adresse Email *</Label>
+                <Input 
+                  id="email" 
+                  name="email"
+                  type="email" 
+                  placeholder="you@example.com" 
+                  required 
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
+            
             <div className="grid gap-2">
-              <Label htmlFor="userName">Nom d'utilisateur *</Label>
-              <Input 
-                id="userName" 
-                name="userName"
-                type="text" 
-                placeholder="Ex: alexd" 
-                required 
-                className="text-base py-3"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Adresse Email *</Label>
-              <Input 
-                id="email" 
-                name="email"
-                type="email" 
-                placeholder="you@example.com" 
-                required 
-                className="text-base py-3"
-                disabled={isLoading}
-              />
-            </div>
-             <div className="grid gap-2">
               <Label htmlFor="phoneNumber">Numéro de téléphone (Optionnel)</Label>
               <Input 
                 id="phoneNumber" 
@@ -190,29 +197,32 @@ export default function SignupPage() {
                 disabled={isLoading}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Mot de passe *</Label>
-              <Input 
-                id="password" 
-                name="password"
-                type="password" 
-                required 
-                placeholder="••••••••"
-                className="text-base py-3"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">Confirmez le mot de passe *</Label>
-              <Input 
-                id="confirmPassword" 
-                name="confirmPassword"
-                type="password" 
-                required 
-                placeholder="••••••••"
-                className="text-base py-3"
-                disabled={isLoading}
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="password">Mot de passe *</Label>
+                <Input 
+                  id="password" 
+                  name="password"
+                  type="password" 
+                  required 
+                  placeholder="••••••••"
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirmPassword">Confirmez le mot de passe *</Label>
+                <Input 
+                  id="confirmPassword" 
+                  name="confirmPassword"
+                  type="password" 
+                  required 
+                  placeholder="••••••••"
+                  className="text-base py-3"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4 p-6 sm:p-8 pt-0">
