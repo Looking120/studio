@@ -21,7 +21,7 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Optional to align, but should be required for actual signup
+  password?: string; // Made non-optional
   confirmPassword?: string;
   birthDate?: string; // Expects YYYY-MM-DD string from form
   phoneNumber?: string;
@@ -43,24 +43,31 @@ export async function signIn(credentials: { email?: string; password?: string })
       body: JSON.stringify(credentials),
     });
 
-    // This log is crucial: it shows what the server sent BEFORE JSON parsing.
-    // const rawText = await response.clone().text();
+    // Log the raw response text before parsing
+    // const rawText = await response.clone().text(); // response.clone() is needed as body can be read once
     // console.log('Auth Service - RAW RESPONSE TEXT from /api/auth/signin:', rawText);
 
     const parsedResponse = await parseJsonResponse<SignInResponse>(response);
     console.log('Auth Service - Parsed JSON response from /api/auth/signin:', parsedResponse);
 
     if (!parsedResponse) {
-      console.error('Auth Service - DEBUG: parsedResponse is null or undefined. This likely means the server sent a 204 No Content or an empty 200 OK response, which is not expected for sign-in.');
-      throw new Error('Authentication failed: No valid JSON response received from server. The server might have sent an empty successful response.');
+      console.error('Auth Service - DEBUG: parsedResponse from parseJsonResponse is null or undefined. This can happen if the server sent a 204 No Content, or if parseJsonResponse had an issue returning null for an empty 200 OK.');
+      throw new Error('Authentication failed: No valid JSON data received from server response. The server might have sent an empty successful response or a 204 No Content.');
     }
+    
+    // Specifically check if parsedResponse is an empty object
+    if (typeof parsedResponse === 'object' && parsedResponse !== null && Object.keys(parsedResponse).length === 0) {
+      console.error('Auth Service - DEBUG: The server sent a 200 OK response with an empty JSON object ({}). A "token" field is expected within the JSON response.');
+      throw new Error('Authentication failed: The server responded with an empty JSON object {}. Expected a "token" field in the JSON response.');
+    }
+
     if (!parsedResponse.token) {
-      console.error('Auth Service - DEBUG: The server sent a JSON response, but it was an empty object {} (or an object without a "token" field). Full parsed JSON response:', parsedResponse);
+      console.error('Auth Service - DEBUG: The server sent a JSON response, but it did not contain a "token" field, or the token was falsy. Full parsed JSON response:', parsedResponse);
       throw new Error('Authentication failed: The server\'s JSON response did not include a "token" field. Response received: ' + JSON.stringify(parsedResponse));
     }
     if (typeof parsedResponse.token !== 'string' || parsedResponse.token.trim() === '') {
-      console.error('Auth Service - DEBUG: parsedResponse.token is not a non-empty string. Token value:', parsedResponse.token, 'Type:', typeof parsedResponse.token);
-      throw new Error('Authentication failed: Token received from server is not a valid string. Token: ' + JSON.stringify(parsedResponse.token));
+      console.error('Auth Service - DEBUG: parsedResponse.token is present, but it is not a non-empty string. Token value:', parsedResponse.token, 'Type:', typeof parsedResponse.token);
+      throw new Error('Authentication failed: Token received from server is not a valid string or is empty. Token: ' + JSON.stringify(parsedResponse.token));
     }
     
     return parsedResponse;
@@ -69,7 +76,6 @@ export async function signIn(credentials: { email?: string; password?: string })
     if (error instanceof UnauthorizedError) {
       throw error; 
     }
-    // Ensure a generic error is thrown if it's not already an Error instance
     if (error instanceof Error) {
       throw error;
     }
@@ -119,13 +125,11 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
     if (response.ok) {
       serverSignOutOk = true;
-      // Try to parse response only if it's not a 204 No Content and has a body
       if (response.status !== 204 && response.headers.get("content-length") !== "0") {
         try {
           const parsed = await parseJsonResponse<{ message?: string }>(response);
           serverMessage = parsed?.message || "Successfully signed out from server.";
         } catch (e) {
-          // Log parsing error but still consider server sign-out OK if status was OK
           console.warn("Auth Service: Server sign-out response was OK but body parsing failed. Error:", e instanceof Error ? e.message : String(e));
           serverMessage = "Successfully signed out from server (response body parsing error).";
         }
@@ -134,8 +138,7 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       }
       console.log(`Auth Service: ${serverMessage}`);
     } else {
-      // Attempt to read error text if sign-out API call failed
-      const errorText = await response.text(); 
+      const errorText = await response.text().catch(() => "Could not read error text from server response."); 
       serverMessage = `Server sign-out attempt failed with status ${response.status}: ${errorText || response.statusText || 'No additional error message from server.'}`;
       console.warn(`Auth Service: ${serverMessage}`);
     }
