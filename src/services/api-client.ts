@@ -8,6 +8,16 @@ interface FetchOptions extends RequestInit {
 }
 
 /**
+ * Custom error class for Unauthorized (401) responses.
+ */
+export class UnauthorizedError extends Error {
+  constructor(message?: string) {
+    super(message || "Unauthorized");
+    this.name = "UnauthorizedError";
+  }
+}
+
+/**
  * A wrapper around the native fetch function to centralize API calls.
  * It automatically includes an Authorization header if a token is found in localStorage.
  * @param endpoint The API endpoint to call (e.g., '/employees').
@@ -56,7 +66,14 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
   const responseText = await response.text();
 
   if (!response.ok) {
-    // Handle non-OK responses (errors)
+    // Handle 401 Unauthorized specifically
+    if (response.status === 401) {
+      const errorMessage = `API request failed with status 401: Unauthorized. ${responseText.trim() === '' ? 'Server returned an empty error response.' : responseText}`;
+      console.warn(errorMessage); // Log as warning, as it will be handled by redirecting
+      throw new UnauthorizedError(errorMessage);
+    }
+
+    // Handle other non-OK responses (errors)
     let errorMessage = `API request failed with status ${response.status}`;
     if (responseText.trim() === '') {
       errorMessage += ". The server returned an empty error response.";
@@ -77,9 +94,6 @@ export async function parseJsonResponse<T>(response: Response): Promise<T> {
   // Handle OK responses
   try {
     if (responseText.trim() === '' && response.ok) {
-      // If response is OK but body is empty (e.g. a 200 OK with no body, though unusual for JSON APIs)
-      // This case might need specific handling if your API does this.
-      // For now, assuming OK responses with content or 204 for no content.
       return null as T; 
     }
     const json = JSON.parse(responseText);

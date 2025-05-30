@@ -13,6 +13,9 @@ import { ListFilter, Search, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAllActivityLogs } from '@/services/activity-service';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { UnauthorizedError } from '@/services/api-client';
+import { signOut } from '@/services/auth-service';
 
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
@@ -35,6 +38,7 @@ export default function ActivityLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activityFilter, setActivityFilter] = useState('all');
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const loadData = async () => {
@@ -46,21 +50,31 @@ export default function ActivityLogsPage() {
         console.log("Activity logs fetched:", data);
         setActivityLogs(data);
       } catch (err) {
-        console.error("Failed to fetch activity logs:", err);
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching activity logs.';
-        setFetchError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Failed to load activity logs",
-          description: errorMessage,
-        });
-        setActivityLogs([]);
+        if (err instanceof UnauthorizedError) {
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+          });
+          await signOut();
+          router.push('/');
+        } else {
+          console.error("Failed to fetch activity logs:", err);
+          const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching activity logs.';
+          setFetchError(errorMessage);
+          toast({
+            variant: "destructive",
+            title: "Failed to load activity logs",
+            description: errorMessage,
+          });
+          setActivityLogs([]);
+        }
       } finally {
         setIsLoading(false);
       }
     };
     loadData();
-  }, [toast]);
+  }, [toast, router]);
 
   const uniqueActivities = useMemo(() => {
     if (isLoading || fetchError || !activityLogs) return ['all'];

@@ -15,6 +15,9 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchEmployees, updateEmployeeStatus as apiUpdateEmployeeStatus } from '@/services/employee-service';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { UnauthorizedError } from '@/services/api-client';
+import { signOut } from '@/services/auth-service';
 
 
 export default function EmployeesPage() {
@@ -23,6 +26,7 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const loadEmployees = async () => {
@@ -34,21 +38,31 @@ export default function EmployeesPage() {
         console.log("Employees fetched:", data);
         setEmployees(data);
       } catch (err) {
-        console.error("Failed to fetch employees:", err);
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching employees.';
-        setFetchError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Failed to load employees",
-          description: errorMessage,
-        });
-        setEmployees([]); // Clear employees on error
+        if (err instanceof UnauthorizedError) {
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+          });
+          await signOut(); // Clear local storage
+          router.push('/'); 
+        } else {
+          console.error("Failed to fetch employees:", err);
+          const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching employees.';
+          setFetchError(errorMessage);
+          toast({
+            variant: "destructive",
+            title: "Failed to load employees",
+            description: errorMessage,
+          });
+          setEmployees([]); 
+        }
       } finally {
         setIsLoading(false);
       }
     };
     loadEmployees();
-  }, [toast]);
+  }, [toast, router]);
 
 
   const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
@@ -66,10 +80,14 @@ export default function EmployeesPage() {
         title: "Statut Mis à Jour",
         description: `Le statut de l'employé a été changé en ${newStatus}.`,
       });
-      // Optionally re-fetch or update with actual response if it differs significantly
-      // For now, optimistic update is kept.
     } catch (error) {
-      setEmployees(originalEmployees); // Revert optimistic update
+      if (error instanceof UnauthorizedError) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+        await signOut();
+        router.push('/');
+        return;
+      }
+      setEmployees(originalEmployees); 
       const errorMessage = error instanceof Error ? error.message : 'Impossible de mettre à jour le statut.';
       toast({
         variant: "destructive",
