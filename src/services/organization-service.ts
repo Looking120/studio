@@ -4,7 +4,7 @@ import type { Office } from '@/lib/data';
 import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
 // --- Office Related Types ---
-export interface AddOfficePayload { // Changed from Omit<Office, 'id'> to be more specific
+export interface AddOfficePayload {
   name: string;
   address: string;
   latitude: number;
@@ -114,7 +114,6 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
         if (response.status === 204) {
              return { success: true, message: 'Office deleted successfully (No Content).' };
         }
-        // Try to parse JSON only if there's content and it's JSON
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
             const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
@@ -122,8 +121,11 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
         }
         return { success: true, message: 'Office deleted successfully.' };
     }
-    const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete office with status ${response.status}` }));
-    throw new Error(errorData.message || `Failed to delete office ${officeId}`);
+    // If response is not OK, parseJsonResponse will throw a detailed error.
+    // This error will be caught by the outer catch block.
+    await parseJsonResponse<any>(response); 
+    // The line below should not be reached if parseJsonResponse throws as expected.
+    throw new Error(`API request to delete office failed with status ${response.status}, but parseJsonResponse did not throw an error.`);
   } catch (error) {
     console.error(`Error deleting office ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
@@ -168,12 +170,10 @@ export async function updateDepartment(departmentId: string, departmentData: Upd
       method: 'PUT',
       body: JSON.stringify(departmentData),
     });
-    // parseJsonResponse will throw for non-OK responses, including 404
     return await parseJsonResponse<Department>(response);
   } catch (error) {
     console.error(`Error updating department ${departmentId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
-    // Check if the error message from apiClient (via parseJsonResponse) indicates a 404
     if (error instanceof Error && (error.message.includes("status 404") || error.message.toLowerCase().includes("not found"))) {
         throw new Error(`Update failed: The department update endpoint (PUT /api/organization/departments/${departmentId}) was not found (404). Please ensure this endpoint is available on the backend.`);
     }
@@ -187,24 +187,31 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
     const response = await apiClient(`/organization/departments/${departmentId}`, {
       method: 'DELETE',
     });
+
     if (response.ok) {
       if (response.status === 204) { // HTTP 204 No Content
         return { success: true, message: 'Department deleted successfully.' };
       }
-      // If there's a body, try to parse it, otherwise assume success
+      // If there's a body (e.g. 200 OK with JSON), try to parse it.
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
-        return result || { success: true, message: 'Department deleted successfully.' };
+        // If parsing fails or result is null, still consider it a success if response was OK.
+        return result && typeof result.success === 'boolean' ? result : { success: true, message: 'Department deleted successfully (parsed response).' };
       }
-      return { success: true, message: 'Department deleted successfully.' };
+      return { success: true, message: 'Department deleted successfully (non-JSON OK response).' };
+    } else {
+      // If response is not OK, parseJsonResponse will throw a detailed error.
+      // This error will be caught by the outer catch block.
+      await parseJsonResponse<any>(response);
+      // The line below should ideally not be reached if parseJsonResponse throws.
+      // Adding a fallback error if parseJsonResponse somehow doesn't throw despite non-OK status.
+      throw new Error(`API request to delete department failed with status ${response.status}, but parseJsonResponse did not throw an error.`);
     }
-    // Handle error responses
-    const errorData = await parseJsonResponse<any>(response).catch(() => ({ message: `Failed to delete department with status ${response.status}` }));
-    throw new Error(errorData.message || `Failed to delete department ${departmentId}`);
   } catch (error) {
     console.error(`Error deleting department ${departmentId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
+    // error.message here should be the detailed one from parseJsonResponse if the API call failed.
     throw new Error(`Failed to delete department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -254,3 +261,4 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
     throw new Error(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
