@@ -51,7 +51,7 @@ const defaultUser = {
   name: "Utilisateur",
   email: "utilisateur@example.com",
   role: "Employé",
-  avatarUrl: "" // Updated to empty, initials will be used
+  avatarUrl: "" 
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -67,11 +67,15 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    setMounted(true); // For theme toggler hydration safety
     if (typeof window !== 'undefined') {
-      setLoggedInUserName(localStorage.getItem('userName'));
-      setLoggedInUserRole(localStorage.getItem('userRole'));
-      setLoggedInUserEmail(localStorage.getItem('userEmail'));
+      const name = localStorage.getItem('userName');
+      const role = localStorage.getItem('userRole');
+      const email = localStorage.getItem('userEmail');
+      console.log('AppClientLayout - Pathname changed or mounted. Reading from localStorage:', { name, role, email, currentPath: pathname });
+      setLoggedInUserName(name);
+      setLoggedInUserRole(role);
+      setLoggedInUserEmail(email);
     }
     // Example: Fetch unread messages count
     // const fetchUnreads = async () => {
@@ -84,7 +88,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     //   }
     // };
     // fetchUnreads();
-  }, []);
+  }, [pathname]); // Re-run when pathname changes to pick up localStorage updates after login/logout
   
   const userToDisplay = {
     name: loggedInUserName || defaultUser.name,
@@ -94,7 +98,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   };
 
   const getInitials = (name: string | null) => {
-    if (!name || name.trim() === "" || name === "User") return "U";
+    console.log('AppClientLayout - getInitials called with name:', name);
+    if (!name || name.trim() === "" || name === "User" || name === "Utilisateur") return "U"; // Handles both "User" and "Utilisateur" as generic
     const nameParts = name.split(' ').filter(part => part.length > 0);
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -127,7 +132,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     console.log("Signing out...");
-    const result = await signOut(); // signOut service function now returns a status object
+    const result = await signOut(); 
   
     if (result.serverSignOutOk) {
       toast({
@@ -136,14 +141,17 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       });
     } else {
       toast({
-        variant: "default", // Using default toast for local logout success
+        variant: "default", 
         title: "Déconnexion Locale Effectuée",
         description: result.message || "Votre session locale a été effacée. La déconnexion du serveur n'a pu être confirmée.",
       });
       console.warn(`Server sign-out issue: ${result.message}`);
     }
     
-    // Redirect to login page regardless of server outcome, as local session is cleared
+    // Clear local state as well
+    setLoggedInUserName(null);
+    setLoggedInUserRole(null);
+    setLoggedInUserEmail(null);
     router.push('/'); 
   };
 
@@ -239,7 +247,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={userToDisplay.avatarUrl} alt={userToDisplay.name} data-ai-hint="user avatar" />
+                    <AvatarImage src={userToDisplay.avatarUrl} alt={userToDisplay.name || ""} data-ai-hint="user avatar" />
                     <AvatarFallback>{getInitials(userToDisplay.name)}</AvatarFallback>
                   </Avatar>
                 </Button>

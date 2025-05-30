@@ -35,6 +35,11 @@ export default function LoginPage() {
     
     console.log("Attempting login with email:", email); 
 
+    // Initialize with fallback values
+    let finalUserName = 'User'; 
+    let finalUserRole = 'Employee'; 
+    let finalUserEmail = email || 'user@example.com'; // Use entered email or a generic fallback if email is null
+
     try {
       if (!email || !password) {
         toast({ variant: "destructive", title: "Error", description: "Email and password are required." });
@@ -42,56 +47,51 @@ export default function LoginPage() {
         return;
       }
       const response = await signIn({ email, password });
-      console.log('Sign in successful, API response:', response); // Log entire response
+      console.log('Login page - API signIn raw response:', response); 
       
-      let finalUserName = 'User'; // Default value
-      let finalUserRole = 'Employee'; // Default value
-      let finalUserEmail = email; // Default to entered email
-
-      if (response.token && typeof window !== 'undefined') {
+      if (response && response.token && typeof window !== 'undefined') {
         localStorage.setItem('authToken', response.token);
-        console.log('Auth token stored in localStorage.');
+        console.log('Login page - Auth token stored in localStorage.');
         
-        console.log('API signIn response.user object:', response.user); // DETAILED LOG
+        console.log('Login page - API signIn response.user object:', response.user);
 
-        if (response.user) {
+        const userFromApi = response.user;
+        if (userFromApi && typeof userFromApi === 'object') {
           let displayName = '';
-          if (response.user.firstName && response.user.lastName) {
-            displayName = `${response.user.firstName} ${response.user.lastName}`;
-          } else if (response.user.name) {
-            displayName = response.user.name;
+          if (userFromApi.firstName && userFromApi.lastName) {
+            displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
+          } else if (userFromApi.name) {
+            displayName = userFromApi.name;
           }
           
-          finalUserName = displayName.trim() || 'User';
-          finalUserRole = response.user.role || 'Employee';
-          finalUserEmail = response.user.email || email;
-
-          localStorage.setItem('userName', finalUserName);
-          localStorage.setItem('userRole', finalUserRole);
-          localStorage.setItem('userEmail', finalUserEmail);
-          console.log(`Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
+          finalUserName = displayName.trim() || 'User'; // Default to 'User' if name fields are empty
+          finalUserRole = userFromApi.role || 'Employee'; // Default to 'Employee' if role is missing
+          finalUserEmail = userFromApi.email || email || 'user@example.com'; // Prioritize API email, then form email, then fallback
         } else {
-          // Fallback if user object is not present in response
-          localStorage.setItem('userName', finalUserName); // Stores default 'User'
-          localStorage.setItem('userRole', finalUserRole); // Stores default 'Employee'
-          localStorage.setItem('userEmail', finalUserEmail); // Stores entered email
-          console.warn('User object not found in signIn response. Using fallbacks for localStorage.');
+          console.warn('Login page - User object in API response was missing or not an object. Using default user info for storage.');
+          // finalUserName, finalUserRole, finalUserEmail retain their initialized defaults
         }
+        
+        // Store derived or default values
+        localStorage.setItem('userName', finalUserName);
+        localStorage.setItem('userRole', finalUserRole);
+        localStorage.setItem('userEmail', finalUserEmail);
+        console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
+        
+        toast({ title: "Login Successful", description: `Welcome back, ${finalUserName}!`});
+        router.push('/dashboard'); 
       } else {
-         console.warn('No token received or not in browser environment.');
-         // Still set defaults if no token but signIn was somehow considered successful (unlikely)
-         localStorage.setItem('userName', finalUserName);
-         localStorage.setItem('userRole', finalUserRole);
-         localStorage.setItem('userEmail', finalUserEmail);
+         console.warn('Login page - No token received from API or not in browser environment. User info not stored from API.');
+         // If login "succeeded" but no token, this is an issue. We might not want to store anything or redirect.
+         // For now, ensure defaults are NOT stored if token is missing.
+         // localStorage.removeItem('userName');
+         // localStorage.removeItem('userRole');
+         // localStorage.removeItem('userEmail');
+         toast({ variant: "destructive", title: "Login Failed", description: "Authentication failed: No token received." });
       }
       
-      // For the welcome toast, prioritize directly from what was intended to be stored.
-      let welcomeName = finalUserName;
-
-      toast({ title: "Login Successful", description: `Welcome back, ${welcomeName}!`});
-      router.push('/dashboard'); 
     } catch (error) {
-      console.error('Sign in failed:', error);
+      console.error('Login page - Sign in failed:', error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error during login.";
       toast({ variant: "destructive", title: "Login Failed", description: errorMessage });
     } finally {
