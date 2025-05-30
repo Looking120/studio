@@ -24,8 +24,8 @@ export interface SignUpData {
   email: string;
   password?: string;
   confirmPassword?: string;
-  phoneNumber?: string;
   birthDate?: string;
+  phoneNumber?: string;
 }
 
 export interface SignUpResponse {
@@ -39,57 +39,67 @@ export interface SignUpResponse {
  * @param credentials Email and password.
  */
 export async function signIn(credentials: { email?: string; password?: string }): Promise<SignInResponse> {
-  console.log('Auth Service: Attempting to sign in with:', credentials.email);
+  console.log('Auth Service: Attempting to sign in with email:', credentials.email);
   try {
     const response = await apiClient('/auth/signin', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    console.log('Auth Service - Raw response from /api/auth/signin:', response);
+
+    // Log raw response text BEFORE parsing if not already done by apiClient
+    // const rawText = await response.clone().text(); // Clone to read body multiple times if needed
+    // console.log('Auth Service - Raw response text from /api/auth/signin:', rawText);
+
     const parsedResponse = await parseJsonResponse<SignInResponse>(response);
     console.log('Auth Service - Parsed JSON response from /api/auth/signin:', parsedResponse);
-    if (!parsedResponse || !parsedResponse.token) {
-        throw new Error('Authentication failed: No token received from server response.');
+
+    if (!parsedResponse) {
+      console.error('Auth Service - DEBUG: parsedResponse is null or undefined.');
+      throw new Error('Authentication failed: No valid JSON response received from server.');
     }
+    if (!parsedResponse.token) {
+      console.error('Auth Service - DEBUG: parsedResponse.token is missing or falsy. Full parsedResponse:', parsedResponse);
+      throw new Error('Authentication failed: No token received from server response.');
+    }
+    if (typeof parsedResponse.token !== 'string' || parsedResponse.token.trim() === '') {
+      console.error('Auth Service - DEBUG: parsedResponse.token is not a non-empty string. Token value:', parsedResponse.token, 'Type:', typeof parsedResponse.token);
+      throw new Error('Authentication failed: Token received is not a valid string.');
+    }
+    
     return parsedResponse;
   } catch (error) {
     console.error('Auth Service - signIn error:', error);
     if (error instanceof UnauthorizedError) {
       throw error; // Re-throw specific error for page to handle
     }
+    // Make sure to re-throw other errors or handle them appropriately
     throw new Error(error instanceof Error ? error.message : 'An unknown error occurred during sign in.');
   }
 }
 
 /**
- * Signs up a new user. (MOCKED)
+ * Signs up a new user.
  * @param userData User details for registration.
  */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
-  console.log('MOCK API CALL: POST /api/auth/signup. User data being sent:', {
-    firstName: userData.firstName,
-    lastName: userData.lastName,
-    userName: userData.userName,
-    email: userData.email,
-    middleName: userData.middleName,
-    phoneNumber: userData.phoneNumber,
-    birthDate: userData.birthDate,
-    // Password is not logged for security
-  });
-  // To connect this:
-  // const response = await apiClient('/auth/signup', {
-  //   method: 'POST',
-  //   body: JSON.stringify(userData),
-  // });
-  // return parseJsonResponse<SignUpResponse>(response);
-
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
-  const mockResponse: SignUpResponse = {
-    message: `Inscription réussie (simulation) pour ${userData.userName}!`,
-    userId: 'mockNewUser-' + Date.now(),
-  };
-  return Promise.resolve(mockResponse);
+  console.log('Auth Service: Attempting to sign up user:', userData.userName);
+  try {
+    const response = await apiClient('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+    const parsedResponse = await parseJsonResponse<SignUpResponse>(response);
+    console.log('Auth Service - Parsed JSON response from /api/auth/signup:', parsedResponse);
+    if (!parsedResponse || !parsedResponse.message) {
+        throw new Error('Signup failed: No confirmation message received from server.');
+    }
+    return parsedResponse;
+  } catch (error) {
+    console.error('Auth Service - signUp error:', error);
+    throw new Error(error instanceof Error ? error.message : 'An unknown error occurred during sign up.');
+  }
 }
+
 
 /**
  * Signs out the current user.
@@ -101,27 +111,35 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
   let serverMessage = "Server sign-out not attempted or failed.";
 
   try {
-    // Optional: Call your backend's signout endpoint
-    // const response = await apiClient('/auth/signout', { method: 'POST' });
-    // if (response.ok) {
-    //   serverSignOutOk = true;
-    //   serverMessage = "Successfully signed out from server.";
-    //   console.log('Auth Service: Successfully signed out from server.');
-    // } else {
-    //   const errorText = await response.text();
-    //   serverMessage = `Server sign-out failed: ${response.status} ${errorText || response.statusText}`;
-    //   console.warn(`Auth Service: Server sign-out failed: ${response.status} ${errorText || response.statusText}`);
-    // }
-    // For now, let's simulate a successful server sign out for mock purposes.
-    // Remove this line when connecting to a real backend signout.
-    await new Promise(resolve => setTimeout(resolve, 200));
-    serverSignOutOk = true; 
-    serverMessage = "Server sign-out successful (simulated).";
-    console.log('Auth Service: Server sign-out successful (simulated).');
+    console.log('Auth Service: Attempting server sign-out...');
+    const response = await apiClient('/auth/signout', { method: 'POST' });
 
+    if (response.ok) {
+      serverSignOutOk = true;
+      // Try to parse if there's content, otherwise assume success
+      if (response.status !== 204 && response.headers.get("content-length") !== "0") {
+        try {
+          const parsed = await parseJsonResponse<{ message?: string }>(response);
+          serverMessage = parsed?.message || "Successfully signed out from server.";
+        } catch (e) {
+          // If parsing fails but status is OK, still consider it a success
+          console.warn("Auth Service: Server sign-out response was OK but body parsing failed. Assuming success.", e);
+          serverMessage = "Successfully signed out from server (response body parsing error).";
+        }
+      } else {
+         serverMessage = "Successfully signed out from server (no content).";
+      }
+      console.log(`Auth Service: ${serverMessage}`);
+    } else {
+      // Handle non-OK responses for signout more gracefully
+      const errorText = await response.text(); // Read error text if any
+      serverMessage = `Server sign-out attempt failed: ${response.status} ${errorText || response.statusText}`;
+      console.warn(`Auth Service: ${serverMessage}`);
+    }
   } catch (error) {
+    // Catch network errors or other issues with the apiClient call itself
     serverMessage = `Error during server sign-out attempt: ${error instanceof Error ? error.message : "Unknown error"}`;
-    console.error(`Auth Service: Error during server sign-out attempt:`, error);
+    console.error(`Auth Service: ${serverMessage}`, error);
   }
 
   // Always clear local storage regardless of server response
