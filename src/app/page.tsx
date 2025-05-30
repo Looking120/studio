@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useState } from "react"; // Added useState
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 // Define the expected structure of the sign-in API response
 interface SignInApiResponse {
@@ -33,12 +33,12 @@ interface SignInApiResponse {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast(); // Initialize toast
+  const [isLoading, setIsLoading] = useState(false); // Added isLoading state
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsLoading(true);
+    setIsLoading(true); // Set loading state
 
     const form = event.currentTarget;
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
@@ -386,5 +386,7 @@ export const deleteUser = (id: string) =>
 
 export const updateUserRole = (id: string, role: string) =>
   fetchApi(`/users/${id}/role`, 'PUT', { role });
+
+    
 
     
