@@ -51,18 +51,26 @@ export default function LoginPage() {
     }
 
     try {
-      // Call the local signIn function (defined at the bottom of this file)
+      // The local signIn function now returns the parsed response directly
       const response = await signIn({ email, password }); 
       console.log('Login page - signIn service call returned:', response);
+
+      // Aggressive logging before the IF condition
+      console.log('Login page - DEBUG: Raw response object received in handleSubmit:', JSON.stringify(response, null, 2));
+      if (response && typeof response === 'object') {
+        console.log('Login page - DEBUG: Keys in response object:', Object.keys(response));
+        console.log('Login page - DEBUG: Value of response.token:', response.token);
+        console.log('Login page - DEBUG: Type of response.token:', typeof response.token);
+      }
+
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
         localStorage.setItem('token', response.token); // Using 'token' as key, consistent with fetchApi
         console.log('Login page - Auth token stored in localStorage (key: token).');
 
-        // Extract user details
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email; // Fallback to entered email
+        let finalUserEmail = email; 
 
         const userFromApi = response.user;
         if (userFromApi && typeof userFromApi === 'object') {
@@ -74,9 +82,9 @@ export default function LoginPage() {
             displayName = userFromApi.name;
           }
           
-          finalUserName = displayName.trim() || 'User'; // Ensure not empty
+          finalUserName = displayName.trim() || 'User'; 
           finalUserRole = userFromApi.role || 'Employee';
-          finalUserEmail = userFromApi.email || email; // Use API email if available
+          finalUserEmail = userFromApi.email || email; 
           
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
         } else {
@@ -95,7 +103,7 @@ export default function LoginPage() {
         if (!response) {
           console.warn('Login page - The response object from signIn service is null or undefined.');
         } else {
-          console.warn('Login page - Response object received (raw from signIn):', response);
+          console.warn('Login page - Response object received (raw from signIn):', JSON.stringify(response, null, 2));
           if (!response.token) {
             console.warn('Login page - "token" field is missing or falsy in the response.');
           } else if (typeof response.token !== 'string') {
@@ -104,7 +112,7 @@ export default function LoginPage() {
             console.warn('Login page - "token" field is a string, but it is empty or contains only whitespace.');
           }
         }
-        setIsLoading(false); // Explicitly set loading to false here
+        setIsLoading(false); 
         toast({
           variant: "destructive",
           title: "Login Failed",
@@ -112,8 +120,8 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      console.error('Sign in failed:', error);
-      setIsLoading(false); // Explicitly set loading to false here
+      console.error('Login page - Sign in failed:', error);
+      setIsLoading(false); 
       toast({
         variant: "destructive",
         title: "Login Failed",
@@ -129,7 +137,6 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl border-transparent bg-card/80 backdrop-blur-lg">
         <CardHeader className="space-y-2 text-center p-6 sm:p-8">
           <div className="flex justify-center mb-6">
-            {/* EmployTrack Logo SVG */}
             <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary drop-shadow-lg">
                 <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M2 7L12 12M12 12L22 7M12 12V22M12 2V12M17 4.5L7 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -224,17 +231,16 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
   console.log(`FETCH_API_DEBUG: Response Status: ${responseStatus} ${responseStatusText}`);
   console.log(`FETCH_API_DEBUG: Response Content-Type: ${contentType}`);
 
-  const responseText = await response.text(); // Get text for logging FIRST
+  const responseText = await response.text(); 
   console.log(`FETCH_API_DEBUG: Raw Response Text for ${API_BASE_URL}${endpoint}: ${responseText}`);
 
 
   if (!response.ok) {
     let errorMsg = `Error ${responseStatus}: ${responseStatusText}. Response: ${responseText}`;
     try {
-        // Attempt to parse even if not ok, in case server sends problem+json
-        const errorJson = JSON.parse(responseText); // Try to parse error response
-        errorMsg = errorJson.title || errorJson.message || errorMsg; // Use title or message from error JSON if available
-        if (errorJson.errors) { // ASP.NET Core often returns validation errors in an 'errors' object
+        const errorJson = JSON.parse(responseText); 
+        errorMsg = errorJson.title || errorJson.message || errorMsg; 
+        if (errorJson.errors) { 
             const validationErrors = Object.values(errorJson.errors).flat().join(', ');
             errorMsg += ` Details: ${validationErrors}`;
         }
@@ -245,15 +251,17 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
     throw new Error(errorMsg);
   }
 
-  // Handle 204 No Content specifically (often for successful DELETE or some PUTs)
-  if (responseStatus === 204) { // No Content
+  if (responseStatus === 204) { 
     console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} returned 204 No Content. Returning null.`);
     return null as T;
   }
 
-  // If response.ok and not 204, we expect JSON, especially for /auth/signin
   if (contentType?.includes('application/json')) {
     try {
+      if (responseText.trim() === '') { // Specifically for 200 OK with empty body
+        console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} was successful (status ${responseStatus}) but server returned an empty JSON response body. Returning null.`);
+        return null as T; 
+      }
       const jsonData = JSON.parse(responseText);
       console.log(`FETCH_API_DEBUG: Parsed JSON Data for ${API_BASE_URL}${endpoint}:`, jsonData);
       return jsonData as T;
@@ -262,26 +270,43 @@ async function fetchApi<T>(endpoint: string, method = 'GET', body?: any): Promis
       throw new Error(`API returned status ${responseStatus} with Content-Type application/json but body was not valid JSON: ${responseText}`);
     }
   } else {
-    // If it's for the signin endpoint and not JSON, it's an error
     if (endpoint === '/auth/signin') {
         console.error(`FETCH_API_DEBUG: /auth/signin endpoint did NOT return application/json. Content-Type: ${contentType}. Raw Text: ${responseText}`);
         throw new Error(`API for /auth/signin returned status ${responseStatus} but Content-Type was not application/json. This is required for login. Received: ${responseText}`);
     }
-    // For other endpoints, this might be acceptable, but less likely for this app
     console.warn(`FETCH_API_DEBUG: Request to ${API_BASE_URL}${endpoint} was successful (status ${responseStatus}) but Content-Type ('${contentType}') was not application/json. Returning raw text.`);
-    return responseText as unknown as T; // This case should be rare for a JSON API
+    return responseText as unknown as T; 
   }
 }
 
 //
 // Auth (as an example if you need to type the response)
 //
-export const signIn = (credentials: { email: string; password?: string }) => // Password can be optional if you just pass email
+export const signIn = (credentials: { email: string; password?: string }) : Promise<SignInApiResponse> => 
   fetchApi<SignInApiResponse>('/auth/signin', 'POST', credentials);
 
-// ... (rest of your API functions: signUp, signOut, getEmployees, etc. remain unchanged)
-export const signUp = (userData: any) => // TODO: Define SignUpData type
-  fetchApi('/auth/signup', 'POST', userData);
+// ... (rest of your API functions: signUp, signOut, getEmployees, etc. remain unchanged but should be moved to service files ideally)
+// Type for SignUpData - adjust based on what your /api/auth/signup endpoint expects
+export interface SignUpData {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  userName: string;
+  email: string;
+  password?: string; // Password can be optional if not sending cleartext
+  confirmPassword?: string; // Often required by backend
+  phoneNumber?: string;
+  birthDate?: string; // e.g., "YYYY-MM-DD"
+}
+
+// Type for SignUpResponse - adjust based on what your /api/auth/signup endpoint returns
+export interface SignUpResponse {
+  message: string;
+  userId?: string;
+}
+
+export const signUp = (userData: SignUpData): Promise<SignUpResponse> =>
+  fetchApi<SignUpResponse>('/auth/signup', 'POST', userData);
 
 export const signOut = () =>
   fetchApi('/auth/signout', 'POST');
@@ -386,7 +411,5 @@ export const deleteUser = (id: string) =>
 
 export const updateUserRole = (id: string, role: string) =>
   fetchApi(`/users/${id}/role`, 'PUT', { role });
-
     
-
     
