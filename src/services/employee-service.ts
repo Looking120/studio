@@ -1,106 +1,136 @@
 
 // src/services/employee-service.ts
 import type { Employee } from '@/lib/data';
-import { mockEmployees } from '@/lib/data'; // Import mock data
-// import { apiClient, parseJsonResponse } from './api-client'; // API calls removed
+import { apiClient, parseJsonResponse, UnauthorizedError } from './api-client';
 
-/**
- * Fetches all employees. (MOCKED)
- */
-export async function fetchEmployees(): Promise<Employee[]> {
-  console.log('MOCK API CALL: GET /api/employees');
-  await new Promise(resolve => setTimeout(resolve, 300)); // Simulate delay
-  return Promise.resolve([...mockEmployees]); // Return a copy
+// Interface for the expected location data from getCurrentEmployeeLocation
+export interface EmployeeLocation {
+  latitude: number;
+  longitude: number;
+  lastSeen: string; // Or Date, adjust as per your API
+  // Add any other relevant fields your API returns
 }
 
 /**
- * Fetches a single employee by their ID. (MOCKED)
+ * Fetches all employees.
+ */
+export async function fetchEmployees(): Promise<Employee[]> {
+  console.log('API CALL: GET /api/employees');
+  try {
+    const response = await apiClient('/employees');
+    return await parseJsonResponse<Employee[]>(response);
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to fetch employees. ${error instanceof Error ? error.message : ''}`);
+  }
+}
+
+/**
+ * Fetches a single employee by their ID.
  * @param id The ID of the employee.
  */
 export async function fetchEmployeeById(id: string): Promise<Employee | null> {
-  console.log(`MOCK API CALL: GET /api/employees/${id}`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const employee = mockEmployees.find(emp => emp.id === id);
-  return Promise.resolve(employee || null);
+  console.log(`API CALL: GET /api/employees/${id}`);
+  try {
+    const response = await apiClient(`/employees/${id}`);
+    if (response.status === 404) return null;
+    return await parseJsonResponse<Employee | null>(response);
+  } catch (error) {
+    console.error(`Error fetching employee by ID ${id}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to fetch employee by ID ${id}. ${error instanceof Error ? error.message : ''}`);
+  }
 }
 
 /**
- * Fetches employees by their status. (MOCKED)
+ * Fetches employees by their status.
  * @param status The status to filter by ('Active' or 'Inactive').
  */
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<Employee[]> {
-  console.log(`MOCK API CALL: GET /api/employees/status/${status}`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const filtered = mockEmployees.filter(emp => emp.status === status);
-  return Promise.resolve(filtered);
+  console.log(`API CALL: GET /api/employees/status/${status}`);
+  try {
+    const response = await apiClient(`/employees/status/${status}`);
+    return await parseJsonResponse<Employee[]>(response);
+  } catch (error) {
+    console.error(`Error fetching employees by status ${status}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to fetch employees by status ${status}. ${error instanceof Error ? error.message : ''}`);
+  }
 }
 
 /**
- * Updates the status of an employee. (MOCKED)
+ * Updates the status of an employee.
  * @param employeeId The ID of the employee.
- * @param status The new status.
+ * @param status The new status ('Active' or 'Inactive').
  */
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<Employee> {
-  console.log(`MOCK API CALL: PUT /api/employees/${employeeId}/status. New status: ${status}`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const employeeIndex = mockEmployees.findIndex(emp => emp.id === employeeId);
-  if (employeeIndex !== -1) {
-    // In a real scenario, you might update a local cache or re-fetch.
-    // For mock, just return a modified-like object.
-    const updatedEmployee = { ...mockEmployees[employeeIndex], status };
-    return Promise.resolve(updatedEmployee);
+  console.log(`API CALL: PUT /api/employees/${employeeId}/status. New status: ${status}`);
+  try {
+    const response = await apiClient(`/employees/${employeeId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }), // Assuming API expects { "status": "Active" } in body
+    });
+    return await parseJsonResponse<Employee>(response);
+  } catch (error) {
+    console.error(`Error updating employee ${employeeId} status to ${status}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to update employee status. ${error instanceof Error ? error.message : ''}`);
   }
-  return Promise.reject(new Error('Mock: Employee not found for status update.'));
 }
 
-
 /**
- * Hires a new user/employee. (MOCKED)
+ * Hires a new user/employee.
+ * The backend endpoint is /api/users/hire.
  * @param employeeData The data for the new employee.
+ * Expects fields like name, email, department, jobTitle. avatarUrl is optional.
  */
 export async function hireEmployee(employeeData: Omit<Employee, 'id' | 'status' | 'avatarUrl' | 'lastSeen' | 'latitude' | 'longitude'> & { avatarUrl?: string }): Promise<Employee> {
-  console.log('MOCK API CALL: POST /api/users/hire.', employeeData);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const newEmployee: Employee = {
-    id: `emp${Date.now()}`,
-    name: employeeData.name,
-    email: employeeData.email,
-    department: employeeData.department,
-    jobTitle: employeeData.jobTitle,
-    status: 'Active',
-    avatarUrl: employeeData.avatarUrl || `https://placehold.co/40x40.png?text=${employeeData.name.substring(0,2)}`,
-  };
-  // mockEmployees.push(newEmployee); // If you want to modify the shared mock array
-  return Promise.resolve(newEmployee);
+  console.log('API CALL: POST /api/users/hire.', employeeData);
+  try {
+    // Note: The endpoint is /users/hire as per the user's full API list.
+    // The Employee type from frontend has 'name', while signup had 'firstName', 'lastName'.
+    // Backend /api/users/hire must be able to handle the 'name' field or this needs adjustment.
+    const response = await apiClient('/users/hire', {
+      method: 'POST',
+      body: JSON.stringify(employeeData),
+    });
+    return await parseJsonResponse<Employee>(response);
+  } catch (error) {
+    console.error('Error hiring employee:', error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to hire employee. ${error instanceof Error ? error.message : ''}`);
+  }
 }
 
 /**
- * Fetches the current location of an employee. (MOCKED)
+ * Fetches the current location of an employee.
  * @param employeeId The ID of the employee.
  */
-export async function getCurrentEmployeeLocation(employeeId: string): Promise<{ latitude: number; longitude: number; lastSeen: string }> {
-  console.log(`MOCK API CALL: GET /api/employees/${employeeId}/location/current`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return Promise.resolve({ latitude: 34.0522, longitude: -118.2437, lastSeen: "just now (mock)" });
+export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
+  console.log(`API CALL: GET /api/employees/${employeeId}/location/current`);
+  try {
+    const response = await apiClient(`/employees/${employeeId}/location/current`);
+    return await parseJsonResponse<EmployeeLocation>(response);
+  } catch (error) {
+    console.error(`Error fetching current location for employee ${employeeId}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to fetch current employee location. ${error instanceof Error ? error.message : ''}`);
+  }
 }
 
 /**
- * Fetches nearby employees for a given employee. (MOCKED)
+ * Fetches nearby employees for a given employee.
  * @param employeeId The ID of the employee.
  */
 export async function getNearbyEmployees(employeeId: string): Promise<Employee[]> {
-  console.log(`MOCK API CALL: GET /api/employees/${employeeId}/location/nearby`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return Promise.resolve(mockEmployees.slice(0, 2)); // Return first 2 as mock nearby
-}
-
-/**
- * Updates the location of an employee. (MOCKED)
- * @param employeeId The ID of the employee.
- * @param locationData The new location data.
- */
-export async function updateEmployeeLocationApi(employeeId: string, locationData: { latitude: number; longitude: number }): Promise<any> {
-  console.log(`MOCK API CALL: PUT /api/location/${employeeId}. Data:`, locationData);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return Promise.resolve({ success: true, message: "Location updated (mock)" }); 
+  console.log(`API CALL: GET /api/employees/${employeeId}/location/nearby`);
+  try {
+    const response = await apiClient(`/employees/${employeeId}/location/nearby`);
+    return await parseJsonResponse<Employee[]>(response);
+  } catch (error) {
+    console.error(`Error fetching nearby employees for ${employeeId}:`, error);
+    if (error instanceof UnauthorizedError) throw error;
+    throw new Error(`Failed to fetch nearby employees. ${error instanceof Error ? error.message : ''}`);
+  }
 }
