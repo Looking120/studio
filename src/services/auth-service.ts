@@ -20,9 +20,10 @@ export interface SignUpData {
   middleName?: string;
   userName: string;
   email: string;
-  password?: string; // Password is essential for signup
-  confirmPassword?: string; // Added for password confirmation
+  password?: string; // Made optional again to match previous, will make required in component
+  confirmPassword?: string; // Made optional, will make required in component
   phoneNumber?: string;
+  birthDate?: string; // Added birthDate
   [key: string]: any;
 }
 
@@ -45,13 +46,10 @@ export async function signIn(credentials: { email?: string; username?: string; p
   });
   const parsedResponse = await parseJsonResponse<SignInResponse>(response);
   
-  // You should store the token upon successful login.
-  // For example, in localStorage:
   if (typeof window !== 'undefined' && parsedResponse.token) {
     localStorage.setItem('authToken', parsedResponse.token);
     console.log('Auth token stored in localStorage.');
   } else if (typeof window !== 'undefined') {
-    // This case might occur if the API doesn't return a token or if not in a browser environment.
     console.warn('No token received from sign-in, or not in browser environment.');
   }
   
@@ -71,6 +69,7 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     email: userData.email,
     middleName: userData.middleName,
     phoneNumber: userData.phoneNumber,
+    birthDate: userData.birthDate,
     // Not logging password or confirmPassword
   });
   const response = await apiClient('/auth/signup', {
@@ -88,16 +87,14 @@ export async function signOut(): Promise<{ message: string }> {
   console.log('API CALL: POST /api/auth/signout.');
   const response = await apiClient('/auth/signout', {
     method: 'POST',
-    // No body typically needed, but depends on your API
   });
   
-  // You should remove the stored token upon sign-out.
-  // For example, from localStorage:
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken');
     console.log('Auth token removed from localStorage.');
   }
 
   const result = await parseJsonResponse<{ message: string }>(response);
-  return result || { message: 'Signed out successfully' }; // Handle 204 No Content
+  return result || { message: 'Signed out successfully' };
 }
+

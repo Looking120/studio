@@ -27,17 +27,29 @@ export default function SignupPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
+
     const form = event.currentTarget;
     const firstName = (form.elements.namedItem('firstName') as HTMLInputElement)?.value;
     const lastName = (form.elements.namedItem('lastName') as HTMLInputElement)?.value;
-    const middleName = (form.elements.namedItem('middleName') as HTMLInputElement)?.value;
+    const birthDate = (form.elements.namedItem('birthDate') as HTMLInputElement)?.value; // Ensure this element exists
     const userName = (form.elements.namedItem('userName') as HTMLInputElement)?.value;
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
     const confirmPassword = (form.elements.namedItem('confirmPassword') as HTMLInputElement)?.value;
-    const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
     
-    console.log("Attempting signup with user details:", { firstName, lastName, userName, email }); 
+    // Optional fields, ensure they are only added if they have value, or backend handles null/empty.
+    const middleName = (form.elements.namedItem('middleName') as HTMLInputElement)?.value;
+    const phoneNumber = (form.elements.namedItem('phoneNumber') as HTMLInputElement)?.value;
+
+    if (!firstName || !lastName || !userName || !email || !password || !confirmPassword || !birthDate) {
+      toast({
+        variant: "destructive",
+        title: "Erreur d'Inscription",
+        description: "Veuillez remplir tous les champs obligatoires (Prénom, Nom, Date de naissance, Nom d'utilisateur, Email, Mot de passe).",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast({
@@ -49,38 +61,31 @@ export default function SignupPage() {
       return;
     }
 
+    const userData: SignUpData = { 
+      firstName, 
+      lastName, 
+      userName, 
+      email, 
+      password,
+      confirmPassword,
+      birthDate, // Added birthDate
+    };
+    if (middleName) userData.middleName = middleName;
+    if (phoneNumber) userData.phoneNumber = phoneNumber;
+      
     try {
-      if (!firstName || !lastName || !userName || !email || !password) {
-        toast({ variant: "destructive", title: "Error", description: "First name, last name, username, email and password are required." });
-        setIsLoading(false);
-        return;
-      }
-      
-      const userData: SignUpData = { 
-        firstName, 
-        lastName, 
-        userName, 
-        email, 
-        password,
-        confirmPassword // Added confirmPassword
-      };
-      if (middleName) userData.middleName = middleName;
-      if (phoneNumber) userData.phoneNumber = phoneNumber;
-      
       const response: SignUpResponse = await signUp(userData);
       
-      console.log('Sign up successful:', response);
       toast({
-        title: "Signup Successful",
-        description: response.message || "Account created successfully. You can now log in.",
+        title: "Inscription Réussie",
+        description: response.message || "Compte créé avec succès. Vous pouvez maintenant vous connecter.",
       });
       router.push('/'); 
     } catch (error) {
-      console.error('Sign up failed:', error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during signup.";
+      const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite lors de l'inscription.";
       toast({
         variant: "destructive",
-        title: "Signup Failed",
+        title: "Échec de l'Inscription",
         description: errorMessage,
       });
     } finally {
@@ -95,16 +100,16 @@ export default function SignupPage() {
            <div className="flex justify-center mb-6">
              <UserPlus className="h-12 w-12 text-primary drop-shadow-lg" />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight">Create Account</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">Créer un Compte</CardTitle>
           <CardDescription className="text-muted-foreground !mt-1">
-            Join EmployTrack today!
+            Rejoignez EmployTrack aujourd'hui !
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="grid gap-4 p-6 sm:p-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="firstName">Prénom</Label>
+                <Label htmlFor="firstName">Prénom *</Label>
                 <Input 
                   id="firstName" 
                   name="firstName"
@@ -116,7 +121,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lastName">Nom de famille</Label>
+                <Label htmlFor="lastName">Nom de famille *</Label>
                 <Input 
                   id="lastName" 
                   name="lastName"
@@ -140,7 +145,18 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="userName">Nom d'utilisateur</Label>
+              <Label htmlFor="birthDate">Date de Naissance *</Label>
+              <Input 
+                name="birthDate" 
+                id="birthDate" 
+                type="date" 
+                required 
+                className="text-base py-3"
+                disabled={isLoading}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="userName">Nom d'utilisateur *</Label>
               <Input 
                 id="userName" 
                 name="userName"
@@ -152,7 +168,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email">Adresse Email</Label>
+              <Label htmlFor="email">Adresse Email *</Label>
               <Input 
                 id="email" 
                 name="email"
@@ -175,7 +191,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password">Mot de passe *</Label>
               <Input 
                 id="password" 
                 name="password"
@@ -187,7 +203,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">Confirmez le mot de passe</Label>
+              <Label htmlFor="confirmPassword">Confirmez le mot de passe *</Label>
               <Input 
                 id="confirmPassword" 
                 name="confirmPassword"
