@@ -4,122 +4,195 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // For add/edit form
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, Trash2, Briefcase, UserCheck, AlertTriangle } from 'lucide-react'; // UserCheck for assign
+import { PlusCircle, Edit, Trash2, Briefcase, UserCheck, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-// import { fetchPositions, addPosition, assignPositionToEmployee /*, updatePosition, deletePosition */ } from '@/services/organization-service';
-// import { useToast } from '@/hooks/use-toast';
-
-interface Position {
-  id: string;
-  title: string;
-  departmentId?: string; // Optional: link to a department
-  departmentName?: string; // For display
-  assignedEmployees?: number;
-}
-
-// Mock data until API is connected
-const mockPositions: Position[] = [
-  { id: 'pos_swe', title: 'Software Engineer', departmentName: 'Engineering', assignedEmployees: 15 },
-  { id: 'pos_pm', title: 'Product Manager', departmentName: 'Product', assignedEmployees: 5 },
-  { id: 'pos_mkt_spec', title: 'Marketing Specialist', departmentName: 'Marketing', assignedEmployees: 8 },
-];
+import { fetchPositions, addPosition, assignPositionToEmployee, type Position, type AddPositionPayload, type AssignPositionPayload } from '@/services/organization-service';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { UnauthorizedError } from '@/services/api-client';
+import { signOut } from '@/services/auth-service';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const { toast } = useToast();
-  // Add state for managing add/edit/assign dialogs if using them
+  const { toast } = useToast();
+  const router = useRouter();
 
-  useEffect(() => {
-    const loadPositions = async () => {
-      setIsLoading(true);
-      setError(null);
-      // try {
-      //   // const data = await fetchPositions();
-      //   // setPositions(data); // You might need to fetch department names separately or join them in backend
-      //   console.log("Placeholder: Would fetch positions.");
-      //   await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-      //   setPositions(mockPositions);
-      // } catch (err) {
-      //   console.error("Failed to fetch positions:", err);
-      //   setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-      //   // toast({ variant: "destructive", title: "Failed to load positions", description: err.message });
-      // } finally {
-      //   setIsLoading(false);
-      // }
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
-      setPositions(mockPositions);
+  // Add state for managing add/edit/assign dialogs
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newPositionTitle, setNewPositionTitle] = useState("");
+  // const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined); // For linking to department
+
+  const loadPositions = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchPositions();
+      setPositions(data);
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+            await signOut();
+            router.push('/');
+            return;
+        }
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        setError(errorMessage);
+        toast({ variant: "destructive", title: "Failed to load positions", description: errorMessage });
+    } finally {
       setIsLoading(false);
-    };
+    }
+  };
+  
+  useEffect(() => {
     loadPositions();
-  }, []);
+    // You might also want to fetch departments here if you need them for a dropdown in the add/edit position form
+  }, [toast, router]);
 
-  const handleAddPosition = () => {
-    console.log("Placeholder: Open add position form/dialog.");
-    // Example:
-    // const positionTitle = prompt("Enter new position title:");
-    // if (positionTitle) {
-    //   try {
-    //     // const newPosition = await addPosition({ title: positionTitle, departmentId: "some_dept_id" });
-    //     // setPositions(prev => [...prev, newPosition]);
-    //     // toast({ title: "Position Added" });
-    //     console.log(`Placeholder: Would add position "${positionTitle}"`);
-    //   } catch (err) { /* ... handle error ... */ }
-    // }
-    alert("Add position functionality - placeholder.");
+  const handleAddPosition = async () => {
+    if (!newPositionTitle.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Position title cannot be empty." });
+        return;
+    }
+    const payload: AddPositionPayload = { 
+        title: newPositionTitle.trim(),
+        // departmentId: selectedDepartmentId // If you add department selection
+    };
+    try {
+      const newPosition = await addPosition(payload);
+      setPositions(prev => [...prev, newPosition]); // Or await loadPositions();
+      toast({ title: "Position Added", description: `${newPosition.title} was successfully added.` });
+      setNewPositionTitle("");
+      // setSelectedDepartmentId(undefined);
+      setShowAddDialog(false);
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+            await signOut();
+            router.push('/');
+            return;
+        }
+        const errorMessage = err instanceof Error ? err.message : 'Could not add position.';
+        toast({ variant: "destructive", title: "Failed to add position", description: errorMessage });
+        console.error("Add position failed:", err);
+    }
   };
 
   const handleEditPosition = (pos: Position) => {
     console.log(`Placeholder: Open edit position form for ${pos.title}.`);
-    alert(`Edit position ${pos.title} - placeholder.`);
+    alert(`Edit position ${pos.title} - functionality to be implemented.`);
   };
 
   const handleDeletePosition = (pos: Position) => {
-     if (confirm(`Are you sure you want to delete the ${pos.title} position?`)) {
-        console.log(`Placeholder: Delete position ${pos.id}.`);
-        // try { /* await deletePosition(pos.id); ... */ } catch (err) { /* ... */ }
-        alert(`Delete position ${pos.title} - placeholder.`);
-     }
+     console.log(`Placeholder: Delete position ${pos.id}.`);
+     alert(`Delete position ${pos.title} - functionality to be implemented.`);
+     // Example:
+     // try { await deletePosition(pos.id); setPositions(prev => prev.filter(p => p.id !== pos.id)); toast({ title: "Position Deleted" }); } catch (err) { ... }
   };
 
   const handleAssignPosition = (pos: Position) => {
     console.log(`Placeholder: Open assign employee to position ${pos.title} dialog.`);
+    alert(`Assign employee to ${pos.title} - functionality to be implemented.`);
     // Example:
     // const employeeIdToAssign = prompt(`Enter Employee ID to assign to ${pos.title}:`);
     // if (employeeIdToAssign) {
+    //   const payload: AssignPositionPayload = { employeeId: employeeIdToAssign };
     //   try {
-    //     // await assignPositionToEmployee(pos.id, { employeeId: employeeIdToAssign });
-    //     // toast({ title: "Position Assigned" });
-    //     // Refresh position data or update locally
-    //     console.log(`Placeholder: Would assign employee ${employeeIdToAssign} to position ${pos.id}`);
+    //     await assignPositionToEmployee(pos.id, payload);
+    //     toast({ title: "Position Assigned" });
+    //     loadPositions(); // Refresh data
     //   } catch (err) { /* ... handle error ... */ }
     // }
-    alert(`Assign employee to ${pos.title} - placeholder.`);
   };
 
   return (
     <Card className="shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Manage Positions</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
           <CardDescription>Define and assign job positions within the organization.</CardDescription>
         </div>
-        <Button onClick={handleAddPosition} disabled={isLoading}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Position
-        </Button>
+         <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <AlertDialogTrigger asChild>
+                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Position
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Add New Position</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Enter the title for the new position. Optionally, link it to a department.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="grid gap-4 py-4">
+                    <Input 
+                        id="positionTitle"
+                        placeholder="E.g., Software Engineer, Marketing Manager"
+                        value={newPositionTitle}
+                        onChange={(e) => setNewPositionTitle(e.target.value)}
+                        className="col-span-3"
+                    />
+                    {/* TODO: Add Select component here to choose departmentId from fetched departments */}
+                    {/* <Select onValueChange={setSelectedDepartmentId} value={selectedDepartmentId}> ... </Select> */}
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => { setNewPositionTitle(""); /* setSelectedDepartmentId(undefined); */ }}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleAddPosition}>Add Position</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </CardHeader>
       <CardContent>
-        {error && (
+         {isLoading && (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Position Title</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Assigned Employees</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <TableRow key={`skeleton-pos-${index}`}>
+                        <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+         )}
+        {!isLoading && error && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load positions</p>
             <p className="text-sm">{error}</p>
           </div>
         )}
-        {!error && (
+        {!isLoading && !error && positions.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+                No positions found. Click "Add Position" to create one.
+            </p>
+        )}
+        {!isLoading && !error && positions.length > 0 && (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -131,46 +204,45 @@ export default function PositionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <TableRow key={`skeleton-pos-${index}`}>
-                      <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : positions.length === 0 && !isLoading ? (
-                    <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            No positions found.
-                        </TableCell>
-                    </TableRow>
-                ) : (
-                  positions.map((pos) => (
+                {positions.map((pos) => (
                     <TableRow key={pos.id}>
-                      <TableCell className="font-medium flex items-center gap-2">
+                    <TableCell className="font-medium flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                         {pos.title}
-                      </TableCell>
-                      <TableCell>{pos.departmentName || 'N/A'}</TableCell>
-                      <TableCell>{pos.assignedEmployees || 0}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="xs" onClick={() => handleAssignPosition(pos)}>
-                          <UserCheck className="mr-1 h-3 w-3" /> Assign
+                    </TableCell>
+                    <TableCell>{pos.departmentName || 'N/A'}</TableCell>
+                    <TableCell>{pos.assignedEmployees !== undefined ? pos.assignedEmployees : 'N/A'}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                        <Button variant="outline" size="xs" onClick={() => handleAssignPosition(pos)} title="Assign Employee">
+                        <UserCheck className="mr-1 h-3 w-3" /> Assign
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPosition(pos)}>
-                          <Edit className="h-4 w-4" />
-                           <span className="sr-only">Edit</span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPosition(pos)} title="Edit Position">
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Edit</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeletePosition(pos)}>
-                          <Trash2 className="h-4 w-4" />
-                           <span className="sr-only">Delete</span>
-                        </Button>
-                      </TableCell>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete Position">
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete</span>
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action will permanently delete the "{pos.title}" position. This cannot be undone.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeletePosition(pos)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
                     </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
