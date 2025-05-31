@@ -108,21 +108,21 @@ export default function EmployeesPage() {
 
   return (
     <Card className="shadow-lg">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <CardTitle>Employee Directory</CardTitle>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search employees..."
-              className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px] bg-background"
+              className="pl-8 w-full sm:w-[200px] md:w-[250px] lg:w-[300px] bg-background"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={isLoading || !!fetchError}
             />
           </div>
-          <Button asChild variant="default" disabled={isLoading || !!fetchError}>
+          <Button asChild variant="default" disabled={isLoading || !!fetchError} className="w-full sm:w-auto">
             <Link href="/employees/add">
               <UserPlus className="mr-2 h-4 w-4" /> Add Employee
             </Link>
@@ -194,7 +194,7 @@ export default function EmployeesPage() {
                           onValueChange={(value: 'Active' | 'Inactive') => handleStatusChange(employee.id, value)}
                           disabled={!employee.id}
                         >
-                          <SelectTrigger className="w-[120px] h-8 text-xs">
+                          <SelectTrigger className="w-full max-w-[120px] h-8 text-xs mx-auto">
                             <SelectValue placeholder="Change status" />
                           </SelectTrigger>
                           <SelectContent>

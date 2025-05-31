@@ -160,14 +160,14 @@ export default function DepartmentsPage() {
 
   return (
     <Card className="shadow-lg">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Departments</CardTitle>
           <CardDescription>View, add, edit, or delete organizational departments.</CardDescription>
         </div>
         <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <AlertDialogTrigger asChild>
-                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading}>
+                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Department
                 </Button>
             </AlertDialogTrigger>
@@ -244,7 +244,7 @@ export default function DepartmentsPage() {
                     <TableRow key={dept.id}>
                     <TableCell className="font-medium">{dept.name}</TableCell>
                     <TableCell>{dept.employeeCount !== undefined ? dept.employeeCount : 'N/A'}</TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right space-x-1 sm:space-x-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(dept)} title="Edit Department">
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Edit</span>

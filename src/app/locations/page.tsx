@@ -84,10 +84,10 @@ export default function LocationsPage() {
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-4">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 gap-4">
           <CardTitle>Employee Live Locations</CardTitle>
-          <div className="flex items-center gap-4">
-            <RadioGroup defaultValue="active" onValueChange={(value: 'all' | 'active' | 'inactive') => setFilter(value)} className="flex items-center">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+            <RadioGroup defaultValue="active" onValueChange={(value: 'all' | 'active' | 'inactive') => setFilter(value)} className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="all" id="r-all" />
                 <Label htmlFor="r-all">All</Label>
@@ -101,7 +101,7 @@ export default function LocationsPage() {
                 <Label htmlFor="r-inactive">Inactive</Label>
               </div>
             </RadioGroup>
-            <Button variant="outline" size="sm" onClick={() => setIsSimulating(!isSimulating)}>
+            <Button variant="outline" size="sm" onClick={() => setIsSimulating(!isSimulating)} className="w-full sm:w-auto">
               <RefreshCw className={`mr-2 h-4 w-4 ${isSimulating ? 'animate-spin' : ''}`} />
               {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
             </Button>

@@ -48,7 +48,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-        <div className="max-w-3xl mx-auto py-8 sm:py-12 space-y-8">
+        <div className="max-w-3xl mx-auto py-8 sm:py-12 space-y-8 px-4">
             <Card className="shadow-xl overflow-hidden">
                 <Skeleton className="h-32 w-full" />
                 <CardHeader className="text-center -mt-20">
@@ -83,7 +83,7 @@ export default function ProfilePage() {
 
   if (!userProfile) {
     return (
-      <div className="max-w-3xl mx-auto py-12 text-center">
+      <div className="max-w-3xl mx-auto py-12 text-center px-4">
         <Card className="shadow-xl">
           <CardHeader>
             <CardTitle>Profile Not Found</CardTitle>
@@ -99,7 +99,7 @@ export default function ProfilePage() {
 
 
   return (
-    <div className="max-w-3xl mx-auto py-8 sm:py-12 space-y-8">
+    <div className="max-w-3xl mx-auto py-8 sm:py-12 space-y-8 px-4">
       <Card className="shadow-xl overflow-hidden border-transparent bg-card/90 backdrop-blur-md">
         <div className="h-32 bg-gradient-to-r from-primary to-accent" />
         <CardHeader className="text-center -mt-20">
@@ -125,10 +125,10 @@ export default function ProfilePage() {
             <InfoItem icon={<CalendarDays className="h-5 w-5 text-primary" />} label="Joined On" value={userProfile.joinDate} />
           </div>
           <div className="pt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
-            <Button size="lg">
+            <Button size="lg" className="w-full sm:w-auto">
               <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
             </Button>
-            <Button variant="outline" size="lg">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto">
               Change Password
             </Button>
           </div>

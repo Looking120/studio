@@ -127,8 +127,8 @@ export default function ActivityLogsPage() {
     <Card className="shadow-lg">
       <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <CardTitle>Employee Activity Logs</CardTitle>
-        <div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
-          <div className="relative w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -144,7 +144,7 @@ export default function ActivityLogsPage() {
             onValueChange={setActivityFilter}
             disabled={isLoading || !!fetchError || uniqueActivities.length <= 1}
           >
-            <SelectTrigger className="w-full md:w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <ListFilter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filter by activity" />
             </SelectTrigger>

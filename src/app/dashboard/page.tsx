@@ -131,7 +131,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 p-4 animate-pulse">
         <Skeleton className="h-24 w-full" />
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
         </div>
@@ -229,7 +229,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {summaryData.map((item) => (
           <Link href={item.href} key={item.title} legacyBehavior>
             <a className="block hover:shadow-lg transition-shadow duration-200 rounded-lg">
@@ -248,7 +248,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card className="bg-card text-card-foreground">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -257,7 +257,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {processedActivityLogs.length === 0 && !isLoadingEmployeeData && ( 
+            {isLoadingEmployeeData && processedActivityLogs.length === 0 && ( 
                  Array.from({ length: 3 }).map((_, index) => (
                     <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
                         <div>
@@ -268,6 +268,9 @@ export default function DashboardPage() {
                     </div>
                 ))
             )}
+            {!isLoadingEmployeeData && processedActivityLogs.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No recent activity to display.</p>
+            )}
             {processedActivityLogs.map(log => (
               <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
                 <div>
@@ -277,9 +280,11 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{log.displayTime}</p>
               </div>
             ))}
-            <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
-              View All Activity Logs
-            </Link>
+            {processedActivityLogs.length > 0 && (
+              <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
+                View All Activity Logs
+              </Link>
+            )}
           </CardContent>
         </Card>
 

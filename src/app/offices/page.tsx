@@ -69,7 +69,7 @@ export default function OfficesPage() {
 
   useEffect(() => {
     loadOffices();
-  }, []); // Removed toast and router from dependency array as loadOffices is stable
+  }, []); 
 
   const markers: MapMarkerData[] = useMemo(() => {
     if (!Array.isArray(offices)) return [];
@@ -151,11 +151,11 @@ export default function OfficesPage() {
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)]">
-      <div className="lg:w-1/3 space-y-4 overflow-y-auto pr-2 pb-4">
+      <div className="lg:w-1/3 space-y-4 overflow-y-auto pr-0 lg:pr-2 pb-4">
         <Card className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
-            <CardHeader className="py-4 flex flex-row items-center justify-between">
+            <CardHeader className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle>Our Offices</CardTitle>
-                <Button size="sm" onClick={handleAddOffice} disabled={isLoading}>
+                <Button size="sm" onClick={handleAddOffice} disabled={isLoading} className="w-full sm:w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Office
                 </Button>
             </CardHeader>
@@ -194,12 +194,12 @@ export default function OfficesPage() {
         {!isLoading && !error && offices.map(office => (
           <Card key={office.id} className="shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-primary" /> 
                   {office.name}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex gap-1 self-end xs:self-center">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)} title="Edit Office">
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>

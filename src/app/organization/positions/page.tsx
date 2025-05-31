@@ -115,14 +115,14 @@ export default function PositionsPage() {
 
   return (
     <Card className="shadow-lg">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
           <CardDescription>Define and assign job positions within the organization.</CardDescription>
         </div>
          <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <AlertDialogTrigger asChild>
-                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading}>
+                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Position
                 </Button>
             </AlertDialogTrigger>

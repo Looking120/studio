@@ -105,10 +105,10 @@ export default function AddEmployeePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
+    <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <Card className="shadow-xl">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle className="text-2xl">Add New Employee</CardTitle>
             <Button variant="outline" size="sm" asChild>
               <Link href="/employees">
@@ -125,7 +125,7 @@ export default function AddEmployeePage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="firstName"
@@ -179,7 +179,7 @@ export default function AddEmployeePage() {
                   </FormItem>
                 )}
               />
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="employeeNumber"
@@ -220,7 +220,7 @@ export default function AddEmployeePage() {
                   </FormItem>
                 )}
               />
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="dateOfBirth"
@@ -263,7 +263,7 @@ export default function AddEmployeePage() {
               </div>
               
               <p className="text-sm text-muted-foreground pt-2">Organizational IDs (UUID/GUID expected) - Placeholder, will be replaced by selectors</p>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                  <FormField
                   control={form.control}
                   name="departmentId"
