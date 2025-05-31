@@ -70,9 +70,15 @@ export default function LoginPage() {
           console.log(`Login page - API User Name: ${displayName || 'Not provided'}, API Role: ${userFromApi.role || 'Not provided'}, API Email: ${userFromApi.email || 'Not provided'}, API User ID: ${userFromApi.id || 'Not provided'}`);
 
           finalUserName = displayName.trim() || 'User';
-          finalUserRole = userFromApi.role || 'Employee';
           
-          // Explicitly check and prioritize API email
+          if (userFromApi.role && userFromApi.role.trim() !== '') {
+            finalUserRole = userFromApi.role;
+            console.log(`Login page - Determined finalUserRole from API: ${finalUserRole}`);
+          } else {
+            finalUserRole = 'Employee'; // Default if API role is missing or empty
+            console.warn(`Login page - API did not provide a valid role in userFromApi.role. Falling back to 'Employee'. API role was: [${userFromApi.role}]`);
+          }
+          
           if (userFromApi.email && typeof userFromApi.email === 'string' && userFromApi.email.trim() !== '') {
             finalUserEmail = userFromApi.email.trim();
             console.log(`Login page - Determined finalUserEmail from API: ${finalUserEmail}`);
@@ -84,9 +90,11 @@ export default function LoginPage() {
           finalUserId = userFromApi.id || '';
           console.log(`Login page - Determined finalUserId: ${finalUserId} (Source: ${userFromApi.id ? 'API' : 'Empty Fallback'})`);
         } else {
-          console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using form input email for storage. User object received:', userFromApi);
-          finalUserEmail = email; // Fallback to form input email
-          finalUserId = ''; // No ID if user object is missing
+          console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Falling back to role: Employee and form input email.');
+          finalUserRole = 'Employee'; 
+          finalUserEmail = email; 
+          finalUserId = ''; 
+          console.log(`Login page - Determined finalUserRole (due to missing API user object): ${finalUserRole} (Source: Fallback)`);
           console.log(`Login page - Determined finalUserEmail (due to missing API user object): ${finalUserEmail} (Source: Form Input)`);
           console.log(`Login page - Determined finalUserId (due to missing API user object): ${finalUserId} (Source: Empty Fallback)`);
         }
@@ -98,7 +106,7 @@ export default function LoginPage() {
         if (finalUserId) {
           localStorage.setItem('userId', finalUserId);
         } else {
-          localStorage.removeItem('userId'); // Ensure no stale ID if API didn't provide one
+          localStorage.removeItem('userId'); 
         }
         console.log(`Login page - Successfully Stored in localStorage: userName='${localStorage.getItem('userName')}', userRole='${localStorage.getItem('userRole')}', userEmail='${localStorage.getItem('userEmail')}', userId='${localStorage.getItem('userId') || 'Not Stored'}'`);
 
