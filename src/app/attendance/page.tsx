@@ -11,6 +11,7 @@ import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays, LogIn, LogO
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from '@/hooks/use-mobile';
 // import { checkIn, checkOut, getAttendanceReport } from '@/services/attendance-service'; 
 // import { useToast } from '@/hooks/use-toast';
 
@@ -27,18 +28,33 @@ interface AttendanceSummaryData {
   avgWorkHours: number;
 }
 
-const currentUserId = mockEmployees[0]?.id || 'emp001'; 
-
 export default function AttendancePage() {
   const [employeeStatuses, setEmployeeStatuses] = useState<Record<string, EmployeeAttendanceStatus>>({});
   const [summaryData, setSummaryData] = useState<AttendanceSummaryData | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const isMobile = useIsMobile();
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentEmployeeDetails, setCurrentEmployeeDetails] = useState<Employee | null>(null);
   // const { toast } = useToast();
+
+  useEffect(() => {
+    setIsClient(true);
+    if (typeof window !== 'undefined') {
+      const role = localStorage.getItem('userRole');
+      const email = localStorage.getItem('userEmail');
+      setCurrentUserRole(role);
+
+      if (role && !role.toLowerCase().includes('admin')) {
+        const employee = mockEmployees.find(emp => emp.email === email);
+        setCurrentEmployeeDetails(employee || null);
+      }
+    }
+  }, []);
 
   const getEmployeeAttendanceStatus = (employeeId: string, activityLogs: typeof mockActivityLogs): EmployeeAttendanceStatus => {
     const today = new Date().toDateString();
     const logsToday = activityLogs.filter(
-      log => log.employeeId === employeeId && new Date(log.startTime!).toDateString() === today // Assuming startTime is checkInTime
+      log => log.employeeId === employeeId && new Date(log.startTime!).toDateString() === today
     );
     const checkInLog = logsToday.find(log => log.activityType === 'Checked In' && log.startTime);
     const checkOutLog = logsToday.find(log => log.activityType === 'Checked Out' && log.endTime);
@@ -62,8 +78,6 @@ export default function AttendancePage() {
   } satisfies ChartConfig;
 
   useEffect(() => {
-    setIsClient(true); 
-
     const statuses: Record<string, EmployeeAttendanceStatus> = {};
     mockEmployees.forEach(employee => {
       statuses[employee.id] = getEmployeeAttendanceStatus(employee.id, mockActivityLogs);
@@ -89,6 +103,21 @@ export default function AttendancePage() {
       avgWorkHours: 7.5, 
     });
   }, []);
+
+  const displayedEmployees = useMemo(() => {
+    if (isClient && isMobile && currentUserRole && !currentUserRole.toLowerCase().includes('admin') && currentEmployeeDetails) {
+      return [currentEmployeeDetails];
+    }
+    return mockEmployees;
+  }, [isClient, isMobile, currentUserRole, currentEmployeeDetails]);
+
+  const dailyStatusCardTitle = (isClient && isMobile && currentUserRole && !currentUserRole.toLowerCase().includes('admin'))
+    ? "My Daily Attendance"
+    : "Daily Attendance Status";
+
+  const dailyStatusCardDescription = (isClient && isMobile && currentUserRole && !currentUserRole.toLowerCase().includes('admin'))
+    ? "Your attendance status for today."
+    : "Overview of employee attendance for today.";
 
   const handleCheckIn = async (employeeId: string) => {
     console.log(`Placeholder: Check-in for employee ${employeeId}`);
@@ -148,8 +177,8 @@ export default function AttendancePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/> Daily Attendance Status</CardTitle>
-          <CardDescription>Overview of employee attendance for today.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/> {dailyStatusCardTitle}</CardTitle>
+          <CardDescription>{dailyStatusCardDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto max-h-[400px]">
@@ -164,7 +193,7 @@ export default function AttendancePage() {
               </TableHeader>
               <TableBody>
                 {!isClient ? (
-                  Array.from({ length: 5 }).map((_, index) => (
+                  Array.from({ length: (isMobile && currentUserRole && !currentUserRole.toLowerCase().includes('admin')) ? 1 : 5 }).map((_, index) => (
                     <TableRow key={`skeleton-row-${index}`}>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -172,8 +201,17 @@ export default function AttendancePage() {
                       <TableCell className="text-center"><Skeleton className="h-8 w-24" /></TableCell>
                     </TableRow>
                   ))
+                ) : displayedEmployees.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            { (isMobile && currentUserRole && !currentUserRole.toLowerCase().includes('admin'))
+                                ? "Your attendance data is not available or could not be loaded."
+                                : "No employee attendance data available."
+                            }
+                        </TableCell>
+                    </TableRow>
                 ) : (
-                  mockEmployees.map((employee: Employee) => {
+                  displayedEmployees.map((employee: Employee) => {
                     const attendance = employeeStatuses[employee.id] || { status: "Loading...", time: "..." };
                     return (
                       <TableRow key={employee.id}>
@@ -278,6 +316,5 @@ export default function AttendancePage() {
     </div>
   );
 }
-
 
     
