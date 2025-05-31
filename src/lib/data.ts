@@ -1,3 +1,4 @@
+
 export interface Employee {
   id: string;
   name: string;
@@ -9,17 +10,19 @@ export interface Employee {
   latitude?: number;
   longitude?: number;
   lastSeen?: string; // For location tracking map
+  officeId?: string; // Added for employee's assigned office
 }
 
 export interface ActivityLog {
   id: string;
   employeeId: string;
   employeeName: string;
-  checkInTime?: string; 
-  checkOutTime?: string;
-  activity: string; 
-  location?: string; 
-  date: string; 
+  startTime?: string; // Was checkInTime
+  endTime?: string;   // Was checkOutTime
+  activityType: string; // Was activity
+  description?: string;
+  location?: string;
+  // date field removed as startTime/endTime should suffice and be more specific
 }
 
 export interface Office {
@@ -31,21 +34,29 @@ export interface Office {
   headcount: number;
 }
 
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  isCompleted: boolean;
+  dueDate?: string; // Optional due date
+}
+
 export const mockEmployees: Employee[] = [
-  { id: 'emp001', name: 'Alice Wonderland', email: 'alice@example.com', department: 'Engineering', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Software Engineer', latitude: 34.052235, longitude: -118.243683, lastSeen: '5m ago' },
-  { id: 'emp002', name: 'Bob The Builder', email: 'bob@example.com', department: 'Construction', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Lead Architect', latitude: 34.055130, longitude: -118.245890, lastSeen: '15m ago' },
+  { id: 'emp001', name: 'Alice Wonderland', email: 'alice@example.com', department: 'Engineering', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Software Engineer', latitude: 34.052235, longitude: -118.243683, lastSeen: '5m ago', officeId: 'off001' },
+  { id: 'emp002', name: 'Bob The Builder', email: 'bob@example.com', department: 'Construction', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Lead Architect', latitude: 34.055130, longitude: -118.245890, lastSeen: '15m ago', officeId: 'off002' },
   { id: 'emp003', name: 'Charlie Brown', email: 'charlie@example.com', department: 'Animation', status: 'Inactive', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Character Designer', latitude: 34.050000, longitude: -118.230000, lastSeen: '2h ago' },
-  { id: 'emp004', name: 'Diana Prince', email: 'diana@example.com', department: 'Justice League', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Ambassador', latitude: 34.056000, longitude: -118.250000, lastSeen: 'Online' },
-  { id: 'emp005', name: 'Edward Scissorhands', email: 'edward@example.com', department: 'Landscaping', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Topiary Artist', latitude: 34.048000, longitude: -118.240000, lastSeen: '30m ago' },
+  { id: 'emp004', name: 'Diana Prince', email: 'diana@example.com', department: 'Justice League', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Ambassador', latitude: 34.056000, longitude: -118.250000, lastSeen: 'Online', officeId: 'off001' },
+  { id: 'emp005', name: 'Edward Scissorhands', email: 'edward@example.com', department: 'Landscaping', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Topiary Artist', latitude: 34.048000, longitude: -118.240000, lastSeen: '30m ago', officeId: 'off003' },
 ];
 
 export const mockActivityLogs: ActivityLog[] = [
-  { id: 'log001', employeeId: 'emp001', employeeName: 'Alice Wonderland', checkInTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), activity: 'Checked In', location: 'Main Office', date: new Date().toISOString() },
-  { id: 'log002', employeeId: 'emp002', employeeName: 'Bob The Builder', checkInTime: new Date(Date.now() - 7.5 * 60 * 60 * 1000).toISOString(), activity: 'Checked In', location: 'Client Site A', date: new Date().toISOString() },
-  { id: 'log003', employeeId: 'emp001', employeeName: 'Alice Wonderland', checkOutTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), activity: 'Checked Out', location: 'Main Office', date: new Date().toISOString() },
-  { id: 'log004', employeeId: 'emp004', employeeName: 'Diana Prince', checkInTime: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(), activity: 'Checked In', location: 'Remote', date: new Date().toISOString() },
-  { id: 'log005', employeeId: 'emp005', employeeName: 'Edward Scissorhands', checkInTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), activity: 'Checked In', location: 'Garden Project', date: new Date().toISOString() },
-  { id: 'log006', employeeId: 'emp002', employeeName: 'Bob The Builder', checkOutTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(), activity: 'Checked Out', location: 'Client Site A', date: new Date().toISOString() },
+  { id: 'log001', employeeId: 'emp001', employeeName: 'Alice Wonderland', startTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), activityType: 'Checked In', location: 'Main Office' },
+  { id: 'log002', employeeId: 'emp002', employeeName: 'Bob The Builder', startTime: new Date(Date.now() - 7.5 * 60 * 60 * 1000).toISOString(), activityType: 'Checked In', location: 'Client Site A' },
+  { id: 'log003', employeeId: 'emp001', employeeName: 'Alice Wonderland', endTime: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), activityType: 'Checked Out', location: 'Main Office' },
+  { id: 'log004', employeeId: 'emp004', employeeName: 'Diana Prince', startTime: new Date(Date.now() - 9 * 60 * 60 * 1000).toISOString(), activityType: 'Checked In', location: 'Remote' },
+  { id: 'log005', employeeId: 'emp005', employeeName: 'Edward Scissorhands', startTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), activityType: 'Checked In', location: 'Garden Project' },
+  { id: 'log006', employeeId: 'emp002', employeeName: 'Bob The Builder', endTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(), activityType: 'Checked Out', location: 'Client Site A' },
 ];
 
 export const mockOffices: Office[] = [
@@ -56,7 +67,14 @@ export const mockOffices: Office[] = [
 
 export const mockAttendanceSummary = {
   totalEmployees: mockEmployees.length,
-  activeToday: mockActivityLogs.filter(log => log.checkInTime && !log.checkOutTime && new Date(log.date).toDateString() === new Date().toDateString()).length,
-  checkedInToday: new Set(mockActivityLogs.filter(log => log.checkInTime && new Date(log.date).toDateString() === new Date().toDateString()).map(log => log.employeeId)).size,
+  activeToday: mockActivityLogs.filter(log => log.startTime && !log.endTime && new Date(log.startTime).toDateString() === new Date().toDateString()).length,
+  checkedInToday: new Set(mockActivityLogs.filter(log => log.startTime && new Date(log.startTime).toDateString() === new Date().toDateString()).map(log => log.employeeId)).size,
   avgWorkHours: 7.5, // Mocked
 };
+
+export const mockTasks: Task[] = [
+    { id: 'task001', title: 'Finaliser le rapport Q3', description: 'Compiler toutes les données et rédiger le résumé exécutif.', isCompleted: false, dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task002', title: 'Préparer la présentation client', description: 'Créer les diapositives pour la réunion de mardi.', isCompleted: false, dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task003', title: 'Revue de code - Module Paiement', description: 'Vérifier les dernières modifications sur la branche feature/payment.', isCompleted: true, dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task004', title: 'Contacter le fournisseur X', description: 'Discuter des nouvelles conditions tarifaires.', isCompleted: false },
+];
