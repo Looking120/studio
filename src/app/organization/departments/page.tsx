@@ -19,7 +19,7 @@ import {
 } from '@/services/organization-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UnauthorizedError } from '@/services/api-client';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import {
   AlertDialog,
@@ -151,9 +151,19 @@ export default function DepartmentsPage() {
         router.push('/');
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'Could not delete department.';
-      toast({ variant: "destructive", title: "Failed to delete department", description: errorMessage });
-      console.error("Delete department failed:", err);
+      
+      let toastMessage = 'Could not delete department.';
+      if (err instanceof HttpError && err.status === 404) {
+        toastMessage = `Could not delete: Department not found. It may have already been deleted.`;
+        console.warn(`Attempted to delete department ${departmentId}, but it was not found (404).`, err);
+      } else if (err instanceof Error) {
+        toastMessage = err.message;
+        console.error("Delete department failed:", err);
+      } else {
+        console.error("Delete department failed with an unknown error:", err);
+      }
+      
+      toast({ variant: "destructive", title: "Failed to delete department", description: toastMessage });
     }
   };
 
