@@ -1,91 +1,148 @@
 
 // src/services/message-service.ts
-// import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
-// User did not provide endpoints for Messages, so this service remains mocked.
+// For data sent TO the API
+export interface SendMessagePayload {
+  senderId: string; // Usually inferred by backend from token, but API might require it
+  receiverId?: string; // For direct messages if applicable
+  conversationId: string; // ID of the conversation/chat room
+  content: string;
+}
 
+export interface MarkReadPayload {
+  messageIds?: string[];
+  conversationId?: string;
+  // userId for whom messages are marked read is usually inferred by backend from auth token
+}
+
+// For data received FROM the API (DTOs)
+interface ApiMessageDto {
+  id: string;
+  senderId: string;
+  senderName?: string; // Optional: Backend might join and provide this
+  conversationId: string;
+  content: string;
+  timestamp: string; // ISO Date string
+}
+
+interface ApiUnreadMessagesDto {
+  count: number;
+  messages?: ApiMessageDto[];
+}
+
+// Frontend-friendly Message type returned by service functions
 export interface Message {
   id: string;
   senderId: string;
-  receiverId?: string;
-  conversationId?: string;
+  senderName?: string; // Name of the sender, if available
+  conversationId: string;
   content: string;
-  timestamp: string;
-  [key: string]: any;
+  timestamp: string; // Keep as ISO string, page can format
 }
 
-export interface Conversation {
+export interface Conversation { // Kept from mock, adjust if API for conversations exists
   id: string;
   participants: string[];
   lastMessage?: Message;
   name?: string;
-  [key: string]: any;
 }
 
 export interface UnreadMessagesInfo {
   count: number;
   messages?: Message[];
-  [key: string]: any;
 }
 
-const mockMessages: Message[] = [
-    { id: 'msg1', senderId: 'user1', conversationId: 'conv1', content: 'Hello there! (mock)', timestamp: new Date(Date.now() - 5 * 60000).toISOString() },
-    { id: 'msg2', senderId: 'user2', conversationId: 'conv1', content: 'Hi! How are you? (mock)', timestamp: new Date(Date.now() - 4 * 60000).toISOString() },
-];
+const mapApiMessageToFrontend = (dto: ApiMessageDto): Message => ({
+  id: dto.id,
+  senderId: dto.senderId,
+  senderName: dto.senderName || 'Unknown User',
+  conversationId: dto.conversationId,
+  content: dto.content,
+  timestamp: dto.timestamp,
+});
 
 /**
- * Sends a message. (MOCKED - No endpoint provided)
- * @param messageData Data for the message to be sent.
+ * Sends a message. (POST /api/messages/send)
+ * @param payload Data for the message to be sent.
  */
-export async function sendMessage(messageData: {
-  senderId: string;
-  receiverId?: string;
-  conversationId?: string;
-  content: string;
-}): Promise<Message> {
-  console.log('MOCK API CALL to send message. Data:', messageData);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const newMessage: Message = {
-    id: `msg${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    ...messageData,
-  };
-  // mockMessages.push(newMessage); // If you want to modify shared array
-  return Promise.resolve(newMessage);
-}
-
-/**
- * Fetches messages for a specific conversation. (MOCKED - No endpoint provided)
- * @param params Parameters to identify the conversation (e.g., conversationId, userIds).
- */
-export async function getConversationMessages(params: { conversationId?: string; userId1?: string; userId2?: string }): Promise<Message[]> {
-  console.log('MOCK API CALL to get conversation messages. Params:', params);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  if (params.conversationId === 'conv1') {
-    return Promise.resolve([...mockMessages]);
+export async function sendMessage(payload: SendMessagePayload): Promise<Message> {
+  console.log(`API CALL (axios): POST /messages/send. Data:`, payload);
+  try {
+    const response = await apiClient<ApiMessageDto>('/messages/send', {
+      method: 'POST',
+      body: payload,
+    });
+    return mapApiMessageToFrontend(response.data);
+  } catch (error) {
+    console.error('Error sending message:', error);
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to send message. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
-  return Promise.resolve([]);
 }
 
 /**
- * Fetches unread messages count or details for an employee. (MOCKED - No endpoint provided)
- * @param employeeId The ID of the employee.
+ * Fetches messages for a specific conversation. (GET /api/messages/conversation)
+ * @param params Parameters like conversationId.
+ */
+export async function getConversationMessages(params: { conversationId: string; userId1?: string; userId2?: string }): Promise<Message[]> {
+  console.log(`API CALL (axios): GET /messages/conversation. Params:`, params);
+  try {
+    const response = await apiClient<ApiMessageDto[]>('/messages/conversation', {
+      method: 'GET',
+      params: { conversationId: params.conversationId } // Adjust if API uses userId1/userId2
+    });
+    const messagesDto = response.data;
+    return (messagesDto || []).map(mapApiMessageToFrontend);
+  } catch (error) {
+    console.error('Error fetching conversation messages:', error);
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch messages. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
+  }
+}
+
+/**
+ * Fetches unread messages count or details for an employee. (GET /api/messages/{employeeId}/unread)
+ * employeeId here is the ID of the logged-in user whose unread messages are being fetched.
+ * @param employeeId The ID of the employee (logged-in user).
  */
 export async function getUnreadMessages(employeeId: string): Promise<UnreadMessagesInfo> {
-  console.log(`MOCK API CALL to get unread messages for employee ${employeeId}.`);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  const mockUnread: UnreadMessagesInfo = {
-    count: Math.floor(Math.random() * 5), // Random unread count
-  };
-  return Promise.resolve(mockUnread);
+  console.log(`API CALL (axios): GET /messages/${employeeId}/unread.`);
+  if (!employeeId) {
+    console.warn("getUnreadMessages called without employeeId.");
+    return { count: 0, messages: [] };
+  }
+  try {
+    const response = await apiClient<ApiUnreadMessagesDto>(`/messages/${employeeId}/unread`, {
+      method: 'GET',
+    });
+    const dto = response.data;
+    return {
+      count: dto.count,
+      messages: (dto.messages || []).map(mapApiMessageToFrontend),
+    };
+  } catch (error) {
+    console.error(`Error fetching unread messages for employee ${employeeId}:`, error);
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch unread messages. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
+  }
 }
 
 /**
- * Marks messages as read. (MOCKED - No endpoint provided)
- * @param data Data to identify messages to mark as read (e.g., messageIds, conversationId for user).
+ * Marks messages as read. (POST /api/messages/mark-read)
+ * @param payload Data to identify messages to mark as read.
  */
-export async function markMessagesAsRead(data: { messageIds?: string[]; conversationId?: string; userId?: string }): Promise<{ success: boolean }> {
-  console.log('MOCK API CALL to mark messages as read. Data:', data);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return Promise.resolve({ success: true });
+export async function markMessagesAsRead(payload: MarkReadPayload): Promise<{ success: boolean; message?: string }> {
+  console.log('API CALL (axios): POST /messages/mark-read. Data:', payload);
+  try {
+    const response = await apiClient<{ success: boolean; message?: string }>('/messages/mark-read', {
+      method: 'POST',
+      body: payload,
+    });
+    return response.data || { success: false, message: "No response data from mark-read" };
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to mark messages as read. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
+  }
 }

@@ -54,7 +54,8 @@ export default function LoginPage() {
 
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email; // Fallback to form input email
+        let finalUserEmail = email; 
+        let finalUserId = '';
 
         const userFromApi = response.user;
         console.log('Login page - Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
@@ -66,22 +67,31 @@ export default function LoginPage() {
           } else if (userFromApi.name) {
             displayName = userFromApi.name;
           }
-          console.log(`Login page - API User Name: ${displayName || 'Not provided'}, API Role: ${userFromApi.role || 'Not provided'}, API Email: ${userFromApi.email || 'Not provided'}`);
+          console.log(`Login page - API User Name: ${displayName || 'Not provided'}, API Role: ${userFromApi.role || 'Not provided'}, API Email: ${userFromApi.email || 'Not provided'}, API User ID: ${userFromApi.id || 'Not provided'}`);
 
           finalUserName = displayName.trim() || 'User';
           finalUserRole = userFromApi.role || 'Employee';
-          finalUserEmail = userFromApi.email || email; // Prioritize email from API, fallback to form input
+          finalUserEmail = userFromApi.email || email; 
+          finalUserId = userFromApi.id || '';
           console.log(`Login page - Determined finalUserEmail: ${finalUserEmail} (Source: ${userFromApi.email ? 'API' : 'Form Input Fallback'})`);
+          console.log(`Login page - Determined finalUserId: ${finalUserId} (Source: ${userFromApi.id ? 'API' : 'Empty Fallback'})`);
         } else {
           console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using form input email for storage. User object received:', userFromApi);
-          finalUserEmail = email; // Ensure fallback if userFromApi is problematic
-           console.log(`Login page - Determined finalUserEmail (due to missing API user object): ${finalUserEmail} (Source: Form Input)`);
+          finalUserEmail = email; 
+          finalUserId = ''; // No ID if user object is missing
+          console.log(`Login page - Determined finalUserEmail (due to missing API user object): ${finalUserEmail} (Source: Form Input)`);
+          console.log(`Login page - Determined finalUserId (due to missing API user object): ${finalUserId} (Source: Empty Fallback)`);
         }
 
         localStorage.setItem('userName', finalUserName);
         localStorage.setItem('userRole', finalUserRole);
         localStorage.setItem('userEmail', finalUserEmail);
-        console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
+        if (finalUserId) {
+          localStorage.setItem('userId', finalUserId);
+        } else {
+          localStorage.removeItem('userId'); // Ensure no stale ID if API didn't provide one
+        }
+        console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}', userId='${finalUserId || 'Not Stored'}'`);
 
         toast({ title: "Login Successful", description: `Welcome, ${finalUserName}!` });
         router.push('/dashboard');
@@ -93,7 +103,7 @@ export default function LoginPage() {
         } else if (!response.token) {
           validationErrorReason = "'token' field is missing or falsy in the response.";
         } else if (typeof response.token !== 'string') {
-          validationErrorReason = `"token" field exists, but is not a string. Type: ${typeof response.token}`;
+          validationErrorReason = `"token" exists, but is not a string. Type: ${typeof response.token}`;
         } else if (response.token.trim() === '') {
           validationErrorReason = "'token' field is a string, but it is empty or contains only whitespace.";
         }
@@ -121,7 +131,7 @@ export default function LoginPage() {
         });
       }
     } finally {
-      if (isLoading) setIsLoading(false); // Ensure isLoading is reset if it was true
+      if (isLoading) setIsLoading(false); 
     }
   };
 
