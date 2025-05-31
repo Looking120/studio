@@ -200,7 +200,7 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    const response = await apiClient('/auth/signout', { method: 'POST' });
+    const response = await apiClient('/auth/signout', { method: 'POST', body: {} }); // Send empty JSON object
 
     serverSignOutOk = true; // If apiClient didn't throw, the request was successful (2xx)
     
@@ -230,6 +230,7 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     localStorage.removeItem('userName'); // Clean up individual items if they exist
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('userId');
     console.log('Auth Service: Auth token and user info removed from localStorage.');
     finalMessage = `Local sign-out successful. ${serverMessage}`;
   } else {
@@ -241,3 +242,4 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     serverSignOutOk,
   };
 }
+
