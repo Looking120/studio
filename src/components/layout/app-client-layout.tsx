@@ -27,9 +27,10 @@ import React, { useEffect, useState } from "react";
 import { signOut as signOutService } from "@/services/auth-service"; 
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
+import { SheetTitle } from "@/components/ui/sheet";
 
 
-const navItems = [
+const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employees", label: "Employés", icon: Users },
   { href: "/locations", label: "Suivi de Localisation", icon: MapPin },
@@ -43,6 +44,13 @@ const navItems = [
     ] 
   },
   { href: "/chat", label: "Messagerie", icon: MessageSquare, notificationKey: "chat" },
+];
+
+const employeeMobileNavItems = [
+  { href: "/dashboard", label: "Tableau de Bord", icon: LayoutDashboard },
+  { href: "/attendance", label: "Ma Présence", icon: BarChart3 },
+  { href: "/activity", label: "Mon Activité", icon: ListChecks },
+  { href: "/chat", label: "Messagerie", icon: MessageSquare },
 ];
 
 const defaultUser = {
@@ -64,6 +72,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
   const [isRestrictionApplied, setIsRestrictionApplied] = useState(false);
+  const [currentNavItems, setCurrentNavItems] = useState(adminNavItems);
+
 
   useEffect(() => {
     setMounted(true);
@@ -74,8 +84,19 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       setLoggedInUserName(name);
       setLoggedInUserRole(role);
       setLoggedInUserEmail(email);
+
+      if (role) {
+        const isAdmin = role.toLowerCase().includes('admin');
+        if (isMobile && !isAdmin) {
+          setCurrentNavItems(employeeMobileNavItems);
+        } else {
+          setCurrentNavItems(adminNavItems);
+        }
+      } else {
+        setCurrentNavItems(adminNavItems); // Default to admin if role not found, though user would be logged out
+      }
     }
-  }, [pathname]); 
+  }, [pathname, isMobile]); // Add isMobile to dependencies
   
   const handleSignOut = async (message?: string) => {
     console.log(message || "Signing out...");
@@ -115,11 +136,19 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         } else {
             setIsRestrictionApplied(false); // Reset if no restriction applies
         }
+        // Update nav items based on role and device
+        if (isMobile && !isAdmin) {
+          setCurrentNavItems(employeeMobileNavItems);
+        } else {
+          setCurrentNavItems(adminNavItems);
+        }
+
       } else {
         setIsRestrictionApplied(false); // No token or role, no restriction applies
+        setCurrentNavItems(adminNavItems); // Default if no role, will be redirected soon anyway
       }
     }
-  }, [mounted, isMobile, loggedInUserRole, pathname, router]); // Removed toast and handleSignOut from deps to avoid loops
+  }, [mounted, isMobile, loggedInUserRole, pathname]);
 
 
   const userToDisplay = {
@@ -136,11 +165,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
-  // If a restriction was applied and forced a sign-out, show a redirecting message.
-  // This helps prevent flashing content before router.push('/') completes.
   if (mounted && isRestrictionApplied && (pathname !== "/" && pathname !== "/signup")) {
-      // Check if the current path indicates a restricted state
-      const role = localStorage.getItem('userRole'); // Re-check role directly, as state might be stale
+      const role = localStorage.getItem('userRole'); 
       const token = localStorage.getItem('authToken');
       let restricted = false;
       if (token && role) {
@@ -164,7 +190,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   }
 
   const getPageTitle = () => {
-    for (const item of navItems) {
+    // Use currentNavItems for title generation
+    for (const item of currentNavItems) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
         return item.label;
       }
@@ -176,7 +203,23 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    if (pathname === '/employees/add') return 'Ajouter un Employé';
+    // Check admin items only if currentNavItems might not cover it (e.g. specific sub-pages not in employee menu)
+    if (currentNavItems !== adminNavItems) {
+        for (const item of adminNavItems) { // Fallback check against admin items for titles like Add Employee
+            if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
+                return item.label;
+            }
+            if (item.subItems) {
+                for (const subItem of item.subItems) {
+                if (pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))) {
+                    return subItem.label;
+                }
+                }
+            }
+        }
+    }
+
+    if (pathname === '/employees/add') return 'Ajouter un Employé'; // Keep specific fallbacks
     if (pathname === '/profile') return 'Mon Profil';
     if (pathname === '/settings') return 'Paramètres';
     return "EmployTrack";
@@ -198,7 +241,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
-            {navItems.map((item, index) => (
+            {currentNavItems.map((item, index) => (
               item.subItems ? (
                 <SidebarGroup key={`group-${item.label}-${index}`} className="p-0">
                    <SidebarMenuButton
@@ -316,5 +359,3 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
