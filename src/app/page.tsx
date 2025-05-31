@@ -54,7 +54,7 @@ export default function LoginPage() {
 
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email; 
+        let finalUserEmail = email; // Default to form input email initially
         let finalUserId = '';
 
         const userFromApi = response.user;
@@ -71,18 +71,27 @@ export default function LoginPage() {
 
           finalUserName = displayName.trim() || 'User';
           finalUserRole = userFromApi.role || 'Employee';
-          finalUserEmail = userFromApi.email || email; 
+          
+          // Explicitly check and prioritize API email
+          if (userFromApi.email && typeof userFromApi.email === 'string' && userFromApi.email.trim() !== '') {
+            finalUserEmail = userFromApi.email.trim();
+            console.log(`Login page - Determined finalUserEmail from API: ${finalUserEmail}`);
+          } else {
+            finalUserEmail = email; // Fallback to form input email
+            console.warn(`Login page - API did not provide a valid email in userFromApi.email. Falling back to form input email: ${email}. API email was: [${userFromApi.email}]`);
+          }
+          
           finalUserId = userFromApi.id || '';
-          console.log(`Login page - Determined finalUserEmail: ${finalUserEmail} (Source: ${userFromApi.email ? 'API' : 'Form Input Fallback'})`);
           console.log(`Login page - Determined finalUserId: ${finalUserId} (Source: ${userFromApi.id ? 'API' : 'Empty Fallback'})`);
         } else {
           console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using form input email for storage. User object received:', userFromApi);
-          finalUserEmail = email; 
+          finalUserEmail = email; // Fallback to form input email
           finalUserId = ''; // No ID if user object is missing
           console.log(`Login page - Determined finalUserEmail (due to missing API user object): ${finalUserEmail} (Source: Form Input)`);
           console.log(`Login page - Determined finalUserId (due to missing API user object): ${finalUserId} (Source: Empty Fallback)`);
         }
-
+        
+        console.log(`Login page - About to store in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}', userId='${finalUserId || 'Not Stored'}'`);
         localStorage.setItem('userName', finalUserName);
         localStorage.setItem('userRole', finalUserRole);
         localStorage.setItem('userEmail', finalUserEmail);
@@ -91,7 +100,7 @@ export default function LoginPage() {
         } else {
           localStorage.removeItem('userId'); // Ensure no stale ID if API didn't provide one
         }
-        console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}', userId='${finalUserId || 'Not Stored'}'`);
+        console.log(`Login page - Successfully Stored in localStorage: userName='${localStorage.getItem('userName')}', userRole='${localStorage.getItem('userRole')}', userEmail='${localStorage.getItem('userEmail')}', userId='${localStorage.getItem('userId') || 'Not Stored'}'`);
 
         toast({ title: "Login Successful", description: `Welcome, ${finalUserName}!` });
         router.push('/dashboard');
@@ -198,3 +207,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
