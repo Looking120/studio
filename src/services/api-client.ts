@@ -2,7 +2,7 @@
 // src/services/api-client.ts
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-export const API_BASE_URL = 'https://localhost:7294/api';
+export const API_BASE_URL = 'https://192.168.0.119:7294/api';
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -127,3 +127,4 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
+
