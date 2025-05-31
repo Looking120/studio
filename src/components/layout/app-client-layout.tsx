@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings, LogOut, Building } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building } from "lucide-react"; // Renamed User from lucide-react to UserIcon
 import {
   SidebarProvider,
   Sidebar,
@@ -27,7 +27,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { signOut as signOutService } from "@/services/auth-service";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
-import { SheetTitle } from "@/components/ui/sheet";
+// SheetTitle was imported for a previous fix but might not be directly used here unless sidebar uses it internally
+// import { SheetTitle } from "@/components/ui/sheet";
 
 
 const adminNavItems = [
@@ -64,26 +65,24 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
-  const isMobile = useIsMobile(); // Used by Sidebar for rendering style
+  const isMobile = useIsMobile(); 
 
+  const [mounted, setMounted] = useState(false);
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
-  const [currentNavItems, setCurrentNavItems] = useState<typeof adminNavItems | typeof employeeNavItems>([]);
+  const [currentNavItems, setCurrentNavItems] = useState<(typeof adminNavItems) | (typeof employeeNavItems)>([]);
 
 
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== 'undefined') {
-      const name = localStorage.getItem('userName');
-      const role = localStorage.getItem('userRole');
-      const email = localStorage.getItem('userEmail');
-      setLoggedInUserName(name);
-      setLoggedInUserRole(role);
-      setLoggedInUserEmail(email);
-    }
+    const name = localStorage.getItem('userName');
+    const role = localStorage.getItem('userRole');
+    const email = localStorage.getItem('userEmail');
+    setLoggedInUserName(name);
+    setLoggedInUserRole(role);
+    setLoggedInUserEmail(email);
   }, []);
 
   const handleSignOut = useCallback(async (message?: string) => {
@@ -106,49 +105,86 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setCurrentNavItems([]); // Clear nav items on sign out
+    setCurrentNavItems([]); 
     router.push('/');
   }, [toast, router]);
 
   useEffect(() => {
     if (!mounted) {
-      setCurrentNavItems([]);
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+
+    if (!token && pathname !== "/" && pathname !== "/signup") {
+      router.push('/');
+      if (currentNavItems.length > 0) setCurrentNavItems([]);
       return;
     }
 
     if (pathname === "/" || pathname === "/signup") {
-      setCurrentNavItems([]);
+      if (currentNavItems.length > 0) setCurrentNavItems([]);
       return;
     }
     
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    if (!token) {
-      if (currentNavItems.length > 0) setCurrentNavItems([]);
-      // router.push('/'); // Redirection is handled by this effect re-running or a dedicated auth guard
-      return;
-    }
+    const currentRole = (loggedInUserRole && loggedInUserRole.trim() !== "") ? loggedInUserRole : null;
+    let navItemsToSet: (typeof adminNavItems) | (typeof employeeNavItems) = [];
 
-    const role = loggedInUserRole;
-    let navItemsToSet: typeof adminNavItems | typeof employeeNavItems = [];
-
-    if (role && role.trim() !== "") {
-      const isAdminUser = role.toLowerCase().includes('admin');
+    if (currentRole) {
+      const isAdminUser = currentRole.toLowerCase().includes('admin');
       if (isAdminUser) {
         navItemsToSet = adminNavItems;
-      } else { // Non-admin, so considered an employee for nav purposes
+      } else {
         navItemsToSet = employeeNavItems;
       }
-    } else {
-      // Role is null or empty string (e.g., not yet loaded from localStorage or genuinely no role)
-      navItemsToSet = [];
-    }
+    } 
     
-    // Only update if the nav items have actually changed
     if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
         setCurrentNavItems(navItemsToSet);
     }
 
-  }, [mounted, pathname, loggedInUserRole, currentNavItems]); // currentNavItems added back carefully to prevent loops with the JSON.stringify check
+  }, [mounted, pathname, loggedInUserRole, router, currentNavItems]);
+
+
+  const getPageTitle = () => {
+    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : (loggedInUserRole?.toLowerCase().includes('admin') ? adminNavItems : employeeNavItems);
+    
+    for (const item of itemsToSearch) {
+      if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
+        return item.label;
+      }
+      if (item.subItems) {
+        for (const subItem of item.subItems) {
+          if (pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))) {
+            return subItem.label;
+          }
+        }
+      }
+    }
+    if (pathname === '/employees/add') return 'Add Employee';
+    if (pathname === '/profile') return 'My Profile';
+    if (pathname === '/settings') return 'Settings';
+    return "EmployTrack"; 
+  };
+
+
+  if (!mounted) {
+    return null; // Render nothing on server and initial client pass to prevent mismatch
+  }
+
+  if (pathname === "/" || pathname === "/signup") {
+    return <>{children}</>;
+  }
+
+  const tokenForRenderCheck = localStorage.getItem('authToken');
+  if (!tokenForRenderCheck && pathname !== "/" && pathname !== "/signup") {
+      // This state is usually brief as useEffect will redirect.
+      return (
+          <div className="flex h-screen w-screen items-center justify-center">
+              {/* Optional: Minimal loading/redirecting indicator */}
+          </div>
+      );
+  }
 
 
   const userToDisplay = {
@@ -164,45 +200,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
-
-  if (pathname === "/" || pathname === "/signup") {
-    return <>{children}</>;
-  }
-
-  // If not mounted yet, or no token and not on public pages, show minimal layout or loading
-  // This prevents flashing of main layout before auth status is clear
-  if (!mounted || (!localStorage.getItem('authToken') && pathname !== "/" && pathname !== "/signup")) {
-    // You might want a dedicated loading spinner component here
-    return (
-        <div className="flex h-screen w-screen items-center justify-center">
-            {/* Basic loading or redirecting indicator */}
-        </div>
-    );
-  }
-
-  const getPageTitle = () => {
-    // Determine which set of items to search based on currentNavItems's first item's label or similar heuristic,
-    // or rely on currentNavItems directly.
-    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : (loggedInUserRole?.toLowerCase().includes('admin') ? adminNavItems : employeeNavItems);
-    
-    for (const item of itemsToSearch) {
-      if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
-        return item.label;
-      }
-      if (item.subItems) {
-        for (const subItem of item.subItems) {
-          if (pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))) {
-            return subItem.label;
-          }
-        }
-      }
-    }
-    // Fallback for pages not directly in nav, like add/edit pages
-    if (pathname === '/employees/add') return 'Add Employee';
-    if (pathname === '/profile') return 'My Profile';
-    if (pathname === '/settings') return 'Settings';
-    return "EmployTrack"; // Default title
-  };
 
   let pageTitle = getPageTitle();
 
@@ -312,7 +309,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="flex items-center">
-                    <User className="mr-2 h-4 w-4" />
+                    <UserIcon className="mr-2 h-4 w-4" />
                     Profile
                   </Link>
                 </DropdownMenuItem>
@@ -338,4 +335,3 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
