@@ -6,13 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary, type Employee, type Office, type Task } from "@/lib/data";
-import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home, CheckSquare, Square } from "lucide-react";
+import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data";
+import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home } from "lucide-react";
 import Link from "next/link";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+
+// Define interfaces for processed data to avoid hydration issues
+interface ProcessedActivityLog extends ActivityLog {
+  displayTime: string;
+}
+
+interface ProcessedTask extends Task {
+  displayDueDate?: string;
+  isOverdue?: boolean;
+}
 
 export default function DashboardPage() {
   const summaryData = [
@@ -30,15 +40,46 @@ export default function DashboardPage() {
   const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const role = localStorage.getItem('userRole');
-      const email = localStorage.getItem('userEmail');
-      setUserRole(role);
+  // State for client-side processed data
+  const [processedActivityLogs, setProcessedActivityLogs] = useState<ProcessedActivityLog[]>([]);
+  const [processedEmployeeTasks, setProcessedEmployeeTasks] = useState<ProcessedTask[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
-      if (isMobile && role && !role.toLowerCase().includes('admin')) {
+  useEffect(() => {
+    setIsClient(true); // Indicate component has mounted on client
+  }, []);
+
+  // Effect for processing recent activity logs (for admin dashboard)
+  useEffect(() => {
+    if (isClient) {
+      const processed = mockActivityLogs.slice(0, 5).map(log => ({
+        ...log,
+        displayTime: log.startTime ? new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+      }));
+      setProcessedActivityLogs(processed);
+    }
+  }, [isClient]); // Depends on isClient to ensure it runs client-side
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      // This function is now only called within useEffect or event handlers on the client
+      return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
+  
+  // Effect for fetching and processing employee-specific data (for mobile employee dashboard)
+  useEffect(() => {
+    if (isClient) { // Ensure localStorage access is client-side only
+      const roleFromStorage = localStorage.getItem('userRole');
+      const emailFromStorage = localStorage.getItem('userEmail');
+      setUserRole(roleFromStorage);
+
+      if (isMobile && roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
         setIsLoadingEmployeeData(true);
-        const employee = mockEmployees.find(emp => emp.email === email);
+        const employee = mockEmployees.find(emp => emp.email === emailFromStorage);
         setCurrentEmployee(employee || null);
 
         if (employee) {
@@ -46,7 +87,16 @@ export default function DashboardPage() {
             setAssignedOffice(mockOffices.find(office => office.id === employee.officeId) || null);
           }
           fetchTasksForEmployee(employee.id)
-            .then(setEmployeeTasks)
+            .then(tasks => {
+              setEmployeeTasks(tasks); // Original tasks
+              // Process tasks for display (client-side)
+              const processed = tasks.map(task => ({
+                ...task,
+                displayDueDate: formatDate(task.dueDate),
+                isOverdue: task.dueDate ? new Date(task.dueDate).getTime() < new Date().setHours(0,0,0,0) && !task.isCompleted : false,
+              }));
+              setProcessedEmployeeTasks(processed);
+            })
             .catch(err => {
               console.error("Failed to fetch tasks:", err);
               toast({ variant: "destructive", title: "Erreur Tâches", description: "Impossible de charger les tâches."});
@@ -56,41 +106,55 @@ export default function DashboardPage() {
           setIsLoadingEmployeeData(false);
         }
       } else {
-        setIsLoadingEmployeeData(false);
+        setIsLoadingEmployeeData(false); // Not mobile employee or no role/email
       }
     }
-  }, [isMobile, toast]);
+  }, [isMobile, toast, isClient]); // Added isClient dependency
 
   const handleTaskStatusChange = async (taskId: string, isCompleted: boolean) => {
     const originalTasks = [...employeeTasks];
+    const originalProcessedTasks = [...processedEmployeeTasks];
+
+    // Optimistic update for UI
     setEmployeeTasks(prevTasks => 
       prevTasks.map(task => task.id === taskId ? { ...task, isCompleted } : task)
     );
+    setProcessedEmployeeTasks(prevTasks =>
+      prevTasks.map(task => task.id === taskId ? { ...task, isCompleted, isOverdue: task.dueDate ? new Date(task.dueDate).getTime() < new Date().setHours(0,0,0,0) && !isCompleted : false } : task)
+    );
+
     try {
       await updateTaskStatus(taskId, isCompleted);
       toast({ title: "Tâche mise à jour", description: `La tâche a été marquée comme ${isCompleted ? 'complétée' : 'non complétée'}.`});
+      // Optionally re-fetch or re-process if backend returns updated task
     } catch (error) {
       console.error("Failed to update task status:", error);
       toast({ variant: "destructive", title: "Erreur", description: "Impossible de mettre à jour la tâche."});
       setEmployeeTasks(originalTasks); // Revert optimistic update
+      setProcessedEmployeeTasks(originalProcessedTasks);
     }
   };
   
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
-  };
+
+  if (!isClient) { // Render skeletons or minimal content on server / before client mount
+    return (
+      <div className="space-y-6 p-4 animate-pulse">
+        <Skeleton className="h-24 w-full" />
+        <div className="grid md:grid-cols-2 gap-4">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
+
 
   if (isMobile && userRole && !userRole.toLowerCase().includes('admin')) {
     // Employee Mobile Dashboard
     if (isLoadingEmployeeData) {
       return (
-        <div className="space-y-6 p-4 animate-pulse">
-          <Skeleton className="h-10 w-3/4 mb-4" />
+        <div className="space-y-6 p-2 sm:p-4 animate-pulse">
+          <h1 className="text-2xl font-semibold text-foreground mb-4"><Skeleton className="h-8 w-3/5" /></h1>
           <Card>
             <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
             <CardContent className="space-y-3">
@@ -118,9 +182,9 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {employeeTasks.length > 0 ? (
+            {processedEmployeeTasks.length > 0 ? (
               <ul className="space-y-3">
-                {employeeTasks.map(task => (
+                {processedEmployeeTasks.map(task => (
                   <li key={task.id} className="flex items-start justify-between p-3 bg-background/70 rounded-md shadow-sm hover:bg-muted/60 transition-colors">
                     <div className="flex items-start space-x-3">
                       <Checkbox
@@ -137,9 +201,9 @@ export default function DashboardPage() {
                         {task.description && <p className={`text-xs ${task.isCompleted ? 'line-through text-muted-foreground/80' : 'text-muted-foreground'}`}>{task.description}</p>}
                       </div>
                     </div>
-                    {task.dueDate && (
-                      <Badge variant={new Date(task.dueDate) < new Date() && !task.isCompleted ? "destructive" : "outline"} className="text-xs whitespace-nowrap ml-2">
-                        {formatDate(task.dueDate)}
+                    {task.displayDueDate && (
+                      <Badge variant={task.isOverdue ? "destructive" : "outline"} className="text-xs whitespace-nowrap ml-2">
+                        {task.displayDueDate}
                       </Badge>
                     )}
                   </li>
@@ -170,8 +234,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Possible future cards for mobile employee: Quick Check-in/out, My Schedule, etc. */}
       </div>
     );
   }
@@ -207,13 +269,24 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {mockActivityLogs.slice(0, 5).map(log => (
+            {processedActivityLogs.length === 0 && !isLoadingEmployeeData && ( // isLoadingEmployeeData is not relevant here
+                 Array.from({ length: 3 }).map((_, index) => (
+                    <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
+                        <div>
+                            <Skeleton className="h-5 w-24 mb-1" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
+                        <Skeleton className="h-4 w-12" />
+                    </div>
+                ))
+            )}
+            {processedActivityLogs.map(log => (
               <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
                 <div>
                   <p className="font-medium text-sm">{log.employeeName}</p>
                   <p className="text-xs text-muted-foreground">{log.activityType} at {log.location}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">{log.startTime ? new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p>
+                <p className="text-xs text-muted-foreground">{log.displayTime}</p>
               </div>
             ))}
             <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
@@ -244,3 +317,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
