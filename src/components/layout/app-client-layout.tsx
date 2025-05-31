@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation"; // Added useRouter
+import { usePathname, useRouter } from "next/navigation";
 import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User, Settings, LogOut, Building } from "lucide-react";
 import {
   SidebarProvider,
@@ -15,7 +15,6 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
@@ -25,9 +24,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
-import { signOut } from "@/services/auth-service"; 
+import { signOut as signOutService } from "@/services/auth-service"; 
 import { useToast } from '@/hooks/use-toast';
-// import { getUnreadMessages } from '@/services/message-service'; 
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const navItems = [
@@ -46,7 +45,6 @@ const navItems = [
   { href: "/chat", label: "Messagerie", icon: MessageSquare, notificationKey: "chat" },
 ];
 
-// Default user data, will be overridden by localStorage if available
 const defaultUser = {
   name: "Utilisateur",
   email: "utilisateur@example.com",
@@ -60,36 +58,70 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
-  // const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const isMobile = useIsMobile();
 
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
+  const [isRestrictionApplied, setIsRestrictionApplied] = useState(false);
 
   useEffect(() => {
-    setMounted(true); // For theme toggler hydration safety
+    setMounted(true);
     if (typeof window !== 'undefined') {
       const name = localStorage.getItem('userName');
       const role = localStorage.getItem('userRole');
       const email = localStorage.getItem('userEmail');
-      console.log('AppClientLayout - Pathname changed or mounted. Reading from localStorage:', { name, role, email, currentPath: pathname });
       setLoggedInUserName(name);
       setLoggedInUserRole(role);
       setLoggedInUserEmail(email);
     }
-    // Example: Fetch unread messages count
-    // const fetchUnreads = async () => {
-    //   try {
-    //     // const unreadInfo = await getUnreadMessages("currentUserId"); 
-    //     // setUnreadChatCount(unreadInfo.count); 
-    //     console.log("Placeholder: Would fetch unread messages for current user");
-    //   } catch (error) {
-    //     console.error("Failed to fetch unread messages:", error);
-    //   }
-    // };
-    // fetchUnreads();
-  }, [pathname]); // Re-run when pathname changes to pick up localStorage updates after login/logout
+  }, [pathname]); 
   
+  const handleSignOut = async (message?: string) => {
+    console.log(message || "Signing out...");
+    const result = await signOutService(); 
+  
+    if (result.serverSignOutOk) {
+      toast({
+        title: "Déconnexion Réussie",
+        description: message || result.message || "Vous avez été déconnecté du serveur.",
+      });
+    } else {
+      toast({
+        variant: "default", 
+        title: "Déconnexion Locale Effectuée",
+        description: message || result.message || "Votre session locale a été effacée. La déconnexion du serveur n'a pu être confirmée.",
+      });
+    }
+    
+    setLoggedInUserName(null);
+    setLoggedInUserRole(null);
+    setLoggedInUserEmail(null);
+    setIsRestrictionApplied(true); // Indicate that a restriction forced a logout
+    router.push('/'); 
+  };
+
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const role = localStorage.getItem('userRole');
+      const token = localStorage.getItem('authToken');
+
+      if (token && role) {
+        const isAdmin = role.toLowerCase().includes('admin');
+        if (isMobile && isAdmin) {
+          handleSignOut("L'accès administrateur est restreint sur les appareils mobiles. Vous avez été déconnecté.");
+        } else if (!isMobile && !isAdmin) {
+          handleSignOut("L'accès employé est restreint sur les appareils de bureau. Vous avez été déconnecté.");
+        } else {
+            setIsRestrictionApplied(false); // Reset if no restriction applies
+        }
+      } else {
+        setIsRestrictionApplied(false); // No token or role, no restriction applies
+      }
+    }
+  }, [mounted, isMobile, loggedInUserRole, pathname, router]); // Removed toast and handleSignOut from deps to avoid loops
+
+
   const userToDisplay = {
     name: loggedInUserName || defaultUser.name,
     role: loggedInUserRole || defaultUser.role,
@@ -98,12 +130,34 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   };
 
   const getInitials = (name: string | null) => {
-    console.log('AppClientLayout - getInitials called with name:', name);
-    if (!name || name.trim() === "" || name === "User" || name === "Utilisateur") return "U"; // Handles both "User" and "Utilisateur" as generic
+    if (!name || name.trim() === "" || name === "User" || name === "Utilisateur") return "U";
     const nameParts = name.split(' ').filter(part => part.length > 0);
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
+
+  // If a restriction was applied and forced a sign-out, show a redirecting message.
+  // This helps prevent flashing content before router.push('/') completes.
+  if (mounted && isRestrictionApplied && (pathname !== "/" && pathname !== "/signup")) {
+      // Check if the current path indicates a restricted state
+      const role = localStorage.getItem('userRole'); // Re-check role directly, as state might be stale
+      const token = localStorage.getItem('authToken');
+      let restricted = false;
+      if (token && role) {
+          const isAdmin = role.toLowerCase().includes('admin');
+          if (isMobile && isAdmin) restricted = true;
+          if (!isMobile && !isAdmin) restricted = true;
+      }
+      if (restricted) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+                <p className="text-lg">Accès restreint pour votre type de compte sur cet appareil.</p>
+                <p className="text-muted-foreground">Vous allez être redirigé vers la page de connexion...</p>
+            </div>
+        );
+      }
+  }
+
 
   if (pathname === "/" || pathname === "/signup") { 
     return <>{children}</>;
@@ -129,32 +183,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   };
   
   let pageTitle = getPageTitle();
-
-  const handleSignOut = async () => {
-    console.log("Signing out...");
-    const result = await signOut(); 
-  
-    if (result.serverSignOutOk) {
-      toast({
-        title: "Déconnexion Réussie",
-        description: result.message || "Vous avez été déconnecté du serveur.",
-      });
-    } else {
-      toast({
-        variant: "default", 
-        title: "Déconnexion Locale Effectuée",
-        description: result.message || "Votre session locale a été effacée. La déconnexion du serveur n'a pu être confirmée.",
-      });
-      console.warn(`Server sign-out issue: ${result.message}`);
-    }
-    
-    // Clear local state as well
-    setLoggedInUserName(null);
-    setLoggedInUserRole(null);
-    setLoggedInUserEmail(null);
-    router.push('/'); 
-  };
-
 
   return (
     <SidebarProvider defaultOpen={true} >
@@ -210,11 +238,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                   <Link href={item.href!}>
                     <item.icon className="h-5 w-5" />
                     <span>{item.label}</span>
-                    {/* {item.notificationKey === "chat" && unreadChatCount > 0 && (
-                        <span className="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
-                            {unreadChatCount}
-                        </span>
-                    )} */}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -278,7 +301,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                 <DropdownMenuItem onClick={handleSignOut} className="flex items-center cursor-pointer">
+                 <DropdownMenuItem onClick={() => handleSignOut()} className="flex items-center cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   Se déconnecter
                 </DropdownMenuItem>
@@ -293,3 +316,5 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
