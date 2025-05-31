@@ -107,10 +107,9 @@ axiosInstance.interceptors.response.use(
       let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
       if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL)) {
         detailedErrorMessage += ' When accessing a local IP, ensure the server is listening on that IP (not just localhost), and check firewall/HTTPS certificate validity from this device.';
-        console.warn(logMessage, error.request);
-      } else {
-        console.error(logMessage, error.request);
       }
+      // Explicitly use console.warn for the "no response" scenario
+      console.warn(logMessage, "Details:", error.message);
       throw new HttpError(detailedErrorMessage, 0, null);
     } else {
       // Something happened in setting up the request that triggered an Error
