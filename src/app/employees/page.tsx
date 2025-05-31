@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search, AlertTriangle, UserCog } from 'lucide-react'; // Added UserCog
+import { UserPlus, Search, AlertTriangle, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +40,7 @@ export default function EmployeesPage() {
   useEffect(() => {
     const loadData = async () => {
       if (!isClient || currentUserRole === null) {
-        setIsLoading(true); 
+        setIsLoading(true);
         return;
       }
 
@@ -49,7 +49,6 @@ export default function EmployeesPage() {
       if (!isAdmin) {
         setEmployees([]);
         setIsLoading(false);
-        // Access denied state is handled by conditional rendering based on isAdminAccess
         return;
       }
 
@@ -67,8 +66,8 @@ export default function EmployeesPage() {
             title: "Session Expired",
             description: "Your session has expired. Please log in again.",
           });
-          await signOut(); 
-          router.push('/'); 
+          await signOut();
+          router.push('/');
         } else {
           console.error("Failed to fetch employees:", err);
           const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching employees.';
@@ -78,7 +77,7 @@ export default function EmployeesPage() {
             title: "Failed to load employees",
             description: errorMessage,
           });
-          setEmployees([]); 
+          setEmployees([]);
         }
       } finally {
         setIsLoading(false);
@@ -89,7 +88,6 @@ export default function EmployeesPage() {
 
 
   const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
-    // Ensure only admins can change status (though UI might already prevent this)
     if (!currentUserRole?.toLowerCase().includes('admin')) {
         toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to change employee status."});
         return;
@@ -115,7 +113,7 @@ export default function EmployeesPage() {
         router.push('/');
         return;
       }
-      setEmployees(originalEmployees); 
+      setEmployees(originalEmployees);
       const errorMessage = error instanceof Error ? error.message : 'Could not update status.';
       toast({
         variant: "destructive",
@@ -164,21 +162,38 @@ export default function EmployeesPage() {
         )}
       </CardHeader>
       <CardContent>
-        {!isAccessDetermined && isLoading && ( 
-           Array.from({ length: 5 }).map((_, index) => (
-            <TableRow key={`skeleton-emp-${index}`} className="border-b-0">
-              <TableCell colSpan={6}>
-                <div className="flex items-center gap-3 py-2">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                  <Skeleton className="h-5 w-20 ml-auto" />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+        {!isAccessDetermined && isLoading && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                  <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                  <TableHead><Skeleton className="h-5 w-20" /></TableHead>
+                  <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                  <TableHead className="text-center"><Skeleton className="h-6 w-16 mx-auto" /></TableHead>
+                  <TableHead className="text-center"><Skeleton className="h-8 w-24 mx-auto" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={`skeleton-emp-initial-${index}`}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <Skeleton className="h-5 w-24" />
+                      </div>
+                    </TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell className="text-center"><Skeleton className="h-6 w-16 mx-auto" /></TableCell>
+                    <TableCell className="text-center"><Skeleton className="h-8 w-24 mx-auto" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
         {isAccessDetermined && !isAdminAccess && (
@@ -216,7 +231,7 @@ export default function EmployeesPage() {
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 5 }).map((_, index) => (
-                        <TableRow key={`skeleton-emp-${index}`}>
+                        <TableRow key={`skeleton-emp-admin-${index}`}>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Skeleton className="h-10 w-10 rounded-full" />
@@ -281,5 +296,3 @@ export default function EmployeesPage() {
     </Card>
   );
 }
-
-    
