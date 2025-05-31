@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building } from "lucide-react"; // Renamed User from lucide-react to UserIcon
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -27,9 +27,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import { signOut as signOutService } from "@/services/auth-service";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
-// SheetTitle was imported for a previous fix but might not be directly used here unless sidebar uses it internally
-// import { SheetTitle } from "@/components/ui/sheet";
-
 
 const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -47,13 +44,6 @@ const adminNavItems = [
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
 ];
 
-const employeeNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/attendance", label: "My Attendance", icon: BarChart3 },
-  { href: "/activity", label: "My Activity", icon: ListChecks },
-  { href: "/chat", label: "Messaging", icon: MessageSquare },
-];
-
 const defaultUser = {
   name: "User",
   email: "user@example.com",
@@ -66,14 +56,13 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
-  const isMobile = useIsMobile(); 
+  const isMobile = useIsMobile();
 
   const [mounted, setMounted] = useState(false);
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
-  const [currentNavItems, setCurrentNavItems] = useState<(typeof adminNavItems) | (typeof employeeNavItems)>([]);
-
+  const [currentNavItems, setCurrentNavItems] = useState<(typeof adminNavItems)>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -105,7 +94,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setCurrentNavItems([]); 
+    setCurrentNavItems([]);
     router.push('/');
   }, [toast, router]);
 
@@ -116,38 +105,29 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
 
     const token = localStorage.getItem('authToken');
 
-    if (!token && pathname !== "/" && pathname !== "/signup") {
-      router.push('/');
-      if (currentNavItems.length > 0) setCurrentNavItems([]);
-      return;
-    }
-
     if (pathname === "/" || pathname === "/signup") {
       if (currentNavItems.length > 0) setCurrentNavItems([]);
       return;
     }
-    
-    const currentRole = (loggedInUserRole && loggedInUserRole.trim() !== "") ? loggedInUserRole : null;
-    let navItemsToSet: (typeof adminNavItems) | (typeof employeeNavItems) = [];
 
-    if (currentRole) {
-      const isAdminUser = currentRole.toLowerCase().includes('admin');
-      if (isAdminUser) {
-        navItemsToSet = adminNavItems;
-      } else {
-        navItemsToSet = employeeNavItems;
-      }
-    } 
+    if (!token) {
+      router.push('/');
+      if (currentNavItems.length > 0) setCurrentNavItems([]);
+      return;
+    }
+    
+    // Always use adminNavItems for all authenticated users
+    const navItemsToSet = adminNavItems;
     
     if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
         setCurrentNavItems(navItemsToSet);
     }
 
-  }, [mounted, pathname, loggedInUserRole, router, currentNavItems]);
+  }, [mounted, pathname, loggedInUserRole, currentNavItems, router]);
 
 
   const getPageTitle = () => {
-    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : (loggedInUserRole?.toLowerCase().includes('admin') ? adminNavItems : employeeNavItems);
+    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems;
     
     for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
@@ -164,28 +144,24 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
-    return "EmployTrack"; 
+    return "EmployTrack";
   };
 
-
   if (!mounted) {
-    return null; // Render nothing on server and initial client pass to prevent mismatch
+    return null; 
+  }
+
+  if (!localStorage.getItem('authToken') && pathname !== "/" && pathname !== "/signup") {
+      return (
+          <div className="flex h-screen w-screen items-center justify-center">
+              {/* Basic loading or redirecting indicator */}
+          </div>
+      );
   }
 
   if (pathname === "/" || pathname === "/signup") {
     return <>{children}</>;
   }
-
-  const tokenForRenderCheck = localStorage.getItem('authToken');
-  if (!tokenForRenderCheck && pathname !== "/" && pathname !== "/signup") {
-      // This state is usually brief as useEffect will redirect.
-      return (
-          <div className="flex h-screen w-screen items-center justify-center">
-              {/* Optional: Minimal loading/redirecting indicator */}
-          </div>
-      );
-  }
-
 
   const userToDisplay = {
     name: loggedInUserName || defaultUser.name,
@@ -204,8 +180,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   let pageTitle = getPageTitle();
 
   return (
-    <SidebarProvider defaultOpen={true} >
-      <Sidebar collapsible="icon" className="border-r bg-sidebar text-sidebar-foreground">
+    <SidebarProvider defaultOpen={!isMobile} >
+      <Sidebar collapsible={isMobile ? "offcanvas" : "icon"} className="border-r bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="p-4">
           <Link href="/dashboard" className="flex items-center gap-2 group">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-sidebar-primary transition-transform duration-300 group-hover:scale-110">
