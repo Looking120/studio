@@ -76,7 +76,11 @@ axiosInstance.interceptors.response.use(
         console.warn(`API request to ${error.config?.url} failed with status 401: Unauthorized. Message: ${errorMessage}`);
         throw new UnauthorizedError(`Unauthorized: ${errorMessage}`);
       }
-      console.error(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+      
+      // Conditionally log error for non-404 statuses, as 404s might be handled specifically by services
+      if (status !== 404) {
+        console.error(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+      }
       throw new HttpError(errorMessage, status, data);
     } else if (error.request) {
       // The request was made but no response was received
@@ -121,3 +125,4 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
+
