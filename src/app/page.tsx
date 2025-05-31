@@ -18,7 +18,7 @@ import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
 import { signIn, type SignInResponse } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
-import { UnauthorizedError } from "@/services/api-client";
+import { UnauthorizedError, HttpError } from "@/services/api-client";
 
 
 export default function LoginPage() {
@@ -133,7 +133,13 @@ export default function LoginPage() {
       }
     } catch (error) {
       setIsLoading(false);
-      console.error('Login page - Sign in failed with error:', error);
+      if (error instanceof HttpError && error.status === 0) {
+        // Specific logging for "no server response"
+        console.warn('Login page - Sign in failed due to network issue (no server response):', error.message);
+      } else {
+        console.error('Login page - Sign in failed with error:', error);
+      }
+      
       if (error instanceof UnauthorizedError) {
         toast({
             variant: "destructive",
