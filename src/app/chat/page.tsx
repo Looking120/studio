@@ -12,6 +12,7 @@ import { fetchUsers, type User } from '@/services/user-service';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { HttpError } from "@/services/api-client";
 
 interface DisplayMessage {
   id: string;
@@ -72,8 +73,12 @@ export default function ChatPage() {
         setUsers(fetchedUsers.filter(user => user.id !== currentUserId && user.id));
         console.log("ChatPage: Users fetched and filtered:", users);
       } catch (err) {
-        console.error("ChatPage: Failed to load users:", err);
         const errorText = err instanceof Error ? err.message : "Could not load users.";
+        if (err instanceof HttpError && err.status === 500) {
+            console.warn(`ChatPage: Failed to load users due to a server error (500). Details: ${errorText}`, err);
+        } else {
+            console.error("ChatPage: Failed to load users:", err);
+        }
         setErrorUsers(errorText);
         toast({ variant: "destructive", title: "User List Error", description: `Failed to load users: ${errorText}` });
       } finally {
