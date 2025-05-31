@@ -37,8 +37,8 @@ const adminNavItems = [
   { href: "/offices", label: "Offices", icon: Building2 },
   {
     label: "Organization", icon: Building, subItems: [
-      { href: "/organization/departments", label: "Departments", icon: Users }, // Consider different icon like Briefcase
-      { href: "/organization/positions", label: "Positions", icon: Users }, // Consider different icon like Award or Badge
+      { href: "/organization/departments", label: "Departments", icon: Users },
+      { href: "/organization/positions", label: "Positions", icon: Users },
     ]
   },
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
@@ -58,7 +58,6 @@ const defaultUser = {
   avatarUrl: ""
 };
 
-// Type that can represent both admin and employee nav items
 type NavItem = {
   href?: string;
   label: string;
@@ -86,13 +85,16 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     const name = localStorage.getItem('userName');
     const role = localStorage.getItem('userRole');
     const email = localStorage.getItem('userEmail');
+    
+    console.log('[AppClientLayout] Initial localStorage read - Name:', name, 'Role:', role, 'Email:', email);
+    
     setLoggedInUserName(name);
     setLoggedInUserRole(role);
     setLoggedInUserEmail(email);
   }, []);
 
   const handleSignOut = useCallback(async (message?: string) => {
-    console.log(message || "Signing out...");
+    console.log('[AppClientLayout] handleSignOut called with message:', message || "Signing out...");
     const result = await signOutService();
 
     if (result.serverSignOutOk) {
@@ -111,47 +113,60 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setCurrentNavItems([]);
+    setCurrentNavItems([]); // Clear nav items on sign out
     router.push('/');
   }, [toast, router]);
 
   useEffect(() => {
     if (!mounted) {
+      // console.log('[AppClientLayout NavEffect] Not mounted yet, returning.');
       return;
     }
+    // console.log('[AppClientLayout NavEffect] Running. Pathname:', pathname, 'Role from state:', loggedInUserRole);
 
     const token = localStorage.getItem('authToken');
 
     if (pathname === "/" || pathname === "/signup") {
-      if (currentNavItems.length > 0) setCurrentNavItems([]);
+      // console.log('[AppClientLayout NavEffect] Public page, ensuring nav items are empty.');
+      if (currentNavItems.length > 0) {
+        setCurrentNavItems([]);
+      }
       return;
     }
 
     if (!token) {
+      // console.log('[AppClientLayout NavEffect] No token and not on public page. Signing out.');
+      // Ensure we don't get into a loop if already on / by checking pathname
       if (pathname !== "/" && pathname !== "/signup") {
           handleSignOut("Session expired or not found. Please log in again.");
       }
-      if (currentNavItems.length > 0) setCurrentNavItems([]);
+      if (currentNavItems.length > 0) { // Also clear nav items here if signing out
+          setCurrentNavItems([]);
+      }
       return;
     }
     
     let navItemsToSet: NavItem[] = [];
-    if (loggedInUserRole && loggedInUserRole.toLowerCase().includes('admin')) {
+    // Ensure loggedInUserRole is a string before calling toLowerCase
+    if (loggedInUserRole && typeof loggedInUserRole === 'string' && loggedInUserRole.toLowerCase().includes('admin')) {
+      // console.log('[AppClientLayout NavEffect] User is Admin. Setting adminNavItems.');
       navItemsToSet = adminNavItems;
     } else { 
-      // Default to employee nav items if role is not admin or if role is not yet defined (should be after login)
+      // console.log('[AppClientLayout NavEffect] User is Employee or role unknown. Setting employeeNavItems.');
       navItemsToSet = employeeNavItems;
     }
     
     if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
+        // console.log('[AppClientLayout NavEffect] Nav items changed. Old:', JSON.stringify(currentNavItems), 'New:', JSON.stringify(navItemsToSet));
         setCurrentNavItems(navItemsToSet);
+    } else {
+      // console.log('[AppClientLayout NavEffect] Nav items determined to be the same. No update to setCurrentNavItems.');
     }
-
-  }, [mounted, pathname, loggedInUserRole, currentNavItems, router, handleSignOut]);
+  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]);
 
 
   const getPageTitle = () => {
-    const itemsToSearch = currentNavItems; // Use currentNavItems which is role-specific
+    const itemsToSearch = currentNavItems; 
     
     for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && item.href && pathname.startsWith(item.href)))) {
@@ -168,9 +183,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
-    // The problematic line that caused the error was here and has been removed.
-    // The logic for "My Dashboard" for employees is handled by employeeNavItems.
-    return "EmployTrack";
+    return "EmployTrack"; 
   };
 
   if (!mounted) {
@@ -180,7 +193,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   if (!localStorage.getItem('authToken') && pathname !== "/" && pathname !== "/signup") {
       return (
           <div className="flex h-screen w-screen items-center justify-center">
-              {/* Basic loading or redirecting indicator */}
+             {/* Basic loading or redirecting indicator can go here if needed */}
           </div>
       );
   }
@@ -195,6 +208,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     email: loggedInUserEmail || defaultUser.email,
     avatarUrl: defaultUser.avatarUrl,
   };
+  
+  // console.log('[AppClientLayout] Rendering. User to display:', userToDisplay, 'Raw state - Name:', loggedInUserName, 'Role:', loggedInUserRole, 'Email:', loggedInUserEmail);
+
 
   const getInitials = (name: string | null) => {
     if (!name || name.trim() === "" || name === "User") return "U";
@@ -337,3 +353,4 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
