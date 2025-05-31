@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from "react";
-import { signOut as signOutService } from "@/services/auth-service"; 
+import { signOut as signOutService } from "@/services/auth-service";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SheetTitle } from "@/components/ui/sheet";
@@ -37,11 +37,11 @@ const adminNavItems = [
   { href: "/activity", label: "Activity Logs", icon: ListChecks },
   { href: "/attendance", label: "Attendance", icon: BarChart3 },
   { href: "/offices", label: "Offices", icon: Building2 },
-  { 
+  {
     label: "Organization", icon: Building, subItems: [
       { href: "/organization/departments", label: "Departments", icon: Users },
       { href: "/organization/positions", label: "Positions", icon: Users },
-    ] 
+    ]
   },
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
 ];
@@ -57,7 +57,7 @@ const defaultUser = {
   name: "User",
   email: "user@example.com",
   role: "Employee",
-  avatarUrl: "" 
+  avatarUrl: ""
 };
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
@@ -72,7 +72,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
   const [isRestrictionApplied, setIsRestrictionApplied] = useState(false);
-  const [currentNavItems, setCurrentNavItems] = useState(adminNavItems);
+  const [currentNavItems, setCurrentNavItems] = useState<typeof adminNavItems>([]);
 
 
   useEffect(() => {
@@ -84,24 +84,14 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       setLoggedInUserName(name);
       setLoggedInUserRole(role);
       setLoggedInUserEmail(email);
-
-      if (role) {
-        const isAdmin = role.toLowerCase().includes('admin');
-        if (isMobile && !isAdmin) {
-          setCurrentNavItems(employeeMobileNavItems);
-        } else {
-          setCurrentNavItems(adminNavItems);
-        }
-      } else {
-        setCurrentNavItems(adminNavItems); 
-      }
     }
-  }, [pathname, isMobile]); 
-  
+  }, []); // Runs once on mount to set initial user details
+
   const handleSignOut = async (message?: string) => {
     console.log(message || "Signing out...");
-    const result = await signOutService(); 
-  
+    setIsRestrictionApplied(true); // Mark that a restriction forced sign-out
+    const result = await signOutService();
+
     if (result.serverSignOutOk) {
       toast({
         title: "Sign Out Successful",
@@ -109,86 +99,98 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       });
     } else {
       toast({
-        variant: "default", 
+        variant: "default",
         title: "Local Sign Out Complete",
         description: message || result.message || "Your local session has been cleared. Server sign-out could not be confirmed.",
       });
     }
-    
+
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setIsRestrictionApplied(true); 
-    router.push('/'); 
+    router.push('/');
   };
 
   useEffect(() => {
-    if (mounted && typeof window !== 'undefined') {
-      const role = localStorage.getItem('userRole');
-      const token = localStorage.getItem('authToken');
+    if (!mounted) {
+      return; // Wait for component to mount and isMobile/loggedInUserRole to be potentially set
+    }
 
-      if (token && role) {
-        const isAdmin = role.toLowerCase().includes('admin');
-        if (isMobile && isAdmin) {
-          handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
-        } else if (!isMobile && !isAdmin) {
-          handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
-        } else {
-            setIsRestrictionApplied(false); 
-        }
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const currentRole = loggedInUserRole; // Use the state variable
+
+    // Handle navigation items and restrictions
+    if (pathname === "/" || pathname === "/signup") {
+      setCurrentNavItems([]); // No nav items on login/signup pages
+      setIsRestrictionApplied(false); // No restrictions apply here
+    } else if (token && currentRole) {
+      const isAdmin = currentRole.toLowerCase().includes('admin');
+      let restrictionTriggered = false;
+
+      if (isMobile && isAdmin) {
+        handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
+        restrictionTriggered = true;
+      } else if (!isMobile && !isAdmin) {
+        handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
+        restrictionTriggered = true;
+      } else {
+        setIsRestrictionApplied(false);
+      }
+
+      if (!restrictionTriggered) {
         if (isMobile && !isAdmin) {
           setCurrentNavItems(employeeMobileNavItems);
         } else {
           setCurrentNavItems(adminNavItems);
         }
-
       } else {
-        setIsRestrictionApplied(false); 
-        setCurrentNavItems(adminNavItems); 
+        setCurrentNavItems([]); // Clear nav items if restriction led to sign out
       }
+    } else if (!token && pathname !== "/" && pathname !== "/signup") {
+      // No token, but on a protected page, should redirect (usually handled by page or main layout logic)
+      // For AppClientLayout, if no token, assume redirection is happening or will happen.
+      // Can set to empty or admin as a fallback before redirection.
+      setCurrentNavItems([]);
+      setIsRestrictionApplied(false); // Or true if redirecting, depends on overall auth flow
+      router.push('/'); // Force redirect if not on public pages and no token
+    } else {
+      // Fallback for unhandled cases or during transition states
+      setCurrentNavItems([]);
+      setIsRestrictionApplied(false);
     }
-  }, [mounted, isMobile, loggedInUserRole, pathname]);
+  }, [mounted, isMobile, loggedInUserRole, pathname, router, toast]);
 
 
   const userToDisplay = {
     name: loggedInUserName || defaultUser.name,
     role: loggedInUserRole || defaultUser.role,
     email: loggedInUserEmail || defaultUser.email,
-    avatarUrl: defaultUser.avatarUrl, 
+    avatarUrl: defaultUser.avatarUrl,
   };
 
   const getInitials = (name: string | null) => {
-    if (!name || name.trim() === "" || name === "User" || name === "User") return "U";
+    if (!name || name.trim() === "" || name === "User") return "U";
     const nameParts = name.split(' ').filter(part => part.length > 0);
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
   if (mounted && isRestrictionApplied && (pathname !== "/" && pathname !== "/signup")) {
-      const role = localStorage.getItem('userRole'); 
-      const token = localStorage.getItem('authToken');
-      let restricted = false;
-      if (token && role) {
-          const isAdmin = role.toLowerCase().includes('admin');
-          if (isMobile && isAdmin) restricted = true;
-          if (!isMobile && !isAdmin) restricted = true;
-      }
-      if (restricted) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-                <p className="text-lg">Access restricted for your account type on this device.</p>
-                <p className="text-muted-foreground">You will be redirected to the login page...</p>
-            </div>
-        );
-      }
+      return (
+          <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+              <p className="text-lg">Access restricted for your account type on this device.</p>
+              <p className="text-muted-foreground">You will be redirected to the login page...</p>
+          </div>
+      );
   }
 
-  if (pathname === "/" || pathname === "/signup") { 
+  if (pathname === "/" || pathname === "/signup") {
     return <>{children}</>;
   }
 
   const getPageTitle = () => {
-    for (const item of currentNavItems) {
+    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems; // Fallback for titles if currentNav is empty during transitions
+    for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
         return item.label;
       }
@@ -200,8 +202,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
       }
     }
+    // Keep adminNavItems check for pages not directly in employeeMobileNavItems but accessible (e.g. profile, settings)
     if (currentNavItems !== adminNavItems) {
-        for (const item of adminNavItems) { 
+        for (const item of adminNavItems) {
             if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
                 return item.label;
             }
@@ -220,7 +223,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/settings') return 'Settings';
     return "EmployTrack";
   };
-  
+
   let pageTitle = getPageTitle();
 
   return (
@@ -241,7 +244,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               item.subItems ? (
                 <SidebarGroup key={`group-${item.label}-${index}`} className="p-0">
                    <SidebarMenuButton
-                      asChild={false} 
+                      asChild={false}
                       isActive={item.subItems.some(sub => sub.href && pathname.startsWith(sub.href))}
                       tooltip={{ children: item.label, side: "right", className: "bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border shadow-md" }}
                       className="justify-start"
@@ -355,3 +358,5 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
