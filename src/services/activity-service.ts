@@ -1,7 +1,7 @@
 
 // src/services/activity-service.ts
 import type { ActivityLog as FrontendActivityLog } from '@/lib/data';
-import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 // Backend DTO for ActivityLog (example, adjust to your actual API response)
 interface ApiActivityLogDto {
@@ -27,17 +27,13 @@ export interface EndActivityPayload {
 
 const mapActivityTypeToString = (type: string | number): string => {
   if (typeof type === 'string') {
-    // If backend already sends "CheckedIn", "Working", etc.
-    // You might want to normalize or map them to more user-friendly terms if needed
-    // e.g. if (type.toLowerCase() === "checkedin") return "Checked In";
     return type;
   }
-  // Example mapping if backend sends numbers that correspond to an enum
   switch (type) {
     case 0: return 'Checked In';
-    case 1: return 'Working'; // Example, adjust to your actual enum
-    case 2: return 'Break';   // Example
-    case 3: return 'Checked Out'; // Example
+    case 1: return 'Working'; 
+    case 2: return 'Break';   
+    case 3: return 'Checked Out'; 
     default: return `Unknown Activity (${type})`;
   }
 };
@@ -49,15 +45,16 @@ const mapActivityTypeToString = (type: string | number): string => {
  * @param endDate ISO string for the end date.
  */
 export async function fetchActivityLogsByEmployee(employeeId: string, startDate: string, endDate: string): Promise<FrontendActivityLog[]> {
-  console.log(`API CALL: GET /api/activity-logs/${employeeId}?StartDate=${startDate}&EndDate=${endDate}`);
+  console.log(`API CALL (axios): GET /activity-logs/${employeeId}?StartDate=${startDate}&EndDate=${endDate}`);
   if (!employeeId) {
     console.warn("fetchActivityLogsByEmployee called with no employeeId");
     return [];
   }
   try {
-    // Using StartDate and EndDate to match typical C# model binding for ActivityTimeRangeRequest
-    const response = await apiClient(`/activity-logs/${employeeId}?StartDate=${encodeURIComponent(startDate)}&EndDate=${encodeURIComponent(endDate)}`);
-    const logsDto = await parseJsonResponse<ApiActivityLogDto[]>(response);
+    const response = await apiClient<ApiActivityLogDto[]>(`/activity-logs/${employeeId}`, {
+      params: { StartDate: startDate, EndDate: endDate }
+    });
+    const logsDto = response.data;
 
     return (logsDto || []).map(log => ({
       id: log.id,
@@ -72,8 +69,7 @@ export async function fetchActivityLogsByEmployee(employeeId: string, startDate:
   } catch (error) {
     console.error(`Error fetching activity logs for employee ${employeeId}:`, error);
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    // Generic fallback for other errors
-    throw new HttpError(`Failed to fetch activity logs for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
+    throw new HttpError(`Failed to fetch activity logs for employee ${employeeId}. An unexpected error occurred.`, (error as any).status || 500, String(error));
   }
 }
 
@@ -83,16 +79,16 @@ export async function fetchActivityLogsByEmployee(employeeId: string, startDate:
  * @param activityData The data for the new activity.
  */
 export async function addEmployeeActivity(employeeId: string, activityData: LogActivityPayload): Promise<FrontendActivityLog> {
-  console.log(`API CALL: POST /api/activity-logs/${employeeId}/activities. Data:`, activityData);
+  console.log(`API CALL (axios): POST /activity-logs/${employeeId}/activities. Data:`, activityData);
   if (!employeeId) {
     throw new Error("employeeId is required to add employee activity.");
   }
   try {
-    const response = await apiClient(`/activity-logs/${employeeId}/activities`, {
+    const response = await apiClient<ApiActivityLogDto>(`/activity-logs/${employeeId}/activities`, {
       method: 'POST',
-      body: JSON.stringify(activityData),
+      body: activityData,
     });
-    const logDto = await parseJsonResponse<ApiActivityLogDto>(response);
+    const logDto = response.data;
     return {
       id: logDto.id,
       employeeId: logDto.employeeId,
@@ -106,7 +102,7 @@ export async function addEmployeeActivity(employeeId: string, activityData: LogA
   } catch (error) {
     console.error(`Error adding activity for employee ${employeeId}:`, error);
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    throw new HttpError(`Failed to add activity for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
+    throw new HttpError(`Failed to add activity for employee ${employeeId}. An unexpected error occurred.`, (error as any).status || 500, String(error));
   }
 }
 
@@ -116,20 +112,21 @@ export async function addEmployeeActivity(employeeId: string, activityData: LogA
  * @param endActivityData Optional data for ending the activity (may not be needed by backend).
  */
 export async function endCurrentEmployeeActivity(employeeId: string, endActivityData?: EndActivityPayload): Promise<FrontendActivityLog | null> {
-  console.log(`API CALL: POST /api/activity-logs/${employeeId}/end-current-activity. Data:`, endActivityData);
+  console.log(`API CALL (axios): POST /activity-logs/${employeeId}/end-current-activity. Data:`, endActivityData);
   if (!employeeId) {
     throw new Error("employeeId is required to end employee activity.");
   }
   try {
-    const response = await apiClient(`/activity-logs/${employeeId}/end-current-activity`, {
+    const response = await apiClient<ApiActivityLogDto | null>(`/activity-logs/${employeeId}/end-current-activity`, {
       method: 'POST',
-      body: JSON.stringify(endActivityData || {}),
+      body: endActivityData || {},
     });
-    if (response.status === 204 || !response.body) {
+    
+    const logDto = response.data;
+    if (!logDto) { // Handles 204 No Content or empty body response
         console.log(`Activity ended for employee ${employeeId}. Backend returned no content.`);
         return null;
     }
-    const logDto = await parseJsonResponse<ApiActivityLogDto>(response);
     return {
       id: logDto.id,
       employeeId: logDto.employeeId,
@@ -143,6 +140,6 @@ export async function endCurrentEmployeeActivity(employeeId: string, endActivity
   } catch (error) {
     console.error(`Error ending activity for employee ${employeeId}:`, error);
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    throw new HttpError(`Failed to end activity for employee ${employeeId}. An unexpected error occurred.`, 500, String(error));
+    throw new HttpError(`Failed to end activity for employee ${employeeId}. An unexpected error occurred.`, (error as any).status || 500, String(error));
   }
 }

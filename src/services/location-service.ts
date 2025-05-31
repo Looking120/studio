@@ -1,21 +1,19 @@
 
 // src/services/location-service.ts
-import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 export interface LocationData {
   latitude: number;
   longitude: number;
   timestamp?: string;
-  address?: string; // If your backend provides geocoded address
-  // Add any other fields returned by /api/location/{employeeId}
+  address?: string; 
   [key: string]: any;
 }
 
 export interface UpdateLocationPayload {
   latitude: number;
   longitude: number;
-  // Add any other fields your backend PUT /api/location/{employeeId} expects
-  timestamp?: string; // Often set by backend, but can be client-provided
+  timestamp?: string; 
 }
 
 /**
@@ -24,21 +22,20 @@ export interface UpdateLocationPayload {
  * @param locationData The new latitude and longitude, and any other relevant data.
  */
 export async function updateEmployeeLocation(employeeId: string, locationData: UpdateLocationPayload): Promise<any> {
-  console.log(`API CALL: PUT /api/location/${employeeId}. Data:`, locationData);
+  console.log(`API CALL (axios): PUT /location/${employeeId}. Data:`, locationData);
   if (!employeeId) {
     throw new Error("employeeId is required to update location.");
   }
   try {
-    const response = await apiClient(`/location/${employeeId}`, {
+    const response = await apiClient<any>(`/location/${employeeId}`, {
       method: 'PUT',
-      body: JSON.stringify(locationData),
+      body: locationData,
     });
-    // Assuming backend returns a success message or the updated location data
-    return await parseJsonResponse<any>(response);
+    return response.data;
   } catch (error) {
     console.error(`Error updating location for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to update employee location for ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to update employee location for ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -47,17 +44,23 @@ export async function updateEmployeeLocation(employeeId: string, locationData: U
  * @param employeeId The ID of the employee.
  */
 export async function getEmployeeLocation(employeeId: string): Promise<LocationData | null> {
-  console.log(`API CALL: GET /api/location/${employeeId}.`);
+  console.log(`API CALL (axios): GET /location/${employeeId}.`);
   if (!employeeId) {
     throw new Error("employeeId is required to get location.");
   }
   try {
-    const response = await apiClient(`/location/${employeeId}`);
-    if (response.status === 404) return null;
-    return await parseJsonResponse<LocationData>(response);
+    const response = await apiClient<LocationData | null>(`/location/${employeeId}`);
+    if (response.status === 404 && !response.data) { // Axios might still return data for 404 if API does
+        return null;
+    }
+    return response.data;
   } catch (error) {
+     if (error instanceof HttpError && error.status === 404) {
+        console.warn(`Location for employee ${employeeId} not found.`);
+        return null;
+    }
     console.error(`Error fetching location for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch employee location for ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch employee location for ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }

@@ -1,6 +1,6 @@
 
 // src/services/attendance-service.ts
-import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 import type { ActivityLog } from '@/lib/data'; // Using frontend ActivityLog for now
 
 // Define a type for the attendance report, adjust as per your API response
@@ -29,31 +29,29 @@ export interface CheckOutData {
  * @param checkInData Optional data for the check-in.
  */
 export async function checkIn(employeeId: string, checkInData?: CheckInData): Promise<ActivityLog> {
-  console.log(`API CALL: POST /api/attendance/${employeeId}/check-in. Data:`, checkInData);
+  console.log(`API CALL (axios): POST /attendance/${employeeId}/check-in. Data:`, checkInData);
   if (!employeeId) {
     throw new Error("employeeId is required for check-in.");
   }
   try {
-    const response = await apiClient(`/attendance/${employeeId}/check-in`, {
+    const response = await apiClient<any>(`/attendance/${employeeId}/check-in`, {
       method: 'POST',
-      body: JSON.stringify(checkInData || {}),
+      body: checkInData || {},
     });
-    // Assuming the response is an ActivityLog or similar structure representing the check-in
-    const logData = await parseJsonResponse<any>(response);
+    const logData = response.data;
     return {
         id: logData.id,
         employeeId: logData.employeeId,
-        employeeName: logData.employeeName || "N/A", // Adjust if name is available
-        activityType: "Checked In", // Or derive from response
+        employeeName: logData.employeeName || "N/A", 
+        activityType: "Checked In", 
         startTime: logData.startTime || new Date().toISOString(),
         location: logData.location || checkInData?.location || "N/A",
-        date: logData.startTime || new Date().toISOString(),
-        // map other fields as necessary
+        // date field is not standard in ActivityLog, ensure consistency or remove
     } as ActivityLog;
   } catch (error) {
     console.error(`Error during check-in for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Check-in failed for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Check-in failed for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -63,16 +61,16 @@ export async function checkIn(employeeId: string, checkInData?: CheckInData): Pr
  * @param checkOutData Optional data for the check-out.
  */
 export async function checkOut(employeeId: string, checkOutData?: CheckOutData): Promise<ActivityLog> {
-  console.log(`API CALL: POST /api/attendance/${employeeId}/check-out. Data:`, checkOutData);
+  console.log(`API CALL (axios): POST /attendance/${employeeId}/check-out. Data:`, checkOutData);
   if (!employeeId) {
     throw new Error("employeeId is required for check-out.");
   }
   try {
-    const response = await apiClient(`/attendance/${employeeId}/check-out`, {
+    const response = await apiClient<any>(`/attendance/${employeeId}/check-out`, {
       method: 'POST',
-      body: JSON.stringify(checkOutData || {}),
+      body: checkOutData || {},
     });
-    const logData = await parseJsonResponse<any>(response);
+    const logData = response.data;
     return {
         id: logData.id,
         employeeId: logData.employeeId,
@@ -80,13 +78,12 @@ export async function checkOut(employeeId: string, checkOutData?: CheckOutData):
         activityType: "Checked Out",
         endTime: logData.endTime || new Date().toISOString(),
         location: logData.location || "N/A",
-        date: logData.endTime || new Date().toISOString(),
-        // map other fields
+        // date field is not standard in ActivityLog
     } as ActivityLog;
   } catch (error) {
     console.error(`Error during check-out for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Check-out failed for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Check-out failed for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -96,21 +93,18 @@ export async function checkOut(employeeId: string, checkOutData?: CheckOutData):
  * @param reportParams Optional parameters for the report (e.g., date range).
  */
 export async function getAttendanceReport(employeeId: string, reportParams?: { startDate?: string; endDate?: string }): Promise<AttendanceReport> {
-  console.log(`API CALL: GET /api/attendance/${employeeId}/report. Params:`, reportParams);
+  console.log(`API CALL (axios): GET /attendance/${employeeId}/report. Params:`, reportParams);
   if (!employeeId) {
     throw new Error("employeeId is required to get attendance report.");
   }
   try {
-    let endpoint = `/attendance/${employeeId}/report`;
-    if (reportParams) {
-      const query = new URLSearchParams(reportParams as any).toString();
-      if (query) endpoint += `?${query}`;
-    }
-    const response = await apiClient(endpoint);
-    return await parseJsonResponse<AttendanceReport>(response);
+    const response = await apiClient<AttendanceReport>(`/attendance/${employeeId}/report`, {
+        params: reportParams
+    });
+    return response.data;
   } catch (error) {
     console.error(`Error fetching attendance report for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch attendance report for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch attendance report for employee ${employeeId}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }

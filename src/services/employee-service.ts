@@ -1,7 +1,7 @@
 
 // src/services/employee-service.ts
 import type { Employee as FrontendEmployee } from '@/lib/data';
-import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 // Interface for the expected location data from getCurrentEmployeeLocation
 export interface EmployeeLocation {
@@ -16,7 +16,7 @@ export interface HireEmployeePayload {
   lastName: string;
   middleName?: string;
   email: string;
-  avatarUrl?: string; // Not in your schema, but often present
+  avatarUrl?: string; 
 
   employeeNumber: string;
   address: string;
@@ -27,18 +27,13 @@ export interface HireEmployeePayload {
   departmentId: string; // Guid as string
   positionId: string;   // Guid as string
   officeId: string;     // Guid as string
-  // userId?: string;    // Optional: If linking to an existing AppUser (omitted for new employee form for now)
 }
 
-// The return type for hireEmployee should ideally match the backend's Employee entity structure.
-// Or a simpler confirmation DTO. Let's assume it returns the created Employee-like object.
 export interface HiredEmployeeResponse extends FrontendEmployee {
-  // Add any specific fields returned by /api/users/hire if different from FrontendEmployee
-  firstName: string; // To ensure these are present
+  firstName: string; 
   lastName: string;
 }
 
-// Backend DTO for Employee (example, adjust to your actual API response)
 interface ApiEmployeeDto {
   id: string;
   firstName: string;
@@ -46,18 +41,16 @@ interface ApiEmployeeDto {
   middleName?: string;
   email: string;
   departmentId?: string;
-  departmentName?: string; // If your API provides it
+  departmentName?: string; 
   positionId?: string;
-  positionName?: string; // If your API provides it
-  currentStatus: number | string; // 0 for Active, 1 for Inactive, or string "Active"/"Inactive"
+  positionName?: string; 
+  currentStatus: number | string; 
   avatarUrl?: string;
   latitude?: number;
   longitude?: number;
   lastSeen?: string;
-  // Add other fields from your C# Employee entity if they are part of the DTO
   employeeNumber?: string;
   phoneNumber?: string;
-  // ... etc.
 }
 
 const mapApiEmployeeToFrontend = (emp: ApiEmployeeDto): FrontendEmployee => {
@@ -86,15 +79,15 @@ const mapApiEmployeeToFrontend = (emp: ApiEmployeeDto): FrontendEmployee => {
  * Fetches all employees. (GET /api/employees)
  */
 export async function fetchEmployees(): Promise<FrontendEmployee[]> {
-  console.log('API CALL: GET /api/employees');
+  console.log('API CALL (axios): GET /employees');
   try {
-    const response = await apiClient('/employees');
-    const employeesData = await parseJsonResponse<ApiEmployeeDto[]>(response);
+    const response = await apiClient<ApiEmployeeDto[]>('/employees');
+    const employeesData = response.data;
     return (employeesData || []).map(mapApiEmployeeToFrontend);
   } catch (error) {
     console.error('Error fetching employees:', error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch employees. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch employees. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -103,17 +96,20 @@ export async function fetchEmployees(): Promise<FrontendEmployee[]> {
  * @param id The ID of the employee.
  */
 export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | null> {
-  console.log(`API CALL: GET /api/employees/${id}`);
+  console.log(`API CALL (axios): GET /employees/${id}`);
   try {
-    const response = await apiClient(`/employees/${id}`);
-    if (response.status === 404) return null;
-    const empData = await parseJsonResponse<ApiEmployeeDto | null>(response);
-    if (!empData) return null;
+    const response = await apiClient<ApiEmployeeDto | null>(`/employees/${id}`);
+    const empData = response.data;
+    if (!empData) return null; // Handles 404 if interceptor allows it or API returns 200 with null
     return mapApiEmployeeToFrontend(empData);
   } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+        console.warn(`Employee with ID ${id} not found.`);
+        return null;
+    }
     console.error(`Error fetching employee by ID ${id}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch employee by ID ${id}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch employee by ID ${id}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -122,43 +118,38 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
  * @param status The status to filter by ('Active' or 'Inactive').
  */
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<FrontendEmployee[]> {
-  console.log(`API CALL: GET /api/employees/status/${status}`);
-  // Backend might expect "Active" or "Inactive" or numeric values. Adjust if needed.
+  console.log(`API CALL (axios): GET /employees/status/${status}`);
   const apiStatus = status;
   try {
-    const response = await apiClient(`/employees/status/${apiStatus}`);
-    const employeesData = await parseJsonResponse<ApiEmployeeDto[]>(response);
+    const response = await apiClient<ApiEmployeeDto[]>(`/employees/status/${apiStatus}`);
+    const employeesData = response.data;
     return (employeesData || []).map(mapApiEmployeeToFrontend);
   } catch (error) {
     console.error(`Error fetching employees by status ${status}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch employees by status ${status}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch employees by status ${status}. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
 /**
  * Updates the status of an employee. (PUT /api/employees/{employeeId}/status)
- * Backend expects numeric status: 0 for Active, 1 for Inactive, or a string.
- * Check your backend API's DTO for this endpoint.
  * @param employeeId The ID of the employee.
  * @param status The new status ('Active' or 'Inactive').
  */
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
-  // Assuming backend expects the string "Active" or "Inactive" or a DTO like { status: "Active" }
-  // If backend expects numeric: const numericStatus = status === 'Active' ? 0 : 1;
-  const payload = { status: status }; // Adjust DTO as per your backend
-  console.log(`API CALL: PUT /api/employees/${employeeId}/status. New status: ${status}. Payload:`, payload);
+  const payload = { status: status }; 
+  console.log(`API CALL (axios): PUT /employees/${employeeId}/status. New status: ${status}. Payload:`, payload);
   try {
-    const response = await apiClient(`/employees/${employeeId}/status`, {
+    const response = await apiClient<ApiEmployeeDto>(`/employees/${employeeId}/status`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: payload,
     });
-    const empData = await parseJsonResponse<ApiEmployeeDto>(response);
+    const empData = response.data;
     return mapApiEmployeeToFrontend(empData);
   } catch (error) {
     console.error(`Error updating employee ${employeeId} status to ${status}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to update employee status. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to update employee status. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -167,25 +158,23 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
  * @param employeeData The data for the new employee, based on HireEmployeePayload.
  */
 export async function hireEmployee(employeeData: HireEmployeePayload): Promise<HiredEmployeeResponse> {
-  console.log('API CALL: POST /api/users/hire. Payload:', employeeData);
+  console.log('API CALL (axios): POST /users/hire. Payload:', employeeData);
   try {
-    const response = await apiClient('/users/hire', {
+    const response = await apiClient<ApiEmployeeDto>('/users/hire', {
       method: 'POST',
-      body: JSON.stringify(employeeData),
+      body: employeeData,
     });
-    const hiredEmpData = await parseJsonResponse<ApiEmployeeDto>(response); // Assuming response is Employee-like
+    const hiredEmpData = response.data; 
     return {
       ...mapApiEmployeeToFrontend(hiredEmpData),
-      firstName: hiredEmpData.firstName, // Ensure these are part of HiredEmployeeResponse
+      firstName: hiredEmpData.firstName, 
       lastName: hiredEmpData.lastName,
     } as HiredEmployeeResponse;
   } catch (error) {
     console.error('Error hiring employee:', error);
-    if (error instanceof UnauthorizedError) throw error;
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-    const statusCode = error instanceof HttpError ? error.status : 500;
-    const responseText = error instanceof HttpError ? error.responseText : "";
-    throw new HttpError(`Failed to hire employee. API Error: ${errorMessage}`, statusCode, responseText);
+    throw new HttpError(`Failed to hire employee. API Error: ${errorMessage}`, (error as any).status || 500, (error as HttpError)?.responseData || "");
   }
 }
 
@@ -194,14 +183,14 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<H
  * @param employeeId The ID of the employee.
  */
 export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
-  console.log(`API CALL: GET /api/employees/${employeeId}/location/current`);
+  console.log(`API CALL (axios): GET /employees/${employeeId}/location/current`);
   try {
-    const response = await apiClient(`/employees/${employeeId}/location/current`);
-    return await parseJsonResponse<EmployeeLocation>(response); // Ensure EmployeeLocation matches backend DTO
+    const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`);
+    return response.data; 
   } catch (error) {
     console.error(`Error fetching current location for employee ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch current employee location. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch current employee location. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }
 
@@ -210,14 +199,14 @@ export async function getCurrentEmployeeLocation(employeeId: string): Promise<Em
  * @param employeeId The ID of the employee.
  */
 export async function getNearbyEmployees(employeeId: string): Promise<FrontendEmployee[]> {
-  console.log(`API CALL: GET /api/employees/${employeeId}/location/nearby`);
+  console.log(`API CALL (axios): GET /employees/${employeeId}/location/nearby`);
   try {
-    const response = await apiClient(`/employees/${employeeId}/location/nearby`);
-    const employeesData = await parseJsonResponse<ApiEmployeeDto[]>(response);
+    const response = await apiClient<ApiEmployeeDto[]>(`/employees/${employeeId}/location/nearby`);
+    const employeesData = response.data;
     return (employeesData || []).map(mapApiEmployeeToFrontend);
   } catch (error) {
     console.error(`Error fetching nearby employees for ${employeeId}:`, error);
-    if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch nearby employees. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    throw new HttpError(`Failed to fetch nearby employees. ${error instanceof Error ? error.message : String(error)}`, (error as any).status || 500, (error as HttpError)?.responseData || String(error));
   }
 }

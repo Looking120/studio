@@ -1,11 +1,8 @@
 
 // src/services/api-client.ts
+import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
 export const API_BASE_URL = 'https://localhost:7294/api';
-
-interface FetchOptions extends RequestInit {
-  // You can add custom options if needed
-}
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -21,97 +18,106 @@ export class UnauthorizedError extends Error {
  * Custom error class for general HTTP errors.
  */
 export class HttpError extends Error {
-  constructor(message: string, public status: number, public responseText: string) {
+  public responseData: any;
+  constructor(message: string, public status: number, responseData: any) {
     super(message);
     this.name = "HttpError";
+    this.responseData = responseData;
   }
 }
 
-
-/**
- * A wrapper around the native fetch function to centralize API calls.
- * It automatically includes an Authorization header if a token is found in localStorage.
- * @param endpoint The API endpoint to call (e.g., '/employees').
- * @param options Fetch options (method, body, headers, etc.).
- * @returns Promise<Response>
- */
-export async function apiClient(endpoint: string, options: FetchOptions = {}): Promise<Response> {
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  const defaultHeaders: HeadersInit = {
+const axiosInstance: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
     'Content-Type': 'application/json',
-    ...options.headers,
-  };
+  },
+});
 
-  // Attempt to retrieve the auth token from localStorage
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      (defaultHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-    }
-  }
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: defaultHeaders,
-    });
-
-    return response;
-  } catch (error) {
-    console.error(`Network or other error for ${url}:`, error);
-    throw error; // Re-throw the error to be handled by the caller
-  }
-}
-
-/**
- * Helper function to parse JSON response.
- * @param response The Response object from a fetch call.
- * @returns Promise<T> The parsed JSON data.
- */
-export async function parseJsonResponse<T>(response: Response): Promise<T> {
-  if (response.status === 204) { // No Content
-    console.warn(`API Info: Request to ${response.url} returned 204 No Content. Returning null.`);
-    return null as T;
-  }
-  
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    // Handle 401 Unauthorized specifically
-    if (response.status === 401) {
-      const errorMessage = `API request failed with status 401: Unauthorized. ${responseText.trim() === '' ? 'Server returned an empty error response.' : responseText}`;
-      // console.warn(errorMessage); // Service layer can log this if needed
-      throw new UnauthorizedError(errorMessage);
-    }
-
-    // Handle other non-OK responses (errors)
-    let errorMessage = `API request failed with status ${response.status}`;
-    if (responseText.trim() === '') {
-      errorMessage += ". The server returned an empty error response.";
-    } else {
-      try {
-        // Attempt to parse error response as JSON for more details
-        const errorJson = JSON.parse(responseText);
-        errorMessage += `: ${errorJson.message || errorJson.title || responseText}`; // Use message or title from error JSON if available
-      } catch (e) {
-        // If parsing error JSON fails, use the raw text
-        errorMessage += `: ${responseText}`;
+axiosInstance.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     }
-    throw new HttpError(errorMessage, response.status, responseText);
+    return config;
+  },
+  (error: AxiosError) => {
+    // This is for request errors (e.g. network issue before request is sent)
+    console.error('Axios request error:', error);
+    return Promise.reject(new HttpError(error.message || 'Failed to send request.', 0, null));
   }
+);
 
-  // Handle OK responses
-  try {
-    if (responseText.trim() === '' && response.ok) { // Specifically for 200 OK with empty body
-      console.warn(`API Info: Request to ${response.url} was successful (${response.status} OK) but server returned an empty response body. Returning null as parsed JSON.`);
-      return null as T; 
+axiosInstance.interceptors.response.use(
+  (response: AxiosResponse) => {
+    // For successful responses (2xx range)
+    // Axios automatically parses JSON, so response.data is the parsed body
+    // If status is 204 No Content, response.data will be null or an empty string.
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      const { status, data } = error.response;
+      
+      let errorMessage = 'An error occurred';
+      if (data && typeof data === 'object') {
+        errorMessage = (data as any).message || (data as any).title || (data as any).detail || JSON.stringify(data);
+      } else if (typeof data === 'string' && data.trim() !== '') {
+        errorMessage = data;
+      } else {
+        errorMessage = error.message || `Request failed with status code ${status}`;
+      }
+      
+      if (status === 401) {
+        console.warn(`API request to ${error.config?.url} failed with status 401: Unauthorized. Message: ${errorMessage}`);
+        throw new UnauthorizedError(`Unauthorized: ${errorMessage}`);
+      }
+      console.error(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+      throw new HttpError(errorMessage, status, data);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('Network error or no response received for request to ' + error.config?.url + ':', error.request);
+      throw new HttpError('Network error or no response from server. Please check your connection and the server status.', 0, null);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Axios setup error for request to ' + error.config?.url + ':', error.message);
+      throw new HttpError(error.message || 'An unknown error occurred while setting up the request.', 0, null);
     }
-    const json = JSON.parse(responseText);
-    return json as T;
-  } catch (e) {
-    console.error(`Failed to parse JSON response for an OK request. Status: ${response.status}, URL: ${response.url}, Body: "${responseText}"`, e);
-    throw new Error(`Failed to parse JSON response from a successful request. Status: ${response.status}, URL: ${response.url}`);
+  }
+);
+
+interface ApiClientOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  body?: any; // For axios, this will be 'data'
+  headers?: Record<string, string>;
+  params?: Record<string, any>; // For URL query parameters
+}
+
+/**
+ * A wrapper around an axios instance to centralize API calls.
+ * @param endpoint The API endpoint to call (e.g., '/employees').
+ * @param options Options including method, body (as data), headers, params.
+ * @returns Promise<AxiosResponse<T>> which includes .data property with parsed body
+ */
+export async function apiClient<T = any>(endpoint: string, options: ApiClientOptions = {}): Promise<AxiosResponse<T>> {
+  const { method = 'GET', body, headers, params } = options;
+
+  try {
+    const response = await axiosInstance.request<T>({
+      url: endpoint,
+      method: method,
+      data: body, // 'data' is the Axios equivalent of 'body' in fetch
+      headers: headers,
+      params: params,
+    });
+    return response;
+  } catch (error) {
+    // The error will be processed by the response interceptor and re-thrown
+    // as UnauthorizedError or HttpError. We just re-throw it here.
+    throw error;
   }
 }
