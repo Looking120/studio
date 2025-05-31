@@ -4,99 +4,99 @@
 
 @layer base {
   :root {
-    /* EmployTrack Light Theme - Professional & Trustworthy */
-    --background: 210 27% 95.5%; /* Light Gray (#F0F4F7) */
-    --foreground: 210 20% 25%; /* Dark, desaturated blue-gray for text */
+    /* EmployTrack Light Theme - Clean, Professional with Blurple Accent */
+    --background: 0 0% 100%; /* White */
+    --foreground: 222 47% 11%; /* Near Black */
     
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 210 20% 25%;
+    --card: 0 0% 97%; /* Very Light Gray */
+    --card-foreground: 222 47% 11%;
     
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 20% 25%;
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 222 47% 11%;
     
-    --primary: 166 44% 48.6%; /* Vibrant Teal (#46B29D) for key interactive elements */
+    --primary: 235 85% 65%; /* Blurple */
     --primary-foreground: 0 0% 100%; /* White */
     
-    --secondary: 205 60% 90%; /* Lighter shade of Moderate Blue for secondary elements */
-    --secondary-foreground: 205 70% 30%; /* Darker Blue for text on secondary */
+    --secondary: 210 40% 96.1%; /* Light Gray-Blue */
+    --secondary-foreground: 222 47% 11%;
     
-    --muted: 210 25% 92%; /* Slightly off-white/gray for muted backgrounds */
-    --muted-foreground: 210 20% 55%; /* Medium gray-blue for muted text */
+    --muted: 210 40% 94%; /* Slightly Darker Light Gray-Blue */
+    --muted-foreground: 215 20.2% 65.1%; /* Medium Gray */
     
-    --accent: 205 70% 62.5%; /* Moderate Blue (#5DADE2) for accents */
+    --accent: 235 85% 65%; /* Blurple */
     --accent-foreground: 0 0% 100%; /* White */
     
-    --destructive: 0 75% 55%; /* Standard strong red */
+    --destructive: 0 84.2% 60.2%; /* Standard Red */
     --destructive-foreground: 0 0% 100%;
     
-    --border: 210 20% 88%; /* Subtle gray border */
-    --input: 0 0% 100%; /* White input background */
-    --ring: 166 44% 55%; /* Vibrant Teal, slightly lighter for rings */
+    --border: 214.3 31.8% 91.4%; /* Light Gray Border */
+    --input: 214.3 31.8% 91.4%; /* Light Gray Input Background */
+    --ring: 235 85% 70%; /* Lighter Blurple for Ring */
     
-    --chart-1: 166 44% 48.6%; /* Primary - Teal */
-    --chart-2: 205 70% 62.5%; /* Accent - Moderate Blue */
-    --chart-3: 45 90% 55%;  /* A warm orange as a contrast */
-    --chart-4: 270 60% 60%; /* A gentle purple */
-    --chart-5: 190 50% 50%; /* A cooler cyan */
+    --chart-1: 235 85% 65%; /* Blurple */
+    --chart-2: 205 70% 62.5%; /* Moderate Blue */
+    --chart-3: 45 90% 55%;  /* Warm Orange */
+    --chart-4: 270 60% 60%; /* Gentle Purple */
+    --chart-5: 190 50% 50%; /* Cooler Cyan */
     
     --radius: 0.5rem;
 
-    /* Sidebar specific theme variables - Light Mode */
-    --sidebar-background: 210 20% 22%; /* Dark, slightly desaturated blue-gray */
-    --sidebar-foreground: 210 20% 90%; /* Light, cool gray text */
-    --sidebar-primary: 166 46% 55%;    /* Teal, slightly brighter for active/hover in sidebar */
+    /* Sidebar specific theme variables - Light Mode (Dark Sidebar) */
+    --sidebar-background: 222 47% 10%; /* Dark Gray-Blue */
+    --sidebar-foreground: 0 0% 98%;    /* White Text */
+    --sidebar-primary: 235 85% 70%;    /* Lighter Blurple */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 30%;     /* Slightly lighter than sidebar bg for hover */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 20% 28%;
-    --sidebar-ring: 166 46% 55%;
+    --sidebar-accent: 222 47% 15%;     /* Slightly Lighter Dark Gray-Blue for Hover */
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 222 47% 8%;
+    --sidebar-ring: 235 85% 70%;
   }
 
   .dark {
-    /* EmployTrack Dark Theme - Professional & Trustworthy */
-    --background: 210 15% 10%; /* Very Dark Gray-Blue */
-    --foreground: 210 20% 88%; /* Light Gray for text */
+    /* EmployTrack Dark Theme - Discord Inspired */
+    --background: 220 9% 13%; /* Discord-like Dark Gray */
+    --foreground: 0 0% 98%; /* Off-White Text (was 100%) */
     
-    --card: 210 15% 15%; /* Darker Gray-Blue for cards */
-    --card-foreground: 210 20% 85%;
+    --card: 221 8% 19%; /* Discord-like Lighter Gray for Cards */
+    --card-foreground: 0 0% 95%; /* Off-White Text on Cards (was 100%) */
     
-    --popover: 210 15% 14%;
-    --popover-foreground: 210 20% 85%;
+    --popover: 221 8% 22%; /* Slightly Lighter Popover for better distinction */
+    --popover-foreground: 0 0% 95%;
     
-    --primary: 166 50% 65%; /* Vibrant Teal (#46B29D) - Lighter for dark mode */
-    --primary-foreground: 166 20% 10%; /* Dark teal/gray for text on primary */
+    --primary: 235 86% 65%; /* Blurple */
+    --primary-foreground: 0 0% 100%; 
     
-    --secondary: 205 65% 25%; /* Darker shade of Moderate Blue */
-    --secondary-foreground: 205 70% 80%; /* Lighter Blue for text on secondary */
+    --secondary: 223 7% 25%; /* Darker Muted Gray for Secondary Elements */
+    --secondary-foreground: 210 20% 88%; 
     
-    --muted: 210 15% 20%; /* Very dark muted background */
-    --muted-foreground: 210 20% 60%; 
+    --muted: 220 9% 16%; /* Very Subtle Gray, slightly lighter than main BG */
+    --muted-foreground: 220 5% 55%; /* Mid-Gray for Muted Text */
     
-    --accent: 205 75% 75%; /* Moderate Blue (#5DADE2) - Lighter for dark mode */
-    --accent-foreground: 205 20% 10%; /* Dark blue/gray for text on accent */
+    --accent: 235 86% 65%; /* Blurple */
+    --accent-foreground: 0 0% 100%;
     
-    --destructive: 0 70% 60%; /* Slightly lighter, but still strong red */
+    --destructive: 0 70% 60%; /* Red for Destructive Actions */
     --destructive-foreground: 0 0% 100%;
     
-    --border: 210 15% 25%; /* Subtle dark border */
-    --input: 210 15% 18%; /* Dark input background */
-    --ring: 166 50% 70%; /* Vibrant Teal, slightly lighter for rings */
+    --border: 223 7% 22%; /* Subtle Border, slightly lighter than cards for visibility */
+    --input: 223 7% 17%; /* Darker Input Background */
+    --ring: 235 86% 70%; /* Lighter Blurple for Focus Ring */
     
-    --chart-1: 166 50% 65%; /* Primary - Teal */
-    --chart-2: 205 75% 75%; /* Accent - Moderate Blue */
-    --chart-3: 45 90% 65%;  /* Lighter Orange */
-    --chart-4: 270 60% 70%; /* Lighter Purple */
-    --chart-5: 190 50% 60%; /* Lighter Cyan */
+    --chart-1: 235 86% 70%; /* Lighter Blurple */
+    --chart-2: 160 70% 60%; /* Vibrant Teal */
+    --chart-3: 45 90% 60%;  /* Orange */
+    --chart-4: 330 80% 70%; /* Pink */
+    --chart-5: 190 80% 65%; /* Cyan */
 
     /* Sidebar specific theme variables - Dark Mode */
-    --sidebar-background: 210 12% 8%; /* Even darker for sidebar background */
-    --sidebar-foreground: 210 15% 85%;
-    --sidebar-primary: 166 50% 70%; /* Teal for active/hover, matching primary in dark */
-    --sidebar-primary-foreground: 166 20% 5%;
-    --sidebar-accent: 210 15% 18%;
-    --sidebar-accent-foreground: 210 15% 92%;
-    --sidebar-border: 210 15% 15%;
-    --sidebar-ring: 166 50% 70%;
+    --sidebar-background: 220 8% 10%; /* Darkest Gray for Sidebar */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 235 86% 68%;   /* Blurple for Active/Hover in Sidebar */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 221 8% 15%;     /* Slightly Lighter Gray for Hover on Sidebar */
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 8% 8%;    /* Very Dark Border for Sidebar */
+    --sidebar-ring: 235 86% 70%;
   }
 }
 
