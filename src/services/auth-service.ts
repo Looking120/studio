@@ -200,8 +200,8 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    // Try sending null as the body, which typically results in no body being sent by axios
-    const response = await apiClient('/auth/signout', { method: 'POST', body: null }); 
+    // Try sending undefined as the body, which might result in no body being sent by axios
+    const response = await apiClient('/auth/signout', { method: 'POST', body: undefined }); 
 
     serverSignOutOk = true; 
     
@@ -218,16 +218,15 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     if (error instanceof UnauthorizedError) {
         serverMessage = `Server sign-out failed (401 Unauthorized). Session might have already been invalid. Proceeding with local sign-out. Message: ${error.message}`;
         console.warn(`Auth Service: ${serverMessage}`, error);
-        // serverSignOutOk remains false, but we don't re-throw here
     } else if (error instanceof HttpError) {
         serverMessage = `Server sign-out attempt failed with HTTP error: ${error.status} ${error.message}`;
-        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn for HttpErrors during sign-out
+        console.warn(`Auth Service: ${serverMessage}`, error); 
     } else if (error instanceof Error) {
         serverMessage = `Error during server sign-out attempt: ${error.message}`;
-        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn
+        console.warn(`Auth Service: ${serverMessage}`, error); 
     } else {
         serverMessage = "Unknown error during server sign-out attempt.";
-        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn
+        console.warn(`Auth Service: ${serverMessage}`, error); 
     }
   }
 
@@ -249,4 +248,3 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     serverSignOutOk,
   };
 }
-
