@@ -78,8 +78,10 @@ axiosInstance.interceptors.response.use(
       }
       
       // Conditionally log error for non-404 statuses, as 404s might be handled specifically by services
-      if (status !== 404) {
+      if (status !== 404 && status !== 500) {
         console.error(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+      } else if (status === 500) {
+        console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
       }
       throw new HttpError(errorMessage, status, data);
     } else if (error.request) {
@@ -125,4 +127,3 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
-
