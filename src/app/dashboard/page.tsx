@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data";
 import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home } from "lucide-react";
 import Link from "next/link";
-import { useIsMobile } from '@/hooks/use-mobile';
+// import { useIsMobile } from '@/hooks/use-mobile'; // No longer needed for role-based dashboard view
 import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,7 @@ export default function DashboardPage() {
     { title: "Avg. Work Hours", value: `${mockAttendanceSummary.avgWorkHours}h`, icon: Clock, href: "/attendance" },
   ];
 
-  const isMobile = useIsMobile();
+  // const isMobile = useIsMobile(); // Not directly used for role differentiation anymore
   const [userRole, setUserRole] = useState<string | null>(null);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [assignedOffice, setAssignedOffice] = useState<Office | null>(null);
@@ -72,7 +72,8 @@ export default function DashboardPage() {
       const emailFromStorage = localStorage.getItem('userEmail');
       setUserRole(roleFromStorage);
 
-      if (isMobile && roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
+      // Employee-specific data loading logic, independent of screen size
+      if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
         setIsLoadingEmployeeData(true);
         const employee = mockEmployees.find(emp => emp.email === emailFromStorage);
         setCurrentEmployee(employee || null);
@@ -100,10 +101,11 @@ export default function DashboardPage() {
           setIsLoadingEmployeeData(false);
         }
       } else {
+        // For admin or if role not determined yet for non-admin path
         setIsLoadingEmployeeData(false); 
       }
     }
-  }, [isMobile, toast, isClient]); 
+  }, [toast, isClient]); // Removed isMobile as it's not used for role differentiation
 
   const handleTaskStatusChange = async (taskId: string, isCompleted: boolean) => {
     const originalTasks = [...employeeTasks];
@@ -139,7 +141,8 @@ export default function DashboardPage() {
     );
   }
 
-  if (isMobile && userRole && !userRole.toLowerCase().includes('admin')) {
+  // Employee-specific dashboard view for all screen sizes
+  if (userRole && !userRole.toLowerCase().includes('admin')) {
     if (isLoadingEmployeeData) {
       return (
         <div className="space-y-6 p-2 sm:p-4 animate-pulse">
@@ -162,7 +165,7 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-6 p-2 sm:p-4">
-        <h1 className="text-2xl font-semibold text-foreground">Employee Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-foreground">My Dashboard</h1>
         
         <Card className="shadow-md">
           <CardHeader>
@@ -227,6 +230,7 @@ export default function DashboardPage() {
     );
   }
 
+  // Admin dashboard view
   return (
     <div className="space-y-6">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

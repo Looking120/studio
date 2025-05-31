@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building, CalendarClock, ScrollText, Fingerprint } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -37,11 +37,18 @@ const adminNavItems = [
   { href: "/offices", label: "Offices", icon: Building2 },
   {
     label: "Organization", icon: Building, subItems: [
-      { href: "/organization/departments", label: "Departments", icon: Users },
-      { href: "/organization/positions", label: "Positions", icon: Users },
+      { href: "/organization/departments", label: "Departments", icon: Users }, // Consider different icon like Briefcase
+      { href: "/organization/positions", label: "Positions", icon: Users }, // Consider different icon like Award or Badge
     ]
   },
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
+];
+
+const employeeNavItems = [
+  { href: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
+  { href: "/attendance", label: "My Attendance", icon: Fingerprint },
+  { href: "/activity", label: "My Activity", icon: ScrollText },
+  { href: "/chat", label: "Messaging", icon: MessageSquare },
 ];
 
 const defaultUser = {
@@ -50,6 +57,16 @@ const defaultUser = {
   role: "Employee",
   avatarUrl: ""
 };
+
+// Type that can represent both admin and employee nav items
+type NavItem = {
+  href?: string;
+  label: string;
+  icon: React.ElementType;
+  notificationKey?: string;
+  subItems?: Array<{ href: string; label: string; icon: React.ElementType; }>;
+};
+
 
 export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -62,7 +79,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
-  const [currentNavItems, setCurrentNavItems] = useState<(typeof adminNavItems)>([]);
+  const [currentNavItems, setCurrentNavItems] = useState<NavItem[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -111,23 +128,30 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (!token) {
-      router.push('/');
+      if (pathname !== "/" && pathname !== "/signup") {
+          handleSignOut("Session expired or not found. Please log in again.");
+      }
       if (currentNavItems.length > 0) setCurrentNavItems([]);
       return;
     }
     
-    // Always use adminNavItems for all authenticated users
-    const navItemsToSet = adminNavItems;
+    let navItemsToSet: NavItem[] = [];
+    if (loggedInUserRole && loggedInUserRole.toLowerCase().includes('admin')) {
+      navItemsToSet = adminNavItems;
+    } else { 
+      // Default to employee nav items if role is not admin or if role is not yet defined (should be after login)
+      navItemsToSet = employeeNavItems;
+    }
     
     if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
         setCurrentNavItems(navItemsToSet);
     }
 
-  }, [mounted, pathname, loggedInUserRole, currentNavItems, router]);
+  }, [mounted, pathname, loggedInUserRole, currentNavItems, router, handleSignOut]);
 
 
   const getPageTitle = () => {
-    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems;
+    const itemsToSearch = currentNavItems; // Use currentNavItems which is role-specific
     
     for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
@@ -144,6 +168,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
+    if (pageTitle === "EmployTrack" && loggedInUserRole && !loggedInUserRole.toLowerCase().includes('admin') && pathname === '/dashboard') {
+        return "My Dashboard";
+    }
     return "EmployTrack";
   };
 
