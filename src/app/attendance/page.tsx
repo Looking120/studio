@@ -107,7 +107,7 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -214,7 +214,7 @@ export default function AttendancePage() {
         </CardContent>
       </Card>
       
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5 text-primary" /> Weekly Attendance Trend</CardTitle>
@@ -278,3 +278,6 @@ export default function AttendancePage() {
     </div>
   );
 }
+
+
+    
