@@ -9,20 +9,19 @@ export interface Employee {
   jobTitle: string;
   latitude?: number;
   longitude?: number;
-  lastSeen?: string; // For location tracking map
-  officeId?: string; // Added for employee's assigned office
+  lastSeen?: string; 
+  officeId?: string; 
 }
 
 export interface ActivityLog {
   id: string;
   employeeId: string;
   employeeName: string;
-  startTime?: string; // Was checkInTime
-  endTime?: string;   // Was checkOutTime
-  activityType: string; // Was activity
+  startTime?: string; 
+  endTime?: string;   
+  activityType: string; 
   description?: string;
   location?: string;
-  // date field removed as startTime/endTime should suffice and be more specific
 }
 
 export interface Office {
@@ -39,7 +38,7 @@ export interface Task {
   title: string;
   description?: string;
   isCompleted: boolean;
-  dueDate?: string; // Optional due date
+  dueDate?: string; 
 }
 
 export const mockEmployees: Employee[] = [
@@ -69,12 +68,12 @@ export const mockAttendanceSummary = {
   totalEmployees: mockEmployees.length,
   activeToday: mockActivityLogs.filter(log => log.startTime && !log.endTime && new Date(log.startTime).toDateString() === new Date().toDateString()).length,
   checkedInToday: new Set(mockActivityLogs.filter(log => log.startTime && new Date(log.startTime).toDateString() === new Date().toDateString()).map(log => log.employeeId)).size,
-  avgWorkHours: 7.5, // Mocked
+  avgWorkHours: 7.5, 
 };
 
 export const mockTasks: Task[] = [
-    { id: 'task001', title: 'Finaliser le rapport Q3', description: 'Compiler toutes les données et rédiger le résumé exécutif.', isCompleted: false, dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-    { id: 'task002', title: 'Préparer la présentation client', description: 'Créer les diapositives pour la réunion de mardi.', isCompleted: false, dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-    { id: 'task003', title: 'Revue de code - Module Paiement', description: 'Vérifier les dernières modifications sur la branche feature/payment.', isCompleted: true, dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-    { id: 'task004', title: 'Contacter le fournisseur X', description: 'Discuter des nouvelles conditions tarifaires.', isCompleted: false },
+    { id: 'task001', title: 'Finalize Q3 Report', description: 'Compile all data and write the executive summary.', isCompleted: false, dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task002', title: 'Prepare Client Presentation', description: 'Create slides for Tuesday\'s meeting.', isCompleted: false, dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task003', title: 'Code Review - Payment Module', description: 'Check the latest changes on the feature/payment branch.', isCompleted: true, dueDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { id: 'task004', title: 'Contact Supplier X', description: 'Discuss new pricing terms.', isCompleted: false },
 ];

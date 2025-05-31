@@ -39,9 +39,9 @@ export default function OfficesPage() {
     setError(null);
     try {
       console.log("Attempting to fetch offices from service...");
-      const data = await fetchOffices();
-      console.log("Offices fetched:", data);
-      setOffices(data || []); 
+      const paginatedData = await fetchOffices(); // fetchOffices now returns PaginatedResult
+      console.log("Offices fetched:", paginatedData);
+      setOffices(paginatedData.items || []); 
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         toast({
@@ -69,7 +69,7 @@ export default function OfficesPage() {
 
   useEffect(() => {
     loadOffices();
-  }, [toast, router]);
+  }, []); // Removed toast and router from dependency array as loadOffices is stable
 
   const markers: MapMarkerData[] = useMemo(() => {
     if (!Array.isArray(offices)) return [];
@@ -89,31 +89,28 @@ export default function OfficesPage() {
         setMapCenter({ lat: markers[0].latitude, lng: markers[0].longitude });
         setMapZoom(10);
       } else {
-        // Calculate bounding box or average for multiple markers
         const avgLat = markers.reduce((sum, m) => sum + m.latitude, 0) / markers.length;
         const avgLng = markers.reduce((sum, m) => sum + m.longitude, 0) / markers.length;
         setMapCenter({ lat: avgLat, lng: avgLng });
-        setMapZoom(3); // Adjust zoom level as needed
+        setMapZoom(3); 
       }
     } else if (!isLoading && offices.length === 0) {
-        // Default center if no offices and not loading
         setMapCenter({ lat: 39.8283, lng: -98.5795 });
         setMapZoom(3);
     }
   }, [markers, isLoading, offices]);
 
   const handleAddOffice = async () => {
-    // For now, adds a predefined office. A form/modal would be needed for user input.
     const newOfficeData: AddOfficePayload = { 
         name: "New Branch " + Math.floor(Math.random() * 1000), 
         address: "123 Placeholder Ave, New City, NC " + Math.floor(Math.random() * 10000), 
-        latitude: 35.7596 + (Math.random() - 0.5) * 2, // Randomly around NC
+        latitude: 35.7596 + (Math.random() - 0.5) * 2, 
         longitude: -79.0193 + (Math.random() - 0.5) * 2, 
         headcount: Math.floor(Math.random() * 50) + 10 
     };
     try {
       const addedOffice = await addOffice(newOfficeData);
-      setOffices(prev => [...prev, addedOffice]); // Optimistic update, or re-fetch: await loadOffices();
+      setOffices(prev => [...prev, addedOffice]); 
       toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -131,21 +128,12 @@ export default function OfficesPage() {
   const handleEditOffice = async (officeId: string) => {
     console.log(`Placeholder: Open edit office dialog for ${officeId}`);
     alert(`Edit office ${officeId} - functionality to be fully implemented with a form/dialog.`);
-    // Example of API call if you had a form:
-    // const updatedData: UpdateOfficePayload = { name: "Updated Name", headcount: 100 }; // Get from form
-    // try {
-    //   const updated = await updateOffice(officeId, updatedData);
-    //   setOffices(prev => prev.map(o => o.id === officeId ? updated : o)); // Or await loadOffices();
-    //   toast({ title: "Office Updated" });
-    // } catch (err) {
-    //   // ... error handling ...
-    // }
   };
 
   const handleDeleteOffice = async (officeId: string) => {
       try {
         await deleteOffice(officeId);
-        setOffices(prev => prev.filter(off => off.id !== officeId)); // Optimistic update, or re-fetch: await loadOffices();
+        setOffices(prev => prev.filter(off => off.id !== officeId)); 
         toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
       } catch (err) {
         if (err instanceof UnauthorizedError) {

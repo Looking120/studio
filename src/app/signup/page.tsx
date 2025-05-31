@@ -43,8 +43,8 @@ export default function SignupPage() {
     if (!firstName || !lastName || !birthDateValue || !userName || !email || !password || !confirmPassword) {
       toast({
         variant: "destructive",
-        title: "Erreur d'Inscription",
-        description: "Veuillez remplir tous les champs obligatoires (Prénom, Nom, Date de naissance, Nom d'utilisateur, Email, Mot de passe).",
+        title: "Signup Error",
+        description: "Please fill all required fields (First Name, Last Name, Date of Birth, Username, Email, Password).",
       });
       setIsLoading(false);
       return;
@@ -53,14 +53,13 @@ export default function SignupPage() {
     if (password !== confirmPassword) {
       toast({
         variant: "destructive",
-        title: "Erreur d'Inscription",
-        description: "Les mots de passe ne correspondent pas.",
+        title: "Signup Error",
+        description: "Passwords do not match.",
       });
       setIsLoading(false);
       return;
     }
 
-    // Convert birthDate to ISO string format if it's just YYYY-MM-DD
     if (birthDateValue && birthDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
       birthDateValue = `${birthDateValue}T00:00:00.000Z`;
     }
@@ -72,7 +71,7 @@ export default function SignupPage() {
       email, 
       password,
       confirmPassword,
-      birthDate: birthDateValue, // Use the potentially transformed value
+      birthDate: birthDateValue, 
     };
     if (middleName) userData.middleName = middleName;
     if (phoneNumber) userData.phoneNumber = phoneNumber;
@@ -81,15 +80,15 @@ export default function SignupPage() {
       const response: SignUpResponse = await signUp(userData);
       
       toast({
-        title: "Inscription Réussie",
-        description: response.message || "Compte créé avec succès. Vous pouvez maintenant vous connecter.",
+        title: "Signup Successful",
+        description: response.message || "Account created successfully. You can now log in.",
       });
       router.push('/'); 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite lors de l'inscription.";
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred during signup.";
       toast({
         variant: "destructive",
-        title: "Échec de l'Inscription",
+        title: "Signup Failed",
         description: errorMessage,
       });
     } finally {
@@ -104,9 +103,9 @@ export default function SignupPage() {
            <div className="flex justify-center mb-6">
              <UserPlus className="h-12 w-12 text-primary drop-shadow-lg" />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight">Créer un Compte</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">Create Account</CardTitle>
           <CardDescription className="text-muted-foreground !mt-1">
-            Rejoignez EmployTrack aujourd'hui !
+            Join EmployTrack today!
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -114,7 +113,7 @@ export default function SignupPage() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="firstName">Prénom *</Label>
+                <Label htmlFor="firstName">First Name *</Label>
                 <Input 
                   id="firstName" 
                   name="firstName"
@@ -126,7 +125,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lastName">Nom de famille *</Label>
+                <Label htmlFor="lastName">Last Name *</Label>
                 <Input 
                   id="lastName" 
                   name="lastName"
@@ -141,7 +140,7 @@ export default function SignupPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="middleName">Deuxième prénom (Optionnel)</Label>
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
                 <Input 
                   id="middleName" 
                   name="middleName"
@@ -152,7 +151,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="birthDate">Date de Naissance *</Label>
+                <Label htmlFor="birthDate">Date of Birth *</Label>
                 <Input 
                   name="birthDate" 
                   id="birthDate" 
@@ -166,7 +165,7 @@ export default function SignupPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="userName">Nom d'utilisateur *</Label>
+                <Label htmlFor="userName">Username *</Label>
                 <Input 
                   id="userName" 
                   name="userName"
@@ -178,7 +177,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">Adresse Email *</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input 
                   id="email" 
                   name="email"
@@ -192,7 +191,7 @@ export default function SignupPage() {
             </div>
             
             <div className="grid gap-2">
-              <Label htmlFor="phoneNumber">Numéro de téléphone (Optionnel)</Label>
+              <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
               <Input 
                 id="phoneNumber" 
                 name="phoneNumber"
@@ -205,7 +204,7 @@ export default function SignupPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="password">Mot de passe *</Label>
+                <Label htmlFor="password">Password *</Label>
                 <Input 
                   id="password" 
                   name="password"
@@ -217,7 +216,7 @@ export default function SignupPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="confirmPassword">Confirmez le mot de passe *</Label>
+                <Label htmlFor="confirmPassword">Confirm Password *</Label>
                 <Input 
                   id="confirmPassword" 
                   name="confirmPassword"
@@ -232,12 +231,12 @@ export default function SignupPage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4 p-6 sm:p-8 pt-0">
             <Button className="w-full text-lg py-3 h-auto font-semibold" type="submit" disabled={isLoading}>
-              {isLoading ? "Création du compte..." : <><UserPlus className="mr-2 h-5 w-5" /> S'inscrire</>}
+              {isLoading ? "Creating account..." : <><UserPlus className="mr-2 h-5 w-5" /> Sign Up</>}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Vous avez déjà un compte?{" "}
+              Already have an account?{" "}
               <Link href="/" className="font-semibold text-primary hover:underline">
-                Connectez-vous ici
+                Sign in here
               </Link>
             </p>
           </CardFooter>

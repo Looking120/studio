@@ -7,11 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { User, Mail, Briefcase, Shield, Edit3, CalendarDays } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-// import { fetchUserById } from '@/services/user-service'; // Or a dedicated profile service
+// import { fetchUserById } from '@/services/user-service'; 
 // import { useToast } from '@/hooks/use-toast';
 
-// Placeholder: Assume we get the current user's ID from an auth context or similar
-const currentUserId = "user123"; // Replace with actual dynamic user ID
+const currentUserId = "user123"; 
 
 interface UserProfile {
   name: string;
@@ -20,7 +19,7 @@ interface UserProfile {
   role: string;
   avatarUrl: string;
   department: string;
-  joinDate: string; // Consider using Date object and formatting it
+  joinDate: string; 
 }
 
 export default function ProfilePage() {
@@ -31,24 +30,6 @@ export default function ProfilePage() {
   useEffect(() => {
     const loadUserProfile = async () => {
       setIsLoading(true);
-      // Example: Fetch user profile data
-      // try {
-      //   // const profileData = await fetchUserById(currentUserId); // Assuming fetchUserById returns UserProfile compatible data
-      //   // if (profileData) {
-      //   //   setUserProfile({
-      //   //       name: profileData.name,
-      //   //       email: profileData.email,
-      //   //       jobTitle: profileData.jobTitle || "N/A",
-      //   //       role: profileData.role || "N/A", // Assuming 'role' comes from user data
-      //   //       avatarUrl: profileData.avatarUrl || `https://placehold.co/120x120.png?text=${profileData.name.substring(0,2)}`,
-      //   //       department: profileData.department || "N/A",
-      //   //       joinDate: profileData.joinDate ? new Date(profileData.joinDate).toLocaleDateString() : "N/A" // Example formatting
-      //   //   });
-      //   // } else {
-      //   //    throw new Error("User profile not found.");
-      //   // }
-      //   console.log(`Placeholder: Would fetch profile for user ${currentUserId}`);
-      //   // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
         setUserProfile({
           name: "Alex Dubois", 
@@ -57,15 +38,8 @@ export default function ProfilePage() {
           role: "Team Lead", 
           avatarUrl: "https://placehold.co/120x120.png?text=AD", 
           department: "UX/UI Design", 
-          joinDate: "15 Mars 2021", 
+          joinDate: "March 15, 2021", 
         });
-      // } catch (error) {
-      //   console.error("Failed to load user profile:", error);
-      //   // toast({ variant: "destructive", title: "Error", description: "Could not load profile data." });
-      //   // Fallback or redirect
-      // } finally {
-      //   setIsLoading(false);
-      // }
       setIsLoading(false);
     };
 

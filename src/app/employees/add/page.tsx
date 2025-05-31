@@ -13,30 +13,26 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { hireEmployee, type HireEmployeePayload } from '@/services/employee-service'; // Updated import
+import { hireEmployee, type HireEmployeePayload } from '@/services/employee-service';
 
-// Adjusted Zod schema to align with HireEmployeePayload and backend entities
-// Note: For GUIDs (departmentId, positionId, officeId) and enums (gender),
-// the form will need proper select/radio components eventually.
 const employeeFormSchema = z.object({
-  firstName: z.string().min(2, { message: "Le prénom doit contenir au moins 2 caractères." }),
-  lastName: z.string().min(2, { message: "Le nom de famille doit contenir au moins 2 caractères." }),
+  firstName: z.string().min(2, { message: "First name must be at least 2 characters." }),
+  lastName: z.string().min(2, { message: "Last name must be at least 2 characters." }),
   middleName: z.string().optional(),
-  email: z.string().email({ message: "Veuillez entrer une adresse email valide." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
   
-  employeeNumber: z.string().min(1, { message: "Le numéro d'employé est requis."}),
-  address: z.string().min(5, { message: "L'adresse doit contenir au moins 5 caractères." }),
-  phoneNumber: z.string().min(5, { message: "Le numéro de téléphone est requis." }),
-  dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Date de naissance invalide."}), // Basic validation
-  gender: z.string().min(1, { message: "Le genre est requis (ex: Male, Female, Other)." }), // String as per new schema
-  hireDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Date d'embauche invalide."}),
+  employeeNumber: z.string().min(1, { message: "Employee number is required."}),
+  address: z.string().min(5, { message: "Address must be at least 5 characters." }),
+  phoneNumber: z.string().min(5, { message: "Phone number is required." }),
+  dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid date of birth."}), 
+  gender: z.string().min(1, { message: "Gender is required (e.g., Male, Female, Other)." }), 
+  hireDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid hire date."}),
   
-  departmentId: z.string().uuid({ message: "L'ID du département doit être un GUID valide." }), // Expecting GUID
-  positionId: z.string().uuid({ message: "L'ID du poste doit être un GUID valide." }),     // Expecting GUID
-  officeId: z.string().uuid({ message: "L'ID du bureau doit être un GUID valide." }),       // Expecting GUID
+  departmentId: z.string().uuid({ message: "Department ID must be a valid GUID." }), 
+  positionId: z.string().uuid({ message: "Position ID must be a valid GUID." }),     
+  officeId: z.string().uuid({ message: "Office ID must be a valid GUID." }),       
 
-  avatarUrl: z.string().url({ message: "Veuillez entrer une URL valide pour l'avatar." }).optional().or(z.literal('')),
-  // userId is optional in HireEmployeePayload, not typically set in this form for a *new* employee
+  avatarUrl: z.string().url({ message: "Please enter a valid URL for the avatar." }).optional().or(z.literal('')),
 });
 
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -52,15 +48,15 @@ export default function AddEmployeePage() {
       lastName: '',
       middleName: '',
       email: '',
-      employeeNumber: `EMP-${Math.floor(1000 + Math.random() * 9000)}`, // Example placeholder
+      employeeNumber: `EMP-${Math.floor(1000 + Math.random() * 9000)}`, 
       address: '',
       phoneNumber: '',
       dateOfBirth: '', 
-      gender: '', // Will need a select/radio for Male, Female, Other
-      hireDate: new Date().toISOString().split('T')[0], // Default to today
-      departmentId: '', // Placeholder, should be a select returning GUID
-      positionId: '',   // Placeholder, should be a select returning GUID
-      officeId: '',     // Placeholder, should be a select returning GUID
+      gender: '', 
+      hireDate: new Date().toISOString().split('T')[0], 
+      departmentId: '', 
+      positionId: '',   
+      officeId: '',     
       avatarUrl: '',
     },
   });
@@ -78,14 +74,13 @@ export default function AddEmployeePage() {
         employeeNumber: data.employeeNumber,
         address: data.address,
         phoneNumber: data.phoneNumber,
-        dateOfBirth: new Date(data.dateOfBirth).toISOString(), // Ensure ISO format
-        gender: data.gender, // Expecting "Male", "Female", "Other"
-        hireDate: new Date(data.hireDate).toISOString(),   // Ensure ISO format
+        dateOfBirth: new Date(data.dateOfBirth).toISOString(), 
+        gender: data.gender, 
+        hireDate: new Date(data.hireDate).toISOString(),   
         
-        departmentId: data.departmentId, // Expecting GUID from form
-        positionId: data.positionId,     // Expecting GUID from form
-        officeId: data.officeId,         // Expecting GUID from form
-        // userId: undefined, // Not typically set when creating a new employee this way
+        departmentId: data.departmentId, 
+        positionId: data.positionId,     
+        officeId: data.officeId,         
       };
 
       console.log("Submitting payload for hireEmployee:", payload);
@@ -93,17 +88,17 @@ export default function AddEmployeePage() {
       console.log('Employee data saved via service:', newEmployee);
 
       toast({
-        title: "Employé Ajouté",
-        description: `${newEmployee.firstName} ${newEmployee.lastName} a été ajouté avec succès.`,
+        title: "Employee Added",
+        description: `${newEmployee.firstName} ${newEmployee.lastName} has been added successfully.`,
       });
       form.reset();
       router.push('/employees');
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue s'est produite lors de l'ajout de l'employé.";
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while adding the employee.";
         toast({
             variant: "destructive",
-            title: "Erreur d'Ajout",
-            description: `Impossible d'ajouter l'employé. ${errorMessage}`
+            title: "Add Error",
+            description: `Could not add employee. ${errorMessage}`
         });
         console.error("Failed to add employee:", error);
     }
@@ -114,17 +109,17 @@ export default function AddEmployeePage() {
       <Card className="shadow-xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl">Ajouter un Nouvel Employé</CardTitle>
+            <CardTitle className="text-2xl">Add New Employee</CardTitle>
             <Button variant="outline" size="sm" asChild>
               <Link href="/employees">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Retour à la liste
+                Back to list
               </Link>
             </Button>
           </div>
           <CardDescription>
-            Remplissez les informations ci-dessous pour ajouter un nouvel employé au système.
-            Les champs marqués d'un * sont obligatoires.
+            Fill in the information below to add a new employee to the system.
+            Fields marked with * are required.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -136,9 +131,9 @@ export default function AddEmployeePage() {
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prénom *</FormLabel>
+                      <FormLabel>First Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Jean" {...field} />
+                        <Input placeholder="Ex: John" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -149,9 +144,9 @@ export default function AddEmployeePage() {
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nom de famille *</FormLabel>
+                      <FormLabel>Last Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Dupont" {...field} />
+                        <Input placeholder="Ex: Doe" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -163,7 +158,7 @@ export default function AddEmployeePage() {
                 name="middleName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Deuxième prénom (Optionnel)</FormLabel>
+                    <FormLabel>Middle Name (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Charles" {...field} />
                     </FormControl>
@@ -176,9 +171,9 @@ export default function AddEmployeePage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse Email *</FormLabel>
+                    <FormLabel>Email Address *</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="Ex: jean.dupont@example.com" {...field} />
+                      <Input type="email" placeholder="Ex: john.doe@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,7 +185,7 @@ export default function AddEmployeePage() {
                   name="employeeNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Numéro d'employé *</FormLabel>
+                      <FormLabel>Employee Number *</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: EMP001" {...field} />
                       </FormControl>
@@ -203,7 +198,7 @@ export default function AddEmployeePage() {
                   name="phoneNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Numéro de téléphone *</FormLabel>
+                      <FormLabel>Phone Number *</FormLabel>
                       <FormControl>
                         <Input type="tel" placeholder="Ex: 555-0100" {...field} />
                       </FormControl>
@@ -217,9 +212,9 @@ export default function AddEmployeePage() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Adresse complète *</FormLabel>
+                    <FormLabel>Full Address *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: 123 Rue Principale, Ville, Pays" {...field} />
+                      <Input placeholder="Ex: 123 Main Street, City, Country" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -231,7 +226,7 @@ export default function AddEmployeePage() {
                   name="dateOfBirth"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date de naissance *</FormLabel>
+                      <FormLabel>Date of Birth *</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -244,9 +239,8 @@ export default function AddEmployeePage() {
                   name="gender"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Genre * (Ex: Male, Female, Other)</FormLabel>
+                      <FormLabel>Gender * (Ex: Male, Female, Other)</FormLabel>
                       <FormControl>
-                         {/* TODO: Replace with Select component for Male, Female, Other */}
                         <Input placeholder="Ex: Male" {...field} />
                       </FormControl>
                       <FormMessage />
@@ -258,7 +252,7 @@ export default function AddEmployeePage() {
                   name="hireDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date d'embauche *</FormLabel>
+                      <FormLabel>Hire Date *</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -268,16 +262,16 @@ export default function AddEmployeePage() {
                 />
               </div>
               
-              <p className="text-sm text-muted-foreground pt-2">IDs Organisationnels (UUID/GUID attendus) - TODO: Remplacer par des sélecteurs</p>
+              <p className="text-sm text-muted-foreground pt-2">Organizational IDs (UUID/GUID expected) - Placeholder, will be replaced by selectors</p>
               <div className="grid md:grid-cols-3 gap-4">
                  <FormField
                   control={form.control}
                   name="departmentId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID Département *</FormLabel>
+                      <FormLabel>Department ID *</FormLabel>
                       <FormControl>
-                        <Input placeholder="GUID Département" {...field} />
+                        <Input placeholder="Department GUID" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -288,9 +282,9 @@ export default function AddEmployeePage() {
                   name="positionId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID Poste *</FormLabel>
+                      <FormLabel>Position ID *</FormLabel>
                       <FormControl>
-                        <Input placeholder="GUID Poste" {...field} />
+                        <Input placeholder="Position GUID" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -301,9 +295,9 @@ export default function AddEmployeePage() {
                   name="officeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ID Bureau *</FormLabel>
+                      <FormLabel>Office ID *</FormLabel>
                       <FormControl>
-                        <Input placeholder="GUID Bureau" {...field} />
+                        <Input placeholder="Office GUID" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -316,7 +310,7 @@ export default function AddEmployeePage() {
                 name="avatarUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>URL de l'Avatar (Optionnel)</FormLabel>
+                    <FormLabel>Avatar URL (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="https://example.com/avatar.png" {...field} />
                     </FormControl>
@@ -327,7 +321,7 @@ export default function AddEmployeePage() {
             </CardContent>
             <CardFooter className="flex justify-end pt-6">
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Ajout en cours..." : "Ajouter l'Employé"}
+                {form.formState.isSubmitting ? "Adding..." : "Add Employee"}
               </Button>
             </CardFooter>
           </form>
@@ -336,4 +330,3 @@ export default function AddEmployeePage() {
     </div>
   );
 }
-

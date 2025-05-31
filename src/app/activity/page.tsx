@@ -21,14 +21,11 @@ const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
   try {
     const date = new Date(dateString);
-    // Check if the date is valid. Date.parse returns NaN for invalid dates,
-    // and new Date(invalid_string) results in 'Invalid Date' whose getTime() is NaN.
     if (isNaN(date.getTime())) {
-      // Attempt to parse as YYYY-MM-DD if it's just a date part
       const parts = dateString.split('T')[0].split('-');
       if (parts.length === 3) {
         const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+        const month = parseInt(parts[1], 10) - 1;
         const day = parseInt(parts[2], 10);
         const potentiallyValidDate = new Date(year, month, day);
         if (!isNaN(potentiallyValidDate.getTime())) {
@@ -41,7 +38,7 @@ const formatDate = (dateString?: string | null) => {
     return format(date, 'MMM d, yyyy, h:mm a');
   } catch (error) {
     console.error("Error formatting date:", dateString, error);
-    return 'Invalid Date'; // Or 'N/A' or some other placeholder
+    return 'Invalid Date';
   }
 };
 
@@ -60,16 +57,13 @@ export default function ActivityLogsPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        console.log("Attempting to fetch activity logs for a specific employee...");
         // TODO: Implement a way to select an employeeId dynamically
-        // For now, using a hardcoded employeeId and a default date range
-        const employeeId = "emp001"; // Placeholder - replace with dynamic selection or from context/props
+        const employeeId = "emp001"; // Placeholder
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(endDate.getDate() - 7); // Fetch logs for the last 7 days
 
         const data = await fetchActivityLogsByEmployee(employeeId, startDate.toISOString(), endDate.toISOString());
-        console.log("Activity logs fetched for employee:", employeeId, data);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         let errorMessage = 'An unknown error occurred while fetching activity logs.';
@@ -81,7 +75,7 @@ export default function ActivityLogsPage() {
           });
           await signOut();
           router.push('/');
-          return; // Important to prevent further processing
+          return; 
         } else if (err instanceof HttpError) {
           errorMessage = err.message;
           if (err.status === 400) {
@@ -124,7 +118,7 @@ export default function ActivityLogsPage() {
     .sort((a, b) => {
         const dateA = a.startTime ? new Date(a.startTime).getTime() : 0;
         const dateB = b.startTime ? new Date(b.startTime).getTime() : 0;
-        return dateB - dateA; // Sort descending by start time
+        return dateB - dateA; 
     });
   }, [activityLogs, searchTerm, activityFilter]);
 
@@ -204,24 +198,7 @@ export default function ActivityLogsPage() {
                 ) : (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            log.activityType?.toLowerCase().includes('checked in') ? 'default' :
-                            log.activityType?.toLowerCase().includes('checked out') ? 'secondary' :
-                            log.activityType?.toLowerCase().includes('break') ? 'outline' :
-                            'outline'
-                          }
-                        >
-                          {log.activityType || 'N/A'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{log.description || 'N/A'}</TableCell>
-                      <TableCell>{log.location || 'N/A'}</TableCell>
-                      <TableCell>{formatDate(log.startTime)}</TableCell>
-                      <TableCell>{formatDate(log.endTime)}</TableCell>
-                    </TableRow>
+                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell><TableCell><Badge variant={ log.activityType?.toLowerCase().includes('checked in') ? 'default' : log.activityType?.toLowerCase().includes('checked out') ? 'secondary' : log.activityType?.toLowerCase().includes('break') ? 'outline' : 'outline' }>{log.activityType || 'N/A'}</Badge></TableCell><TableCell>{log.description || 'N/A'}</TableCell><TableCell>{log.location || 'N/A'}</TableCell><TableCell>{formatDate(log.startTime)}</TableCell><TableCell>{formatDate(log.endTime)}</TableCell></TableRow>
                   ))
                 )}
               </TableBody>

@@ -1,9 +1,8 @@
 
 // src/services/organization-service.ts
-import type { Office as FrontendOffice } from '@/lib/data'; // Renamed to avoid conflict
+import type { Office as FrontendOffice } from '@/lib/data'; 
 import { apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
 
-// --- Common Paginated Result Type ---
 export interface PaginatedResult<T> {
   items: T[];
   totalCount: number;
@@ -14,27 +13,25 @@ export interface PaginatedResult<T> {
   hasPreviousPage?: boolean;
 }
 
-// --- Office Related Types ---
 interface ApiOfficeDto {
   id: string;
   name: string;
   address: string;
-  latitude: number;  // Assuming direct properties now
-  longitude: number; // Assuming direct properties now
+  latitude: number;  
+  longitude: number; 
   headcount: number;
-  // center?: { y: number, x: number }; // If backend uses NetTopologySuite Point for center
-  radius?: number; // From your C# service for UpdateOfficeAsync
-  description?: string; // From your C# service for UpdateOfficeAsync
+  radius?: number; 
+  description?: string; 
 }
 
-export interface AddOfficePayload { // Maps to OfficeCreateRequest
+export interface AddOfficePayload { 
   name: string;
   address: string;
   latitude: number;
   longitude: number;
-  headcount: number; // Ensure this is part of your OfficeCreateRequest DTO if used
+  headcount: number; 
 }
-export interface UpdateOfficePayload { // Maps to OfficeUpdateRequest
+export interface UpdateOfficePayload { 
   name?: string;
   address?: string;
   latitude?: number;
@@ -48,26 +45,25 @@ const mapApiOfficeToFrontend = (dto: ApiOfficeDto): FrontendOffice => ({
   id: dto.id,
   name: dto.name,
   address: dto.address,
-  latitude: dto.latitude,  // Using direct properties
-  longitude: dto.longitude, // Using direct properties
+  latitude: dto.latitude,  
+  longitude: dto.longitude, 
   headcount: dto.headcount,
 });
 
-// --- Department Related Types ---
 interface ApiDepartmentDto {
   id: string;
   name: string;
   employeeCount?: number;
 }
-export interface Department { // Frontend Department type
+export interface Department { 
   id: string;
   name: string;
   employeeCount?: number;
 }
-export interface AddDepartmentPayload { // Maps to DepartmentCreateRequest
+export interface AddDepartmentPayload { 
   name: string;
 }
-export interface UpdateDepartmentPayload { // For PUT /api/organization/departments/{id}
+export interface UpdateDepartmentPayload { 
   name: string;
 }
 
@@ -77,7 +73,6 @@ const mapApiDepartmentToFrontend = (dto: ApiDepartmentDto): Department => ({
   employeeCount: dto.employeeCount,
 });
 
-// --- Position Related Types ---
 interface ApiPositionDto {
   id: string;
   title: string;
@@ -85,21 +80,20 @@ interface ApiPositionDto {
   departmentName?: string;
   assignedEmployees?: number;
 }
-export interface Position { // Frontend Position type
+export interface Position { 
   id: string;
   title: string;
   departmentId?: string;
   departmentName?: string;
   assignedEmployees?: number;
 }
-export interface AddPositionPayload { // Maps to PositionCreateRequest
+export interface AddPositionPayload { 
   title: string;
   departmentId?: string;
 }
-export interface AssignPositionPayload { // For PUT /api/organization/positions/{positionId}/assign
-  // Define what your backend /assign endpoint expects. E.g., employeeId or departmentId
-  employeeId?: string; // If assigning an employee to this position
-  departmentId?: string; // If assigning this position to a department (as per your C# service)
+export interface AssignPositionPayload { 
+  employeeId?: string; 
+  departmentId?: string; 
 }
 
 const mapApiPositionToFrontend = (dto: ApiPositionDto): Position => ({
@@ -109,9 +103,6 @@ const mapApiPositionToFrontend = (dto: ApiPositionDto): Position => ({
   departmentName: dto.departmentName,
   assignedEmployees: dto.assignedEmployees,
 });
-
-
-// --- Office Endpoints ---
 
 export async function addOffice(officeData: AddOfficePayload): Promise<FrontendOffice> {
   console.log('API CALL: POST /api/organization/offices. Data:', officeData);
@@ -125,7 +116,7 @@ export async function addOffice(officeData: AddOfficePayload): Promise<FrontendO
   } catch (error) {
     console.error('Error adding office:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to add office. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to add office. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to add office.");
   }
 }
 
@@ -141,7 +132,7 @@ export async function fetchOffices(): Promise<PaginatedResult<FrontendOffice>> {
   } catch (error) {
     console.error('Error fetching offices:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch offices. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to fetch offices. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to fetch offices.");
   }
 }
 
@@ -156,7 +147,7 @@ export async function fetchOfficeById(officeId: string): Promise<FrontendOffice 
   } catch (error) {
     console.error(`Error fetching office by ID ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch office by ID ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to fetch office by ID ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to fetch office by ID ${officeId}.`);
   }
 }
 
@@ -175,7 +166,7 @@ export async function updateOffice(officeId: string, officeData: UpdateOfficePay
     if (error instanceof HttpError && error.status === 404) {
       throw new HttpError(`Update failed: The endpoint to update office ${officeId} (PUT /api/organization/offices/${officeId}) was not found on the server (404). Please ensure this endpoint exists.`, 404, error.responseText);
     }
-    throw new HttpError(`Failed to update office ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to update office ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to update office ${officeId}.`);
   }
 }
 
@@ -194,19 +185,17 @@ export async function deleteOffice(officeId: string): Promise<{ success: boolean
       }
       return { success: true, message: 'Office deleted successfully.' };
     }
-    await parseJsonResponse<any>(response); // This will throw for non-OK if not handled above
-    throw new HttpError(`Unexpected error deleting office ${officeId}`, response.status, await response.text()); // Fallback
+    await parseJsonResponse<any>(response); 
+    throw new HttpError(`Unexpected error deleting office ${officeId}`, response.status, await response.text()); 
   } catch (error) {
     console.error(`Error deleting office ${officeId}:`, error);
     if (error instanceof UnauthorizedError) throw error;
     if (error instanceof HttpError && error.status === 404) {
       throw new HttpError(`Delete failed: The endpoint to delete office ${officeId} (DELETE /api/organization/offices/${officeId}) was not found on the server (404). Please ensure this endpoint exists.`, 404, error.responseText);
     }
-    throw new HttpError(`Failed to delete office ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to delete office ${officeId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to delete office ${officeId}.`);
   }
 }
-
-// --- Department Endpoints ---
 
 export async function addDepartment(departmentData: AddDepartmentPayload): Promise<Department> {
   console.log('API CALL: POST /api/organization/departments. Data:', departmentData);
@@ -220,7 +209,7 @@ export async function addDepartment(departmentData: AddDepartmentPayload): Promi
   } catch (error) {
     console.error('Error adding department:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to add department. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to add department. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to add department.");
   }
 }
 
@@ -233,13 +222,12 @@ export async function fetchDepartments(): Promise<Department[]> {
   } catch (error) {
     console.error('Error fetching departments:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch departments. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to fetch departments. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to fetch departments.");
   }
 }
 
 export async function updateDepartment(departmentId: string, departmentData: UpdateDepartmentPayload): Promise<Department> {
   console.log(`API CALL: PUT /api/organization/departments/${departmentId}. Data:`, departmentData);
-  // IMPORTANT: Your API endpoint list does not specify a PUT for departments. This will likely 404.
   try {
     const response = await apiClient(`/organization/departments/${departmentId}`, {
       method: 'PUT',
@@ -253,20 +241,18 @@ export async function updateDepartment(departmentId: string, departmentData: Upd
     if (error instanceof HttpError && error.status === 404) {
       throw new HttpError(`Update failed: The department update endpoint (PUT /api/organization/departments/${departmentId}) was not found on the server (404). Please ensure this endpoint is available on the backend.`, 404, error.responseText);
     }
-    throw new HttpError(`Failed to update department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to update department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to update department ${departmentId}.`);
   }
 }
 
 export async function deleteDepartment(departmentId: string): Promise<{ success: boolean; message?: string }> {
   console.log(`API CALL: DELETE /api/organization/departments/${departmentId}.`);
-  // IMPORTANT: Your API endpoint list does not specify a DELETE for departments. This will likely 404.
   try {
     const response = await apiClient(`/organization/departments/${departmentId}`, {
       method: 'DELETE',
     });
     if (response.ok) {
       if (response.status === 204) return { success: true, message: 'Department deleted successfully.' };
-      // Try to parse if there's a body for other OK statuses
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json") && response.body) {
           const result = await response.json().catch(() => null) as { success: boolean; message?: string } | null;
@@ -274,9 +260,7 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
       }
       return { success: true, message: 'Department deleted successfully.' };
     }
-    // If response is not OK, parseJsonResponse will throw a detailed HttpError
     await parseJsonResponse<any>(response);
-    // Fallback, should not be reached if parseJsonResponse throws as expected.
     throw new HttpError(`Unexpected error deleting department ${departmentId}`, response.status, await response.text());
   } catch (error) {
     console.error(`Error deleting department ${departmentId}:`, error);
@@ -284,12 +268,9 @@ export async function deleteDepartment(departmentId: string): Promise<{ success:
     if (error instanceof HttpError && error.status === 404) {
       throw new HttpError(`Delete failed: The department delete endpoint (DELETE /api/organization/departments/${departmentId}) was not found on the server (404). Please ensure this endpoint is available on the backend.`, 404, error.responseText);
     }
-    throw new HttpError(`Failed to delete department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to delete department ${departmentId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to delete department ${departmentId}.`);
   }
 }
-
-
-// --- Position Endpoints ---
 
 export async function addPosition(positionData: AddPositionPayload): Promise<Position> {
   console.log('API CALL: POST /api/organization/positions. Data:', positionData);
@@ -303,7 +284,7 @@ export async function addPosition(positionData: AddPositionPayload): Promise<Pos
   } catch (error) {
     console.error('Error adding position:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to add position. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to add position. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to add position.");
   }
 }
 
@@ -316,14 +297,12 @@ export async function fetchPositions(): Promise<Position[]> {
   } catch (error) {
     console.error('Error fetching positions:', error);
     if (error instanceof UnauthorizedError) throw error;
-    throw new HttpError(`Failed to fetch positions. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to fetch positions. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "Failed to fetch positions.");
   }
 }
 
 export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<any> {
   console.log(`API CALL: PUT /api/organization/positions/${positionId}/assign. Data:`, assignmentData);
-  // Your C# service has AssignPositionToDepartmentAsync. Ensure this endpoint matches that intent,
-  // or if it's for assigning an employee to a position, the backend logic needs to exist.
   try {
     const response = await apiClient(`/organization/positions/${positionId}/assign`, {
       method: 'PUT',
@@ -336,6 +315,6 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
     if (error instanceof HttpError && error.status === 404) {
       throw new HttpError(`Assign position failed: The endpoint (PUT /api/organization/positions/${positionId}/assign) was not found on the server (404).`, 404, error.responseText);
     }
-    throw new HttpError(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : "");
+    throw new HttpError(`Failed to assign position ${positionId}. ${error instanceof Error ? error.message : String(error)}`, error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.responseText : `Failed to assign position ${positionId}.`);
   }
 }

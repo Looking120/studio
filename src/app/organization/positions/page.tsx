@@ -42,7 +42,6 @@ export default function PositionsPage() {
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newPositionTitle, setNewPositionTitle] = useState("");
-  // const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined);
 
   const loadPositions = async () => {
     setIsLoading(true);
@@ -79,14 +78,12 @@ export default function PositionsPage() {
     }
     const payload: AddPositionPayload = {
         title: newPositionTitle.trim(),
-        // departmentId: selectedDepartmentId
     };
     try {
       const newPosition = await addPosition(payload);
       setPositions(prev => [...prev, newPosition]);
       toast({ title: "Position Added", description: `${newPosition.title} was successfully added.` });
       setNewPositionTitle("");
-      // setSelectedDepartmentId(undefined);
       setShowAddDialog(false);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -109,33 +106,11 @@ export default function PositionsPage() {
   const handleDeletePositionConfirm = async (positionId: string) => {
      console.log(`Placeholder: Delete position ${positionId}.`);
      alert(`Delete position ${positionId} - functionality to be implemented.`);
-     // Example:
-     // try {
-     //   await deletePosition(positionId); // Assuming deletePosition service function exists
-     //   setPositions(prev => prev.filter(p => p.id !== positionId));
-     //   toast({ title: "Position Deleted" });
-     // } catch (err) {
-     //   if (err instanceof UnauthorizedError) { /* ... */ }
-     //   toast({ variant: "destructive", title: "Delete Failed", description: err.message });
-     // }
   };
 
   const handleAssignPosition = (pos: Position) => {
     console.log(`Placeholder: Open assign employee to position ${pos.title} dialog.`);
     alert(`Assign employee to ${pos.title} - functionality to be implemented with a form/dialog.`);
-    // Example:
-    // const employeeIdToAssign = prompt(`Enter Employee ID to assign to ${pos.title}:`);
-    // if (employeeIdToAssign) {
-    //   const payload: AssignPositionPayload = { employeeId: employeeIdToAssign };
-    //   try {
-    //     await assignPositionToEmployee(pos.id, payload);
-    //     toast({ title: "Position Assigned" });
-    //     loadPositions(); // Refresh data
-    //   } catch (err) {
-    //      if (err instanceof UnauthorizedError) { /* ... */ }
-    //      toast({ variant: "destructive", title: "Assign Failed", description: err.message });
-    //   }
-    // }
   };
 
   return (
@@ -168,11 +143,9 @@ export default function PositionsPage() {
                             onChange={(e) => setNewPositionTitle(e.target.value)}
                         />
                     </div>
-                    {/* TODO: Add Select component here to choose departmentId from fetched departments */}
-                    {/* <Select onValueChange={setSelectedDepartmentId} value={selectedDepartmentId}> ... </Select> */}
                 </div>
                 <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => { setNewPositionTitle(""); /* setSelectedDepartmentId(undefined); */ }}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel onClick={() => { setNewPositionTitle(""); }}>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -272,5 +245,3 @@ export default function PositionsPage() {
     </Card>
   );
 }
-
-    

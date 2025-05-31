@@ -14,7 +14,6 @@ import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 
-// Define interfaces for processed data to avoid hydration issues
 interface ProcessedActivityLog extends ActivityLog {
   displayTime: string;
 }
@@ -40,16 +39,14 @@ export default function DashboardPage() {
   const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true);
   const { toast } = useToast();
 
-  // State for client-side processed data
   const [processedActivityLogs, setProcessedActivityLogs] = useState<ProcessedActivityLog[]>([]);
   const [processedEmployeeTasks, setProcessedEmployeeTasks] = useState<ProcessedTask[]>([]);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true); // Indicate component has mounted on client
+    setIsClient(true); 
   }, []);
 
-  // Effect for processing recent activity logs (for admin dashboard)
   useEffect(() => {
     if (isClient) {
       const processed = mockActivityLogs.slice(0, 5).map(log => ({
@@ -58,21 +55,19 @@ export default function DashboardPage() {
       }));
       setProcessedActivityLogs(processed);
     }
-  }, [isClient]); // Depends on isClient to ensure it runs client-side
+  }, [isClient]); 
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     try {
-      // This function is now only called within useEffect or event handlers on the client
       return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     } catch {
       return '';
     }
   };
   
-  // Effect for fetching and processing employee-specific data (for mobile employee dashboard)
   useEffect(() => {
-    if (isClient) { // Ensure localStorage access is client-side only
+    if (isClient) { 
       const roleFromStorage = localStorage.getItem('userRole');
       const emailFromStorage = localStorage.getItem('userEmail');
       setUserRole(roleFromStorage);
@@ -88,8 +83,7 @@ export default function DashboardPage() {
           }
           fetchTasksForEmployee(employee.id)
             .then(tasks => {
-              setEmployeeTasks(tasks); // Original tasks
-              // Process tasks for display (client-side)
+              setEmployeeTasks(tasks); 
               const processed = tasks.map(task => ({
                 ...task,
                 displayDueDate: formatDate(task.dueDate),
@@ -99,23 +93,22 @@ export default function DashboardPage() {
             })
             .catch(err => {
               console.error("Failed to fetch tasks:", err);
-              toast({ variant: "destructive", title: "Erreur Tâches", description: "Impossible de charger les tâches."});
+              toast({ variant: "destructive", title: "Error Loading Tasks", description: "Could not load tasks."});
             })
             .finally(() => setIsLoadingEmployeeData(false));
         } else {
           setIsLoadingEmployeeData(false);
         }
       } else {
-        setIsLoadingEmployeeData(false); // Not mobile employee or no role/email
+        setIsLoadingEmployeeData(false); 
       }
     }
-  }, [isMobile, toast, isClient]); // Added isClient dependency
+  }, [isMobile, toast, isClient]); 
 
   const handleTaskStatusChange = async (taskId: string, isCompleted: boolean) => {
     const originalTasks = [...employeeTasks];
     const originalProcessedTasks = [...processedEmployeeTasks];
 
-    // Optimistic update for UI
     setEmployeeTasks(prevTasks => 
       prevTasks.map(task => task.id === taskId ? { ...task, isCompleted } : task)
     );
@@ -125,18 +118,16 @@ export default function DashboardPage() {
 
     try {
       await updateTaskStatus(taskId, isCompleted);
-      toast({ title: "Tâche mise à jour", description: `La tâche a été marquée comme ${isCompleted ? 'complétée' : 'non complétée'}.`});
-      // Optionally re-fetch or re-process if backend returns updated task
+      toast({ title: "Task Updated", description: `Task has been marked as ${isCompleted ? 'completed' : 'incomplete'}.`});
     } catch (error) {
       console.error("Failed to update task status:", error);
-      toast({ variant: "destructive", title: "Erreur", description: "Impossible de mettre à jour la tâche."});
-      setEmployeeTasks(originalTasks); // Revert optimistic update
+      toast({ variant: "destructive", title: "Error", description: "Could not update task."});
+      setEmployeeTasks(originalTasks); 
       setProcessedEmployeeTasks(originalProcessedTasks);
     }
   };
   
-
-  if (!isClient) { // Render skeletons or minimal content on server / before client mount
+  if (!isClient) { 
     return (
       <div className="space-y-6 p-4 animate-pulse">
         <Skeleton className="h-24 w-full" />
@@ -148,9 +139,7 @@ export default function DashboardPage() {
     );
   }
 
-
   if (isMobile && userRole && !userRole.toLowerCase().includes('admin')) {
-    // Employee Mobile Dashboard
     if (isLoadingEmployeeData) {
       return (
         <div className="space-y-6 p-2 sm:p-4 animate-pulse">
@@ -173,12 +162,12 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-6 p-2 sm:p-4">
-        <h1 className="text-2xl font-semibold text-foreground">Tableau de Bord Employé</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Employee Dashboard</h1>
         
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
-              <Briefcase className="h-5 w-5 text-primary" /> Mes Tâches
+              <Briefcase className="h-5 w-5 text-primary" /> My Tasks
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -192,7 +181,7 @@ export default function DashboardPage() {
                         checked={task.isCompleted}
                         onCheckedChange={(checked) => handleTaskStatusChange(task.id, !!checked)}
                         className="mt-1 flex-shrink-0"
-                        aria-label={`Marquer la tâche ${task.title} comme ${task.isCompleted ? 'non complétée' : 'complétée'}`}
+                        aria-label={`Mark task ${task.title} as ${task.isCompleted ? 'incomplete' : 'complete'}`}
                       />
                       <div className="flex-grow">
                         <label htmlFor={`task-${task.id}`} className={`font-medium text-sm ${task.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -210,7 +199,7 @@ export default function DashboardPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">Aucune tâche assignée pour le moment.</p>
+              <p className="text-sm text-muted-foreground">No tasks assigned at the moment.</p>
             )}
           </CardContent>
         </Card>
@@ -218,7 +207,7 @@ export default function DashboardPage() {
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
-              <Home className="h-5 w-5 text-primary" /> Mon Lieu de Travail
+              <Home className="h-5 w-5 text-primary" /> My Workplace
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -228,9 +217,9 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">{assignedOffice.address}</p>
               </>
             ) : currentEmployee ? (
-              <p className="text-sm text-muted-foreground">Aucun bureau principal assigné. Contactez votre administrateur.</p>
+              <p className="text-sm text-muted-foreground">No primary office assigned. Contact your administrator.</p>
             ) : (
-               <p className="text-sm text-muted-foreground">Informations sur l'employé non disponibles.</p>
+               <p className="text-sm text-muted-foreground">Employee information not available.</p>
             )}
           </CardContent>
         </Card>
@@ -238,7 +227,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Default Dashboard (Admin or Desktop Employee - though desktop employee should be redirected by AppClientLayout)
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -269,7 +257,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {processedActivityLogs.length === 0 && !isLoadingEmployeeData && ( // isLoadingEmployeeData is not relevant here
+            {processedActivityLogs.length === 0 && !isLoadingEmployeeData && ( 
                  Array.from({ length: 3 }).map((_, index) => (
                     <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
                         <div>
@@ -317,4 +305,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

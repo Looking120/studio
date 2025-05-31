@@ -12,10 +12,9 @@ import { Label } from "@/components/ui/label";
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Helper to generate a slightly different coordinate
 const randomizeCoordinates = (lat: number, lng: number) => {
   return {
-    lat: lat + (Math.random() - 0.5) * 0.002, // Approx +/- 200m
+    lat: lat + (Math.random() - 0.5) * 0.002, 
     lng: lng + (Math.random() - 0.5) * 0.002,
   };
 };
@@ -25,7 +24,7 @@ export default function LocationsPage() {
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees.filter(e => e.latitude && e.longitude));
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [isSimulating, setIsSimulating] = useState(true);
-  const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 }); // Default to LA
+  const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 }); 
   const [mapZoom, setMapZoom] = useState(12);
 
 
@@ -42,7 +41,7 @@ export default function LocationsPage() {
             return emp;
           })
         );
-      }, 5000); // Update every 5 seconds
+      }, 5000); 
     }
     return () => clearInterval(intervalId);
   }, [isSimulating]);
@@ -71,20 +70,19 @@ export default function LocationsPage() {
 
   useEffect(() => {
     if (markers.length > 0) {
-      // Calculate the average coordinates to center the map
       const avgLat = markers.reduce((sum, m) => sum + m.latitude, 0) / markers.length;
       const avgLng = markers.reduce((sum, m) => sum + m.longitude, 0) / markers.length;
       setMapCenter({ lat: avgLat, lng: avgLng });
-      setMapZoom(markers.length === 1 ? 13 : 11); // Zoom in more if only one marker
+      setMapZoom(markers.length === 1 ? 13 : 11); 
     } else {
-      setMapCenter({ lat: 34.0522, lng: -118.2437 }); // Default LA
+      setMapCenter({ lat: 34.0522, lng: -118.2437 }); 
       setMapZoom(12);
     }
   }, [markers]);
 
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> {/* Adjusted height slightly */}
+    <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <CardTitle>Employee Live Locations</CardTitle>

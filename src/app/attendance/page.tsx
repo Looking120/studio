@@ -5,14 +5,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { mockEmployees, mockActivityLogs, Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button"; // Added Button
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays, LogIn, LogOut, FileText } from 'lucide-react'; // Added icons
-import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { BarChart, Users, Clock, CheckCircle, XCircle, CalendarDays, LogIn, LogOut, FileText } from 'lucide-react';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
-// import { checkIn, checkOut, getAttendanceReport } from '@/services/attendance-service'; // Import attendance service
-// import { useToast } from '@/hooks/use-toast'; // For notifications
+// import { checkIn, checkOut, getAttendanceReport } from '@/services/attendance-service'; 
+// import { useToast } from '@/hooks/use-toast';
 
 interface EmployeeAttendanceStatus {
   status: string;
@@ -27,7 +27,6 @@ interface AttendanceSummaryData {
   avgWorkHours: number;
 }
 
-// Placeholder for current user - replace with actual auth context
 const currentUserId = mockEmployees[0]?.id || 'emp001'; 
 
 export default function AttendancePage() {
@@ -36,21 +35,20 @@ export default function AttendancePage() {
   const [isClient, setIsClient] = useState(false);
   // const { toast } = useToast();
 
-  // This function would ideally fetch data from your activity logs or a dedicated attendance endpoint
   const getEmployeeAttendanceStatus = (employeeId: string, activityLogs: typeof mockActivityLogs): EmployeeAttendanceStatus => {
     const today = new Date().toDateString();
     const logsToday = activityLogs.filter(
-      log => log.employeeId === employeeId && new Date(log.date).toDateString() === today
+      log => log.employeeId === employeeId && new Date(log.startTime!).toDateString() === today // Assuming startTime is checkInTime
     );
-    const checkInLog = logsToday.find(log => log.activity === 'Checked In' && log.checkInTime);
-    const checkOutLog = logsToday.find(log => log.activity === 'Checked Out' && log.checkOutTime);
+    const checkInLog = logsToday.find(log => log.activityType === 'Checked In' && log.startTime);
+    const checkOutLog = logsToday.find(log => log.activityType === 'Checked Out' && log.endTime);
 
-    if (checkInLog && !checkOutLog) return { status: "Present", time: new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    if (checkInLog && checkOutLog) return { status: "Completed", time: `${new Date(checkInLog.checkInTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(checkOutLog.checkOutTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` };
+    if (checkInLog && !checkOutLog) return { status: "Present", time: new Date(checkInLog.startTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    if (checkInLog && checkOutLog) return { status: "Completed", time: `${new Date(checkInLog.startTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(checkOutLog.endTime!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` };
     return { status: "Absent", time: "N/A" };
   };
   
-  const attendanceChartData = [ // Renamed from attendanceData to avoid conflict
+  const attendanceChartData = [ 
     { day: 'Mon', present: 18, absent: 2 },
     { day: 'Tue', present: 20, absent: 0 },
     { day: 'Wed', present: 19, absent: 1 },
@@ -59,7 +57,7 @@ export default function AttendancePage() {
   ];
 
   const chartConfig = {
-    present: { label: "Present", color: "hsl(var(--chart-2))" }, // Ensure these CSS vars exist
+    present: { label: "Present", color: "hsl(var(--chart-2))" }, 
     absent: { label: "Absent", color: "hsl(var(--destructive))" },
   } satisfies ChartConfig;
 
@@ -75,7 +73,7 @@ export default function AttendancePage() {
     const todayString = new Date().toDateString();
     const checkedInTodayCount = new Set(
       mockActivityLogs
-        .filter(log => log.checkInTime && new Date(log.date).toDateString() === todayString)
+        .filter(log => log.startTime && new Date(log.startTime!).toDateString() === todayString && log.activityType === 'Checked In')
         .map(log => log.employeeId)
     ).size;
     
@@ -90,65 +88,22 @@ export default function AttendancePage() {
       totalEmployees: totalEmployees,
       avgWorkHours: 7.5, 
     });
-
-    // Example: Fetch attendance report for the current user (or a default one)
-    // const fetchReport = async () => {
-    //   try {
-    //     // const report = await getAttendanceReport(currentUserId, { startDate: "2024-01-01", endDate: "2024-12-31"});
-    //     // console.log("Attendance Report for user:", currentUserId, report);
-    //     // Update state with report data if needed for display
-    //     console.log(`Placeholder: Would fetch attendance report for user ${currentUserId}`);
-    //   } catch (error) {
-    //     console.error("Failed to fetch attendance report:", error);
-    //     // toast({ variant: "destructive", title: "Error", description: "Could not fetch attendance report." });
-    //   }
-    // };
-    // fetchReport();
-
   }, []);
 
   const handleCheckIn = async (employeeId: string) => {
     console.log(`Placeholder: Check-in for employee ${employeeId}`);
-    // try {
-    //   const result = await checkIn(employeeId, { location: "Auto-detected or Main Office" });
-    //   console.log("Check-in successful:", result);
-    //   // Update employeeStatuses or re-fetch data to reflect the change
-    //   toast({ title: "Checked In", description: `Successfully checked in ${employeeId}.` });
-    // } catch (error) {
-    //   console.error("Check-in failed:", error);
-    //   toast({ variant: "destructive", title: "Check-in Failed", description: error.message });
-    // }
     alert(`Placeholder: Check-in for ${employeeId}`);
   };
 
   const handleCheckOut = async (employeeId: string) => {
     console.log(`Placeholder: Check-out for employee ${employeeId}`);
-    // try {
-    //   const result = await checkOut(employeeId, { notes: "End of day" });
-    //   console.log("Check-out successful:", result);
-    //   // Update employeeStatuses or re-fetch data
-    //   toast({ title: "Checked Out", description: `Successfully checked out ${employeeId}.` });
-    // } catch (error) {
-    //   console.error("Check-out failed:", error);
-    //   toast({ variant: "destructive", title: "Check-out Failed", description: error.message });
-    // }
     alert(`Placeholder: Check-out for ${employeeId}`);
   };
   
   const handleViewReport = async (employeeId: string) => {
     console.log(`Placeholder: View report for employee ${employeeId}`);
-    // try {
-    // const report = await getAttendanceReport(employeeId); // Add date range if needed
-    // console.log("Attendance Report:", report);
-    // // Display report in a modal or navigate to a report page
-    // toast({ title: "Report Generated", description: `Report for ${employeeId} is ready.` });
-    // } catch (error) {
-    //   console.error("Failed to generate report:", error);
-    //   toast({ variant: "destructive", title: "Report Failed", description: error.message });
-    // }
     alert(`Placeholder: View report for ${employeeId}`);
   };
-
 
   return (
     <div className="space-y-6">
@@ -194,14 +149,7 @@ export default function AttendancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/> Daily Attendance Status</CardTitle>
-          <CardDescription>Overview of employee attendance for today. 
-            {/* Quick actions for current user: */}
-          </CardDescription>
-           {/* Placeholder for Check-in/out for current user - could be moved to a more prominent spot */}
-           {/* <div className="mt-2 flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleCheckIn(currentUserId)}><LogIn className="mr-2 h-4 w-4"/> Check In</Button>
-                <Button size="sm" variant="outline" onClick={() => handleCheckOut(currentUserId)}><LogOut className="mr-2 h-4 w-4"/> Check Out</Button>
-            </div> */}
+          <CardDescription>Overview of employee attendance for today.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto max-h-[400px]">

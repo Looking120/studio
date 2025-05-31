@@ -3,16 +3,15 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function LoginPageDeprecated() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/'); // Redirect to the new login page (root)
+    router.replace('/'); 
   }, [router]);
 
-  // Display a loading/redirecting message or skeleton
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <div className="space-y-4 w-full max-w-md">

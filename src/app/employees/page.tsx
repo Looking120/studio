@@ -44,7 +44,7 @@ export default function EmployeesPage() {
             title: "Session Expired",
             description: "Your session has expired. Please log in again.",
           });
-          await signOut(); // Clear local storage
+          await signOut(); 
           router.push('/'); 
         } else {
           console.error("Failed to fetch employees:", err);
@@ -67,7 +67,6 @@ export default function EmployeesPage() {
 
   const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
     const originalEmployees = [...employees];
-    // Optimistic update
     setEmployees(prevEmployees =>
       prevEmployees.map(emp =>
         emp.id === employeeId ? { ...emp, status: newStatus } : emp
@@ -77,8 +76,8 @@ export default function EmployeesPage() {
     try {
       await apiUpdateEmployeeStatus(employeeId, newStatus);
       toast({
-        title: "Statut Mis à Jour",
-        description: `Le statut de l'employé a été changé en ${newStatus}.`,
+        title: "Status Updated",
+        description: `Employee status has been changed to ${newStatus}.`,
       });
     } catch (error) {
       if (error instanceof UnauthorizedError) {
@@ -88,11 +87,11 @@ export default function EmployeesPage() {
         return;
       }
       setEmployees(originalEmployees); 
-      const errorMessage = error instanceof Error ? error.message : 'Impossible de mettre à jour le statut.';
+      const errorMessage = error instanceof Error ? error.message : 'Could not update status.';
       toast({
         variant: "destructive",
-        title: "Erreur de Mise à Jour",
-        description: `Impossible de mettre à jour le statut de l'employé. ${errorMessage}`,
+        title: "Update Error",
+        description: `Could not update employee status. ${errorMessage}`,
       });
       console.error(`Failed to update employee ${employeeId} status to ${newStatus}:`, error);
     }
@@ -110,13 +109,13 @@ export default function EmployeesPage() {
   return (
     <Card className="shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Répertoire des Employés</CardTitle>
+        <CardTitle>Employee Directory</CardTitle>
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Rechercher des employés..."
+              placeholder="Search employees..."
               className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px] bg-background"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -125,7 +124,7 @@ export default function EmployeesPage() {
           </div>
           <Button asChild variant="default" disabled={isLoading || !!fetchError}>
             <Link href="/employees/add">
-              <UserPlus className="mr-2 h-4 w-4" /> Ajouter un Employé
+              <UserPlus className="mr-2 h-4 w-4" /> Add Employee
             </Link>
           </Button>
         </div>
@@ -144,11 +143,11 @@ export default function EmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nom</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Département</TableHead>
-                  <TableHead>Poste</TableHead>
-                  <TableHead className="text-center">Statut</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -196,11 +195,11 @@ export default function EmployeesPage() {
                           disabled={!employee.id}
                         >
                           <SelectTrigger className="w-[120px] h-8 text-xs">
-                            <SelectValue placeholder="Changer statut" />
+                            <SelectValue placeholder="Change status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Active">Actif</SelectItem>
-                            <SelectItem value="Inactive">Inactif</SelectItem>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Inactive">Inactive</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
@@ -212,7 +211,7 @@ export default function EmployeesPage() {
           </div>
         )}
         {!isLoading && !fetchError && filteredEmployees.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">Aucun employé trouvé.</p>
+            <p className="text-center text-muted-foreground py-8">No employees found.</p>
         )}
       </CardContent>
     </Card>

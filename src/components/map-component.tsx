@@ -26,7 +26,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   center,
   zoom = 12,
   mapStyleUrl,
-  mapboxAccessToken, // Renamed from apiKey for clarity
+  mapboxAccessToken, 
 }) => {
   const [selectedMarker, setSelectedMarker] = useState<MapMarkerData | null>(null);
   const [currentAccessToken, setCurrentAccessToken] = useState<string | null>(null);
@@ -77,7 +77,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
         mapboxAccessToken={currentAccessToken}
-        mapStyle={mapStyleUrl || "mapbox://styles/mapbox/streets-v12"} // Default Mapbox style
+        mapStyle={mapStyleUrl || "mapbox://styles/mapbox/streets-v12"} 
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
       >
@@ -106,7 +106,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
             onClose={() => setSelectedMarker(null)}
             closeOnClick={false}
             anchor="bottom"
-            offset={selectedMarker.icon ? 30 : 15} // Adjust offset based on icon presence/size
+            offset={selectedMarker.icon ? 30 : 15} 
           >
             <div className="p-1 max-w-xs">
               <h4 className="font-semibold text-sm text-popover-foreground">{selectedMarker.title}</h4>

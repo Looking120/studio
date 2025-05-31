@@ -2,8 +2,6 @@
 // src/services/auth-service.ts
 import { API_BASE_URL, apiClient, parseJsonResponse, UnauthorizedError, HttpError } from './api-client';
 
-// Interface for the RAW response from the API /api/auth/signin
-// Based on user's Swagger example
 interface ApiSignInRawResponse {
   id: string;
   userName: string;
@@ -15,18 +13,17 @@ interface ApiSignInRawResponse {
   durationInMinutes: number;
 }
 
-// Interface for what the signIn service returns to the application (expected by components)
 export interface SignInUser {
   id?: string;
   firstName?: string;
   lastName?: string;
-  name?: string; // For compatibility, can be constructed from firstName and lastName
+  name?: string; 
   userName?: string;
   email: string;
   role: string;
 }
 export interface SignInResponse {
-  token: string; // The application expects 'token'
+  token: string; 
   user: SignInUser;
 }
 
@@ -34,7 +31,7 @@ export interface SignUpData {
   firstName: string;
   lastName: string;
   middleName?: string;
-  birthDate?: string; // Expects "YYYY-MM-DDTHH:mm:ss.sssZ" format
+  birthDate?: string; 
   userName: string;
   email: string;
   password?: string;
@@ -42,7 +39,6 @@ export interface SignUpData {
   phoneNumber?: string;
 }
 
-// This interface represents what the signup endpoint *actually* returns (from user's Swagger)
 interface ActualSignUpApiResponse {
   id: string;
   userName: string;
@@ -50,23 +46,18 @@ interface ActualSignUpApiResponse {
   lastName: string;
   email: string;
   role: string;
-  accessToken: string; // Signup also returns an access token
+  accessToken: string; 
   durationInMinutes: number;
-  message?: string; // Keep for flexibility if backend sometimes sends a message
+  message?: string; 
 }
 
 export interface SignUpResponse {
   message: string;
   userId?: string;
-  // Optionally, include token and user if signup logs them in directly
   token?: string;
   user?: SignInUser;
 }
 
-
-/**
- * Signs in a user. (POST /api/auth/signin)
- */
 export async function signIn(credentials: { email?: string; password?: string }): Promise<SignInResponse> {
   console.log('Auth Service: Attempting to sign in with email:', credentials.email);
   let rawText = '';
@@ -123,15 +114,11 @@ export async function signIn(credentials: { email?: string; password?: string })
   }
 }
 
-
-/**
- * Signs up a new user. (POST /api/auth/signup)
- */
 export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
   const requestBody: any = {
     firstName: userData.firstName,
     lastName: userData.lastName,
-    birthDate: userData.birthDate, // Expected in "YYYY-MM-DDTHH:mm:ss.sssZ" format
+    birthDate: userData.birthDate, 
     userName: userData.userName,
     email: userData.email,
     password: userData.password,
@@ -183,7 +170,7 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
     if (!responseText.trim()) {
       console.warn('Auth Service (signUp) - Signup was successful but API returned an empty response body.');
       return {
-        message: "Inscription réussie! (Le serveur n'a pas renvoyé de détails supplémentaires)",
+        message: "Signup successful! (Server did not return additional details)",
       };
     }
 
@@ -192,7 +179,6 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
 
     if (parsedApiResponse && parsedApiResponse.accessToken && typeof parsedApiResponse.accessToken === 'string' && parsedApiResponse.accessToken.trim() !== '') {
       console.log('Auth Service - DEBUG (signUp): accessToken checks: Found valid accessToken:', parsedApiResponse.accessToken);
-      // Signup was successful and returned a login-like response
       const userToStore: SignInUser = {
         id: parsedApiResponse.id,
         userName: parsedApiResponse.userName,
@@ -202,14 +188,13 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
         email: parsedApiResponse.email,
         role: parsedApiResponse.role,
       };
-      // Storing token and user info in localStorage after successful signup
       if (typeof window !== 'undefined') {
-        localStorage.setItem('token', parsedApiResponse.accessToken); // Using 'token' key for consistency
+        localStorage.setItem('token', parsedApiResponse.accessToken); 
         localStorage.setItem('user', JSON.stringify(userToStore));
         console.log('Auth Service (signUp) - User details and accessToken stored in localStorage.');
       }
       return {
-        message: "Inscription et connexion initiales réussies!",
+        message: "Initial signup and login successful!",
         userId: parsedApiResponse.id,
         token: parsedApiResponse.accessToken,
         user: userToStore
@@ -233,12 +218,6 @@ export async function signUp(userData: SignUpData): Promise<SignUpResponse> {
   }
 }
 
-
-/**
- * Signs out the current user. (POST /api/auth/signout)
- * Clears local authentication data and optionally attempts to sign out from the server.
- * @returns A promise with the sign-out status.
- */
 export async function signOut(): Promise<{ message: string; serverSignOutOk: boolean }> {
   let serverSignOutOk = false;
   let serverMessage = "Server sign-out not attempted or failed.";
@@ -282,7 +261,6 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
       } catch (e) { /* ignore, use status text */ }
       serverMessage = `Server sign-out attempt failed: ${errorDetail}`;
       console.warn(`Auth Service: ${serverMessage}`);
-      // Do not throw UnauthorizedError here, let the caller decide based on serverSignOutOk
     }
   } catch (error) {
     serverMessage = `Error during server sign-out attempt: ${error instanceof Error ? error.message : "Unknown error"}`;
@@ -290,12 +268,12 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
   }
 
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('authToken'); // For sign-in
-    localStorage.removeItem('token');     // For sign-up storage
+    localStorage.removeItem('authToken'); 
+    localStorage.removeItem('token');     
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
-    localStorage.removeItem('user');      // For sign-up storage
+    localStorage.removeItem('user');      
     console.log('Auth Service: Auth token and user info removed from localStorage.');
     finalMessage = `Local sign-out successful. ${serverMessage}`;
   } else {

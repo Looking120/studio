@@ -57,7 +57,7 @@ export default function DepartmentsPage() {
       console.log("Attempting to fetch departments from service...");
       const data = await fetchDepartments();
       console.log("Departments fetched:", data);
-      setDepartments(data || []); // Ensure it's an array
+      setDepartments(data || []); 
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         toast({
@@ -278,7 +278,6 @@ export default function DepartmentsPage() {
         )}
       </CardContent>
 
-      {/* Edit Department Dialog */}
       <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -307,5 +306,3 @@ export default function DepartmentsPage() {
     </Card>
   );
 }
-
-    

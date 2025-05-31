@@ -32,31 +32,31 @@ import { SheetTitle } from "@/components/ui/sheet";
 
 const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/employees", label: "Employés", icon: Users },
-  { href: "/locations", label: "Suivi de Localisation", icon: MapPin },
-  { href: "/activity", label: "Logs d'Activité", icon: ListChecks },
-  { href: "/attendance", label: "Présence", icon: BarChart3 },
-  { href: "/offices", label: "Bureaux", icon: Building2 },
+  { href: "/employees", label: "Employees", icon: Users },
+  { href: "/locations", label: "Location Tracking", icon: MapPin },
+  { href: "/activity", label: "Activity Logs", icon: ListChecks },
+  { href: "/attendance", label: "Attendance", icon: BarChart3 },
+  { href: "/offices", label: "Offices", icon: Building2 },
   { 
-    label: "Organisation", icon: Building, subItems: [
-      { href: "/organization/departments", label: "Départements", icon: Users /* Placeholder icon */ },
-      { href: "/organization/positions", label: "Postes", icon: Users /* Placeholder icon */ },
+    label: "Organization", icon: Building, subItems: [
+      { href: "/organization/departments", label: "Departments", icon: Users },
+      { href: "/organization/positions", label: "Positions", icon: Users },
     ] 
   },
-  { href: "/chat", label: "Messagerie", icon: MessageSquare, notificationKey: "chat" },
+  { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
 ];
 
 const employeeMobileNavItems = [
-  { href: "/dashboard", label: "Tableau de Bord", icon: LayoutDashboard },
-  { href: "/attendance", label: "Ma Présence", icon: BarChart3 },
-  { href: "/activity", label: "Mon Activité", icon: ListChecks },
-  { href: "/chat", label: "Messagerie", icon: MessageSquare },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/attendance", label: "My Attendance", icon: BarChart3 },
+  { href: "/activity", label: "My Activity", icon: ListChecks },
+  { href: "/chat", label: "Messaging", icon: MessageSquare },
 ];
 
 const defaultUser = {
-  name: "Utilisateur",
-  email: "utilisateur@example.com",
-  role: "Employé",
+  name: "User",
+  email: "user@example.com",
+  role: "Employee",
   avatarUrl: "" 
 };
 
@@ -93,10 +93,10 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
           setCurrentNavItems(adminNavItems);
         }
       } else {
-        setCurrentNavItems(adminNavItems); // Default to admin if role not found, though user would be logged out
+        setCurrentNavItems(adminNavItems); 
       }
     }
-  }, [pathname, isMobile]); // Add isMobile to dependencies
+  }, [pathname, isMobile]); 
   
   const handleSignOut = async (message?: string) => {
     console.log(message || "Signing out...");
@@ -104,21 +104,21 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   
     if (result.serverSignOutOk) {
       toast({
-        title: "Déconnexion Réussie",
-        description: message || result.message || "Vous avez été déconnecté du serveur.",
+        title: "Sign Out Successful",
+        description: message || result.message || "You have been logged out from the server.",
       });
     } else {
       toast({
         variant: "default", 
-        title: "Déconnexion Locale Effectuée",
-        description: message || result.message || "Votre session locale a été effacée. La déconnexion du serveur n'a pu être confirmée.",
+        title: "Local Sign Out Complete",
+        description: message || result.message || "Your local session has been cleared. Server sign-out could not be confirmed.",
       });
     }
     
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setIsRestrictionApplied(true); // Indicate that a restriction forced a logout
+    setIsRestrictionApplied(true); 
     router.push('/'); 
   };
 
@@ -130,13 +130,12 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       if (token && role) {
         const isAdmin = role.toLowerCase().includes('admin');
         if (isMobile && isAdmin) {
-          handleSignOut("L'accès administrateur est restreint sur les appareils mobiles. Vous avez été déconnecté.");
+          handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
         } else if (!isMobile && !isAdmin) {
-          handleSignOut("L'accès employé est restreint sur les appareils de bureau. Vous avez été déconnecté.");
+          handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
         } else {
-            setIsRestrictionApplied(false); // Reset if no restriction applies
+            setIsRestrictionApplied(false); 
         }
-        // Update nav items based on role and device
         if (isMobile && !isAdmin) {
           setCurrentNavItems(employeeMobileNavItems);
         } else {
@@ -144,8 +143,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
 
       } else {
-        setIsRestrictionApplied(false); // No token or role, no restriction applies
-        setCurrentNavItems(adminNavItems); // Default if no role, will be redirected soon anyway
+        setIsRestrictionApplied(false); 
+        setCurrentNavItems(adminNavItems); 
       }
     }
   }, [mounted, isMobile, loggedInUserRole, pathname]);
@@ -159,7 +158,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   };
 
   const getInitials = (name: string | null) => {
-    if (!name || name.trim() === "" || name === "User" || name === "Utilisateur") return "U";
+    if (!name || name.trim() === "" || name === "User" || name === "User") return "U";
     const nameParts = name.split(' ').filter(part => part.length > 0);
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -177,20 +176,18 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       if (restricted) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-                <p className="text-lg">Accès restreint pour votre type de compte sur cet appareil.</p>
-                <p className="text-muted-foreground">Vous allez être redirigé vers la page de connexion...</p>
+                <p className="text-lg">Access restricted for your account type on this device.</p>
+                <p className="text-muted-foreground">You will be redirected to the login page...</p>
             </div>
         );
       }
   }
-
 
   if (pathname === "/" || pathname === "/signup") { 
     return <>{children}</>;
   }
 
   const getPageTitle = () => {
-    // Use currentNavItems for title generation
     for (const item of currentNavItems) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
         return item.label;
@@ -203,9 +200,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    // Check admin items only if currentNavItems might not cover it (e.g. specific sub-pages not in employee menu)
     if (currentNavItems !== adminNavItems) {
-        for (const item of adminNavItems) { // Fallback check against admin items for titles like Add Employee
+        for (const item of adminNavItems) { 
             if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
                 return item.label;
             }
@@ -219,9 +215,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
     }
 
-    if (pathname === '/employees/add') return 'Ajouter un Employé'; // Keep specific fallbacks
-    if (pathname === '/profile') return 'Mon Profil';
-    if (pathname === '/settings') return 'Paramètres';
+    if (pathname === '/employees/add') return 'Add Employee';
+    if (pathname === '/profile') return 'My Profile';
+    if (pathname === '/settings') return 'Settings';
     return "EmployTrack";
   };
   
@@ -304,7 +300,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 aria-label="Toggle theme"
-                title={`Passer en mode ${theme === 'dark' ? 'clair' : 'sombre'}`}
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               >
                 {theme === 'dark' ? <Sun className="h-5 w-5 text-foreground" /> : <Moon className="h-5 w-5 text-foreground" />}
               </Button>
@@ -334,19 +330,19 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
-                    Profil
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center">
                     <Settings className="mr-2 h-4 w-4" />
-                    Paramètres
+                    Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                  <DropdownMenuItem onClick={() => handleSignOut()} className="flex items-center cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Se déconnecter
+                  Log Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

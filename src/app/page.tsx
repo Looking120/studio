@@ -16,7 +16,7 @@ import { LogIn } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
-import { signIn, type SignInResponse } from '@/services/auth-service'; // SignInResponse est maintenant correcte
+import { signIn, type SignInResponse } from '@/services/auth-service';
 import { useToast } from '@/hooks/use-toast';
 import { UnauthorizedError } from "@/services/api-client";
 
@@ -35,37 +35,33 @@ export default function LoginPage() {
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
 
     if (!email || !password) {
-      toast({ variant: "destructive", title: "Erreur de Connexion", description: "L'email et le mot de passe sont requis." });
+      toast({ variant: "destructive", title: "Login Error", description: "Email and password are required." });
       setIsLoading(false);
       return;
     }
 
     try {
       console.log(`Login page - Attempting signIn with email: ${email}`);
-      const response: SignInResponse | null = await signIn({ email, password }); // Appel correct avec un objet
+      const response: SignInResponse | null = await signIn({ email, password }); 
       console.log('Login page - signIn service call returned:', response);
 
-      // AGGRESSIVE LOGGING TO CHECK THE RESPONSE STRUCTURE (maintenu pour débogage si nécessaire)
       console.log('Login page - DEBUG: Raw response object received in handleSubmit:', JSON.stringify(response, null, 2));
       if (response && typeof response === 'object') {
         console.log('Login page - DEBUG: Keys in response object:', Object.keys(response));
-        console.log('Login page - DEBUG: Value of response.token:', response.token); // Devrait être le accessToken renommé
+        console.log('Login page - DEBUG: Value of response.token:', response.token); 
         console.log('Login page - DEBUG: Type of response.token:', typeof response.token);
         console.log('Login page - DEBUG: Value of response.user:', response.user);
       }
-      // END AGGRESSIVE LOGGING
 
       if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
-        // Le service auth-service.ts a déjà adapté la réponse de l'API,
-        // donc response.token est bien le token et response.user contient les infos utilisateur.
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
-        let finalUserName = 'Utilisateur';
-        let finalUserRole = 'Employé';
+        let finalUserName = 'User';
+        let finalUserRole = 'Employee';
         let finalUserEmail = email;
 
-        const userFromApi = response.user; // L'objet user est maintenant correctement fourni par le service
+        const userFromApi = response.user; 
         console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
 
         if (userFromApi && typeof userFromApi === 'object') {
@@ -78,12 +74,12 @@ export default function LoginPage() {
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) { // Fallback au champ name construit par le service
+          } else if (userFromApi.name) { 
             displayName = userFromApi.name;
           }
 
-          finalUserName = displayName.trim() || 'Utilisateur';
-          finalUserRole = userFromApi.role || 'Employé';
+          finalUserName = displayName.trim() || 'User';
+          finalUserRole = userFromApi.role || 'Employee';
           finalUserEmail = userFromApi.email || email;
 
           console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
@@ -96,7 +92,7 @@ export default function LoginPage() {
         localStorage.setItem('userEmail', finalUserEmail);
         console.log(`Login page - Stored in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}'`);
 
-        toast({ title: "Connexion Réussie", description: `Bienvenue, ${finalUserName}!` });
+        toast({ title: "Login Successful", description: `Welcome, ${finalUserName}!` });
         router.push('/dashboard');
       } else {
         setIsLoading(false);
@@ -114,7 +110,7 @@ export default function LoginPage() {
         }
         toast({
           variant: "destructive",
-          title: "Échec de l'Authentification",
+          title: "Authentication Failed",
           description: "Authentication failed: No valid token received from server. Please check server logs and API response format.",
         });
       }
@@ -124,18 +120,17 @@ export default function LoginPage() {
       if (error instanceof UnauthorizedError) {
         toast({
             variant: "destructive",
-            title: "Échec de la Connexion",
-            description: "Email ou mot de passe incorrect."
+            title: "Login Failed",
+            description: "Incorrect email or password."
         });
       } else {
         toast({
             variant: "destructive",
-            title: "Échec de la Connexion",
-            description: error instanceof Error ? error.message : "Erreur inconnue lors de la connexion."
+            title: "Login Failed",
+            description: error instanceof Error ? error.message : "Unknown error during login."
         });
       }
     } finally {
-      // Ensure isLoading is set to false in all paths if it was true
       if (isLoading) setIsLoading(false);
     }
   };
