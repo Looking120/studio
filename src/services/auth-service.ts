@@ -200,7 +200,8 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    const response = await apiClient('/auth/signout', { method: 'POST', body: {} }); 
+    // Try sending null as the body, which typically results in no body being sent by axios
+    const response = await apiClient('/auth/signout', { method: 'POST', body: null }); 
 
     serverSignOutOk = true; 
     
@@ -219,14 +220,14 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
         console.warn(`Auth Service: ${serverMessage}`, error);
         // serverSignOutOk remains false, but we don't re-throw here
     } else if (error instanceof HttpError) {
-        serverMessage = `Server sign-out attempt failed with HTTP error: ${error.message}`;
-        console.error(`Auth Service: ${serverMessage}`, error);
+        serverMessage = `Server sign-out attempt failed with HTTP error: ${error.status} ${error.message}`;
+        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn for HttpErrors during sign-out
     } else if (error instanceof Error) {
         serverMessage = `Error during server sign-out attempt: ${error.message}`;
-        console.error(`Auth Service: ${serverMessage}`, error);
+        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn
     } else {
         serverMessage = "Unknown error during server sign-out attempt.";
-        console.error(`Auth Service: ${serverMessage}`, error);
+        console.warn(`Auth Service: ${serverMessage}`, error); // Changed to warn
     }
   }
 
