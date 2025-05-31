@@ -154,7 +154,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     const itemsToSearch = currentNavItems; // Use currentNavItems which is role-specific
     
     for (const item of itemsToSearch) {
-      if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
+      if (item.href && (pathname === item.href || (item.href !== "/dashboard" && item.href && pathname.startsWith(item.href)))) {
         return item.label;
       }
       if (item.subItems) {
@@ -168,9 +168,8 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
-    if (pageTitle === "EmployTrack" && loggedInUserRole && !loggedInUserRole.toLowerCase().includes('admin') && pathname === '/dashboard') {
-        return "My Dashboard";
-    }
+    // The problematic line that caused the error was here and has been removed.
+    // The logic for "My Dashboard" for employees is handled by employeeNavItems.
     return "EmployTrack";
   };
 
