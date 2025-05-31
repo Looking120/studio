@@ -34,6 +34,8 @@ export default function LoginPage() {
     const email = (form.elements.namedItem('email') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
 
+    console.log(`Login Page: Attempting login for email: ${email}`);
+
     if (!email || !password) {
       toast({ variant: "destructive", title: "Login Error", description: "Email and password are required." });
       setIsLoading(false);
@@ -41,50 +43,39 @@ export default function LoginPage() {
     }
 
     try {
-      console.log(`Login page - Attempting signIn with email: ${email}`);
-      const response: SignInResponse | null = await signIn({ email, password }); 
-      console.log('Login page - signIn service call returned:', response);
+      console.log(`Login page - Attempting signIn service call with email: ${email}`);
+      const response: SignInResponse | null = await signIn({ email, password });
+      console.log('Login page - signIn service call returned (raw):', JSON.stringify(response, null, 2));
 
-      console.log('Login page - DEBUG: Raw response object received in handleSubmit:', JSON.stringify(response, null, 2));
-      if (response && typeof response === 'object') {
-        console.log('Login page - DEBUG: Keys in response object:', Object.keys(response));
-        console.log('Login page - DEBUG: Value of response.token:', response.token); 
-        console.log('Login page - DEBUG: Type of response.token:', typeof response.token);
-        console.log('Login page - DEBUG: Value of response.user:', response.user);
-      }
-
-      if (response && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
+      if (response && typeof response === 'object' && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
+        console.log('Login page - Token received:', response.token ? response.token.substring(0, 20) + "..." : "N/A");
         localStorage.setItem('authToken', response.token);
         console.log('Login page - Auth token stored in localStorage (key: authToken).');
 
         let finalUserName = 'User';
         let finalUserRole = 'Employee';
-        let finalUserEmail = email;
+        let finalUserEmail = email; // Fallback to form input email
 
-        const userFromApi = response.user; 
-        console.log('Login page - DEBUG: Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
+        const userFromApi = response.user;
+        console.log('Login page - Processing userFromApi object:', JSON.stringify(userFromApi, null, 2));
 
         if (userFromApi && typeof userFromApi === 'object') {
-          console.log('Login page - DEBUG: userFromApi.firstName:', userFromApi.firstName);
-          console.log('Login page - DEBUG: userFromApi.lastName:', userFromApi.lastName);
-          console.log('Login page - DEBUG: userFromApi.name (fallback/constructed):', userFromApi.name);
-          console.log('Login page - DEBUG: userFromApi.role:', userFromApi.role);
-          console.log('Login page - DEBUG: userFromApi.email:', userFromApi.email);
-
           let displayName = '';
           if (userFromApi.firstName && userFromApi.lastName) {
             displayName = `${userFromApi.firstName} ${userFromApi.lastName}`;
-          } else if (userFromApi.name) { 
+          } else if (userFromApi.name) {
             displayName = userFromApi.name;
           }
+          console.log(`Login page - API User Name: ${displayName || 'Not provided'}, API Role: ${userFromApi.role || 'Not provided'}, API Email: ${userFromApi.email || 'Not provided'}`);
 
           finalUserName = displayName.trim() || 'User';
           finalUserRole = userFromApi.role || 'Employee';
-          finalUserEmail = userFromApi.email || email;
-
-          console.log(`Login page - Extracted from API response.user: Name='${finalUserName}', Role='${finalUserRole}', Email='${finalUserEmail}'`);
+          finalUserEmail = userFromApi.email || email; // Prioritize email from API, fallback to form input
+          console.log(`Login page - Determined finalUserEmail: ${finalUserEmail} (Source: ${userFromApi.email ? 'API' : 'Form Input Fallback'})`);
         } else {
-          console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using default/fallback user info for storage. User object received:', userFromApi);
+          console.warn('Login page - User object (response.user) in API response was missing, null, or not an object. Using form input email for storage. User object received:', userFromApi);
+          finalUserEmail = email; // Ensure fallback if userFromApi is problematic
+           console.log(`Login page - Determined finalUserEmail (due to missing API user object): ${finalUserEmail} (Source: Form Input)`);
         }
 
         localStorage.setItem('userName', finalUserName);
@@ -96,27 +87,26 @@ export default function LoginPage() {
         router.push('/dashboard');
       } else {
         setIsLoading(false);
-        console.warn('Login page - Token validation failed in page.tsx. Detailed diagnostics:');
+        let validationErrorReason = "Unknown reason for token validation failure.";
         if (!response) {
-          console.warn('Login page - The response object from signIn service is null or undefined.');
-        } else {
-          if (!response.token) {
-            console.warn('Login page - "token" field is missing or falsy in the response.');
-          } else if (typeof response.token !== 'string') {
-            console.warn(`Login page - "token" field exists, but is not a string. Actual type: ${typeof response.token}, Value:`, response.token);
-          } else if (response.token.trim() === '') {
-            console.warn('Login page - "token" field is a string, but it is empty or contains only whitespace.');
-          }
+          validationErrorReason = "The response object from signIn service is null or undefined.";
+        } else if (!response.token) {
+          validationErrorReason = "'token' field is missing or falsy in the response.";
+        } else if (typeof response.token !== 'string') {
+          validationErrorReason = `"token" field exists, but is not a string. Type: ${typeof response.token}`;
+        } else if (response.token.trim() === '') {
+          validationErrorReason = "'token' field is a string, but it is empty or contains only whitespace.";
         }
+        console.warn(`Login page - Token validation failed in page.tsx. Reason: ${validationErrorReason} Full response:`, JSON.stringify(response, null, 2));
         toast({
           variant: "destructive",
           title: "Authentication Failed",
-          description: "Authentication failed: No valid token received from server. Please check server logs and API response format.",
+          description: `Authentication failed: No valid token received. ${validationErrorReason}`,
         });
       }
     } catch (error) {
       setIsLoading(false);
-      console.error('Login page - Sign in failed:', error);
+      console.error('Login page - Sign in failed with error:', error);
       if (error instanceof UnauthorizedError) {
         toast({
             variant: "destructive",
@@ -131,7 +121,7 @@ export default function LoginPage() {
         });
       }
     } finally {
-      if (isLoading) setIsLoading(false);
+      if (isLoading) setIsLoading(false); // Ensure isLoading is reset if it was true
     }
   };
 
