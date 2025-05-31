@@ -200,8 +200,14 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    // Try sending undefined as the body, which might result in no body being sent by axios
-    const response = await apiClient('/auth/signout', { method: 'POST', body: undefined }); 
+    // Attempt to send no body and explicitly remove Content-Type header for this request
+    const response = await apiClient('/auth/signout', {
+      method: 'POST',
+      body: undefined, // Ensure no body is sent
+      headers: {
+        'Content-Type': null, // Attempt to remove the Content-Type header
+      },
+    });
 
     serverSignOutOk = true; 
     
