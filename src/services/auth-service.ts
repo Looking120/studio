@@ -199,14 +199,11 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
   let finalMessage = "";
 
   try {
-    console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    // Attempt to send no body and explicitly remove Content-Type header for this request
+    console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout with no body and explicit empty headers...');
     const response = await apiClient('/auth/signout', {
       method: 'POST',
-      body: undefined, // Ensure no body is sent
-      headers: {
-        'Content-Type': null, // Attempt to remove the Content-Type header
-      },
+      body: undefined,
+      headers: {}, // Explicitly pass empty headers
     });
 
     serverSignOutOk = true; 
