@@ -50,6 +50,21 @@ axiosInstance.interceptors.request.use(
   }
 );
 
+// Heuristic to check if a string looks like an IP address based URL's hostname
+const isHostnameIpAddress = (url: string | undefined): boolean => {
+  if (!url) return false;
+  try {
+    const hostname = new URL(url).hostname;
+    // Basic IPv4 regex
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+    return ipRegex.test(hostname);
+  } catch (e) {
+    // If it's a relative URL (like from error.config.url), new URL will fail.
+    // In that case, we assume it's not an IP for this specific check.
+    return false;
+  }
+};
+
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
     // For successful responses (2xx range)
@@ -86,8 +101,17 @@ axiosInstance.interceptors.response.use(
       throw new HttpError(errorMessage, status, data);
     } else if (error.request) {
       // The request was made but no response was received
-      console.error('Network error or no response received for request to ' + error.config?.url + ':', error.request);
-      throw new HttpError('Network error or no response from server. Please check your connection and the server status.', 0, null);
+      const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
+      const logMessage = `Network error or no response received from ${targetUrl}:`;
+      
+      let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
+      if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL)) {
+        detailedErrorMessage += ' When accessing a local IP, ensure the server is listening on that IP (not just localhost), and check firewall/HTTPS certificate validity from this device.';
+        console.warn(logMessage, error.request);
+      } else {
+        console.error(logMessage, error.request);
+      }
+      throw new HttpError(detailedErrorMessage, 0, null);
     } else {
       // Something happened in setting up the request that triggered an Error
       console.error('Axios setup error for request to ' + error.config?.url + ':', error.message);
@@ -99,7 +123,7 @@ axiosInstance.interceptors.response.use(
 interface ApiClientOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: any; // For axios, this will be 'data'
-  headers?: Record<string, string>;
+  headers?: Record<string, string | null> | {}; // Allow null to remove header
   params?: Record<string, any>; // For URL query parameters
 }
 
@@ -117,7 +141,7 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
       url: endpoint,
       method: method,
       data: body, // 'data' is the Axios equivalent of 'body' in fetch
-      headers: headers,
+      headers: headers as Record<string, string>, // Cast because axios expects string values for headers
       params: params,
     });
     return response;
@@ -127,4 +151,3 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
-
