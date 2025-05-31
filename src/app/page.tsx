@@ -133,26 +133,27 @@ export default function LoginPage() {
       }
     } catch (error) {
       setIsLoading(false);
+      let toastDescription = "An unknown error occurred during login.";
+      if (error instanceof Error) {
+        toastDescription = error.message;
+      }
+
       if (error instanceof HttpError && error.status === 0) {
-        // Specific logging for "no server response"
+        // Specific handling for "no server response"
         console.warn('Login page - Sign in failed due to network issue (no server response):', error.message);
+        toastDescription = `${error.message} If using HTTPS with an IP, ensure you've accepted SSL certificate warnings on your phone's browser for this IP address.`;
+      } else if (error instanceof UnauthorizedError) {
+        toastDescription = "Incorrect email or password.";
+        console.warn('Login page - Sign in failed (Unauthorized):', error.message);
       } else {
-        console.error('Login page - Sign in failed with error:', error);
+        console.error('Login page - Sign in failed with general error:', error);
       }
       
-      if (error instanceof UnauthorizedError) {
-        toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: "Incorrect email or password."
-        });
-      } else {
-        toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: error instanceof Error ? error.message : "Unknown error during login."
-        });
-      }
+      toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: toastDescription
+      });
     } finally {
       if (isLoading) setIsLoading(false); 
     }
