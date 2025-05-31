@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { signOut as signOutService } from "@/services/auth-service";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -85,11 +85,11 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       setLoggedInUserRole(role);
       setLoggedInUserEmail(email);
     }
-  }, []); // Runs once on mount to set initial user details
+  }, []);
 
-  const handleSignOut = async (message?: string) => {
+  const handleSignOut = useCallback(async (message?: string) => {
     console.log(message || "Signing out...");
-    setIsRestrictionApplied(true); // Mark that a restriction forced sign-out
+    setIsRestrictionApplied(true);
     const result = await signOutService();
 
     if (result.serverSignOutOk) {
@@ -109,56 +109,72 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
     router.push('/');
-  };
+  }, [toast, router, setIsRestrictionApplied, setLoggedInUserName, setLoggedInUserRole, setLoggedInUserEmail]);
 
   useEffect(() => {
     if (!mounted) {
-      return; // Wait for component to mount and isMobile/loggedInUserRole to be potentially set
+      setCurrentNavItems([]);
+      return;
     }
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    const currentRole = loggedInUserRole; // Use the state variable
+    const rawRoleFromStorage = loggedInUserRole;
+    // Treat null or empty string role from storage as effectively no role for logic below
+    const currentRole = (rawRoleFromStorage && rawRoleFromStorage.trim() !== "") ? rawRoleFromStorage : null;
 
-    // Handle navigation items and restrictions
+
     if (pathname === "/" || pathname === "/signup") {
-      setCurrentNavItems([]); // No nav items on login/signup pages
-      setIsRestrictionApplied(false); // No restrictions apply here
-    } else if (token && currentRole) {
-      const isAdmin = currentRole.toLowerCase().includes('admin');
-      let restrictionTriggered = false;
-
-      if (isMobile && isAdmin) {
-        handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
-        restrictionTriggered = true;
-      } else if (!isMobile && !isAdmin) {
-        handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
-        restrictionTriggered = true;
-      } else {
-        setIsRestrictionApplied(false);
-      }
-
-      if (!restrictionTriggered) {
-        if (isMobile && !isAdmin) {
-          setCurrentNavItems(employeeMobileNavItems);
-        } else {
-          setCurrentNavItems(adminNavItems);
-        }
-      } else {
-        setCurrentNavItems([]); // Clear nav items if restriction led to sign out
-      }
-    } else if (!token && pathname !== "/" && pathname !== "/signup") {
-      // No token, but on a protected page, should redirect (usually handled by page or main layout logic)
-      // For AppClientLayout, if no token, assume redirection is happening or will happen.
-      // Can set to empty or admin as a fallback before redirection.
-      setCurrentNavItems([]);
-      setIsRestrictionApplied(false); // Or true if redirecting, depends on overall auth flow
-      router.push('/'); // Force redirect if not on public pages and no token
-    } else {
-      // Fallback for unhandled cases or during transition states
       setCurrentNavItems([]);
       setIsRestrictionApplied(false);
+      return; 
     }
-  }, [mounted, isMobile, loggedInUserRole, pathname, router, toast]);
+    
+    if (!token) {
+        setCurrentNavItems([]);
+        router.push('/');
+        setIsRestrictionApplied(false);
+        return;
+    }
+
+    if (!currentRole) { // Role not determined or empty
+        setCurrentNavItems([]);
+        setIsRestrictionApplied(false); // No restriction decision yet, but no menu.
+        // Optionally, if a token exists but no role, this might be an error state or incomplete login.
+        console.warn("AppClientLayout: Token exists but user role is not set or is empty. Clearing nav items.");
+        return;
+    }
+
+    // Token and a non-empty currentRole are known
+    const isAdmin = currentRole.toLowerCase().includes('admin');
+    let restrictionTriggered = false;
+
+    if (isMobile && isAdmin) { // Admin on mobile
+      handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
+      restrictionTriggered = true;
+    } else if (!isMobile && !isAdmin) { // Employee on desktop
+      handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
+      restrictionTriggered = true;
+    } else {
+      // No restriction triggered for this combination
+      setIsRestrictionApplied(false);
+    }
+
+    if (restrictionTriggered) {
+      setCurrentNavItems([]); // Clear nav items if restriction led to sign out
+    } else {
+      // No restriction, determine correct nav items
+      if (!isMobile && isAdmin) { // Admin on desktop
+        setCurrentNavItems(adminNavItems);
+      } else if (isMobile && !isAdmin) { // Employee on mobile
+        setCurrentNavItems(employeeMobileNavItems);
+      } else {
+        // This case implies a state that should have been restricted or is unexpected.
+        // e.g. Admin on mobile (but wasn't restricted) or Employee on desktop (but wasn't restricted).
+        console.warn("AppClientLayout: Reached unexpected 'else' for nav items after restriction check. Role:", currentRole, "isMobile:", isMobile, "isAdmin:", isAdmin);
+        setCurrentNavItems([]); // Safest to show no menu
+      }
+    }
+  }, [mounted, isMobile, loggedInUserRole, pathname, router, toast, handleSignOut]);
 
 
   const userToDisplay = {
@@ -189,7 +205,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   }
 
   const getPageTitle = () => {
-    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems; // Fallback for titles if currentNav is empty during transitions
+    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems;
     for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
         return item.label;
@@ -202,7 +218,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    // Keep adminNavItems check for pages not directly in employeeMobileNavItems but accessible (e.g. profile, settings)
     if (currentNavItems !== adminNavItems) {
         for (const item of adminNavItems) {
             if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
