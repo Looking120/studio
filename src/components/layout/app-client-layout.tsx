@@ -81,7 +81,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [currentNavItems, setCurrentNavItems] = useState<NavItem[]>([]);
 
   useEffect(() => {
-    setMounted(true);
+    setMounted(true); // Indicate client-side mount
     const name = localStorage.getItem('userName');
     const role = localStorage.getItem('userRole');
     const email = localStorage.getItem('userEmail');
@@ -91,7 +91,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(name);
     setLoggedInUserRole(role);
     setLoggedInUserEmail(email);
-  }, []);
+  }, []); // Empty dependency array: runs once on mount
 
   const handleSignOut = useCallback(async (message?: string) => {
     console.log('[AppClientLayout] handleSignOut called with message:', message || "Signing out...");
@@ -113,21 +113,18 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
-    setCurrentNavItems([]); // Clear nav items on sign out
+    setCurrentNavItems([]); 
     router.push('/');
   }, [toast, router]);
 
   useEffect(() => {
     if (!mounted) {
-      // console.log('[AppClientLayout NavEffect] Not mounted yet, returning.');
       return;
     }
-    // console.log('[AppClientLayout NavEffect] Running. Pathname:', pathname, 'Role from state:', loggedInUserRole);
-
+    
     const token = localStorage.getItem('authToken');
 
     if (pathname === "/" || pathname === "/signup") {
-      // console.log('[AppClientLayout NavEffect] Public page, ensuring nav items are empty.');
       if (currentNavItems.length > 0) {
         setCurrentNavItems([]);
       }
@@ -135,34 +132,31 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (!token) {
-      // console.log('[AppClientLayout NavEffect] No token and not on public page. Signing out.');
-      // Ensure we don't get into a loop if already on / by checking pathname
       if (pathname !== "/" && pathname !== "/signup") {
           handleSignOut("Session expired or not found. Please log in again.");
       }
-      if (currentNavItems.length > 0) { // Also clear nav items here if signing out
+      if (currentNavItems.length > 0) { 
           setCurrentNavItems([]);
       }
       return;
     }
     
     let navItemsToSet: NavItem[] = [];
-    // Ensure loggedInUserRole is a string before calling toLowerCase
+    console.log('[AppClientLayout NavEffect] Role from state for nav determination:', loggedInUserRole);
     if (loggedInUserRole && typeof loggedInUserRole === 'string' && loggedInUserRole.toLowerCase().includes('admin')) {
-      // console.log('[AppClientLayout NavEffect] User is Admin. Setting adminNavItems.');
+      console.log('[AppClientLayout NavEffect] User is Admin. Setting adminNavItems.');
       navItemsToSet = adminNavItems;
     } else { 
-      // console.log('[AppClientLayout NavEffect] User is Employee or role unknown. Setting employeeNavItems.');
+      console.log('[AppClientLayout NavEffect] User is Employee or role unknown/null. Setting employeeNavItems. Role was:', loggedInUserRole);
       navItemsToSet = employeeNavItems;
     }
     
+    // Only update if the nav items have actually changed to prevent potential loops
     if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
-        // console.log('[AppClientLayout NavEffect] Nav items changed. Old:', JSON.stringify(currentNavItems), 'New:', JSON.stringify(navItemsToSet));
+        console.log('[AppClientLayout NavEffect] Nav items changed. Setting new nav items.');
         setCurrentNavItems(navItemsToSet);
-    } else {
-      // console.log('[AppClientLayout NavEffect] Nav items determined to be the same. No update to setCurrentNavItems.');
     }
-  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]);
+  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]); // Removed currentNavItems from here
 
 
   const getPageTitle = () => {
@@ -193,7 +187,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   if (!localStorage.getItem('authToken') && pathname !== "/" && pathname !== "/signup") {
       return (
           <div className="flex h-screen w-screen items-center justify-center">
-             {/* Basic loading or redirecting indicator can go here if needed */}
           </div>
       );
   }
@@ -201,6 +194,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   if (pathname === "/" || pathname === "/signup") {
     return <>{children}</>;
   }
+  
+  // Log state values just before constructing userToDisplay
+  console.log('[AppClientLayout] Rendering. User state for display - Name:', loggedInUserName, 'Role:', loggedInUserRole, 'Email:', loggedInUserEmail);
 
   const userToDisplay = {
     name: loggedInUserName || defaultUser.name,
@@ -209,9 +205,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     avatarUrl: defaultUser.avatarUrl,
   };
   
-  // console.log('[AppClientLayout] Rendering. User to display:', userToDisplay, 'Raw state - Name:', loggedInUserName, 'Role:', loggedInUserRole, 'Email:', loggedInUserEmail);
-
-
   const getInitials = (name: string | null) => {
     if (!name || name.trim() === "" || name === "User") return "U";
     const nameParts = name.split(' ').filter(part => part.length > 0);
