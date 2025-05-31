@@ -2,7 +2,7 @@
 // src/services/api-client.ts
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-export const API_BASE_URL = 'http://192.168.0.119:5125/api'; // Changed to HTTP and port 5125
+export const API_BASE_URL = 'https://192.168.0.119:7294/api'; // Reverted to HTTPS and port 7294
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -94,7 +94,8 @@ axiosInstance.interceptors.response.use(
       
       // Conditionally log error for non-404 statuses, as 404s might be handled specifically by services
       if (status !== 404 && status !== 500) {
-        console.error(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+        // Changed from console.error to console.warn for non-critical API errors that might be handled
+        console.warn(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
       } else if (status === 500) {
         console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
       }
