@@ -46,7 +46,7 @@ const adminNavItems = [
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
 ];
 
-const employeeMobileNavItems = [
+const employeeNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/attendance", label: "My Attendance", icon: BarChart3 },
   { href: "/activity", label: "My Activity", icon: ListChecks },
@@ -66,13 +66,12 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
-  const isMobile = useIsMobile();
+  const isMobile = useIsMobile(); // Used by Sidebar for rendering style
 
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [loggedInUserRole, setLoggedInUserRole] = useState<string | null>(null);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState<string | null>(null);
-  const [isRestrictionApplied, setIsRestrictionApplied] = useState(false);
-  const [currentNavItems, setCurrentNavItems] = useState<typeof adminNavItems>([]);
+  const [currentNavItems, setCurrentNavItems] = useState<typeof adminNavItems | typeof employeeNavItems>([]);
 
 
   useEffect(() => {
@@ -89,7 +88,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = useCallback(async (message?: string) => {
     console.log(message || "Signing out...");
-    setIsRestrictionApplied(true);
     const result = await signOutService();
 
     if (result.serverSignOutOk) {
@@ -108,8 +106,9 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     setLoggedInUserName(null);
     setLoggedInUserRole(null);
     setLoggedInUserEmail(null);
+    setCurrentNavItems([]); // Clear nav items on sign out
     router.push('/');
-  }, [toast, router, setIsRestrictionApplied, setLoggedInUserName, setLoggedInUserRole, setLoggedInUserEmail]);
+  }, [toast, router]);
 
   useEffect(() => {
     if (!mounted) {
@@ -117,64 +116,39 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    const rawRoleFromStorage = loggedInUserRole;
-    // Treat null or empty string role from storage as effectively no role for logic below
-    const currentRole = (rawRoleFromStorage && rawRoleFromStorage.trim() !== "") ? rawRoleFromStorage : null;
-
-
     if (pathname === "/" || pathname === "/signup") {
       setCurrentNavItems([]);
-      setIsRestrictionApplied(false);
-      return; 
+      return;
     }
     
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
     if (!token) {
-        setCurrentNavItems([]);
-        router.push('/');
-        setIsRestrictionApplied(false);
-        return;
+      if (currentNavItems.length > 0) setCurrentNavItems([]);
+      // router.push('/'); // Redirection is handled by this effect re-running or a dedicated auth guard
+      return;
     }
 
-    if (!currentRole) { // Role not determined or empty
-        setCurrentNavItems([]);
-        setIsRestrictionApplied(false); // No restriction decision yet, but no menu.
-        // Optionally, if a token exists but no role, this might be an error state or incomplete login.
-        console.warn("AppClientLayout: Token exists but user role is not set or is empty. Clearing nav items.");
-        return;
-    }
+    const role = loggedInUserRole;
+    let navItemsToSet: typeof adminNavItems | typeof employeeNavItems = [];
 
-    // Token and a non-empty currentRole are known
-    const isAdmin = currentRole.toLowerCase().includes('admin');
-    let restrictionTriggered = false;
-
-    if (isMobile && isAdmin) { // Admin on mobile
-      handleSignOut("Administrator access is restricted on mobile devices. You have been logged out.");
-      restrictionTriggered = true;
-    } else if (!isMobile && !isAdmin) { // Employee on desktop
-      handleSignOut("Employee access is restricted on desktop devices. You have been logged out.");
-      restrictionTriggered = true;
-    } else {
-      // No restriction triggered for this combination
-      setIsRestrictionApplied(false);
-    }
-
-    if (restrictionTriggered) {
-      setCurrentNavItems([]); // Clear nav items if restriction led to sign out
-    } else {
-      // No restriction, determine correct nav items
-      if (!isMobile && isAdmin) { // Admin on desktop
-        setCurrentNavItems(adminNavItems);
-      } else if (isMobile && !isAdmin) { // Employee on mobile
-        setCurrentNavItems(employeeMobileNavItems);
-      } else {
-        // This case implies a state that should have been restricted or is unexpected.
-        // e.g. Admin on mobile (but wasn't restricted) or Employee on desktop (but wasn't restricted).
-        console.warn("AppClientLayout: Reached unexpected 'else' for nav items after restriction check. Role:", currentRole, "isMobile:", isMobile, "isAdmin:", isAdmin);
-        setCurrentNavItems([]); // Safest to show no menu
+    if (role && role.trim() !== "") {
+      const isAdminUser = role.toLowerCase().includes('admin');
+      if (isAdminUser) {
+        navItemsToSet = adminNavItems;
+      } else { // Non-admin, so considered an employee for nav purposes
+        navItemsToSet = employeeNavItems;
       }
+    } else {
+      // Role is null or empty string (e.g., not yet loaded from localStorage or genuinely no role)
+      navItemsToSet = [];
     }
-  }, [mounted, isMobile, loggedInUserRole, pathname, router, toast, handleSignOut]);
+    
+    // Only update if the nav items have actually changed
+    if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
+        setCurrentNavItems(navItemsToSet);
+    }
+
+  }, [mounted, pathname, loggedInUserRole, currentNavItems]); // currentNavItems added back carefully to prevent loops with the JSON.stringify check
 
 
   const userToDisplay = {
@@ -191,21 +165,26 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
-  if (mounted && isRestrictionApplied && (pathname !== "/" && pathname !== "/signup")) {
-      return (
-          <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
-              <p className="text-lg">Access restricted for your account type on this device.</p>
-              <p className="text-muted-foreground">You will be redirected to the login page...</p>
-          </div>
-      );
-  }
-
   if (pathname === "/" || pathname === "/signup") {
     return <>{children}</>;
   }
 
+  // If not mounted yet, or no token and not on public pages, show minimal layout or loading
+  // This prevents flashing of main layout before auth status is clear
+  if (!mounted || (!localStorage.getItem('authToken') && pathname !== "/" && pathname !== "/signup")) {
+    // You might want a dedicated loading spinner component here
+    return (
+        <div className="flex h-screen w-screen items-center justify-center">
+            {/* Basic loading or redirecting indicator */}
+        </div>
+    );
+  }
+
   const getPageTitle = () => {
-    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : adminNavItems;
+    // Determine which set of items to search based on currentNavItems's first item's label or similar heuristic,
+    // or rely on currentNavItems directly.
+    const itemsToSearch = currentNavItems.length > 0 ? currentNavItems : (loggedInUserRole?.toLowerCase().includes('admin') ? adminNavItems : employeeNavItems);
+    
     for (const item of itemsToSearch) {
       if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
         return item.label;
@@ -218,25 +197,11 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    if (currentNavItems !== adminNavItems) {
-        for (const item of adminNavItems) {
-            if (item.href && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))) {
-                return item.label;
-            }
-            if (item.subItems) {
-                for (const subItem of item.subItems) {
-                if (pathname === subItem.href || (subItem.href && pathname.startsWith(subItem.href))) {
-                    return subItem.label;
-                }
-                }
-            }
-        }
-    }
-
+    // Fallback for pages not directly in nav, like add/edit pages
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
-    return "EmployTrack";
+    return "EmployTrack"; // Default title
   };
 
   let pageTitle = getPageTitle();
@@ -327,7 +292,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={userToDisplay.avatarUrl} alt={userToDisplay.name || ""} data-ai-hint="user avatar" />
+                    <AvatarImage src={userToDisplay.avatarUrl} alt={userToDisplay.name || ""} data-ai-hint="user avatar"/>
                     <AvatarFallback>{getInitials(userToDisplay.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -374,4 +339,3 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-    
