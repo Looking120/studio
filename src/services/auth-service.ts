@@ -200,11 +200,11 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
 
   try {
     console.log('Auth Service: Attempting server sign-out via POST /api/auth/signout...');
-    const response = await apiClient('/auth/signout', { method: 'POST', body: {} }); // Send empty JSON object
+    const response = await apiClient('/auth/signout', { method: 'POST', body: {} }); 
 
-    serverSignOutOk = true; // If apiClient didn't throw, the request was successful (2xx)
+    serverSignOutOk = true; 
     
-    if (response.status === 204 || !response.data) { // 204 No Content, or data is null/undefined/empty for other 2xx
+    if (response.status === 204 || !response.data) { 
       serverMessage = "Successfully signed out from server (No Content or empty response).";
     } else if ((response.data as any).message) {
       serverMessage = (response.data as any).message;
@@ -214,20 +214,26 @@ export async function signOut(): Promise<{ message: string; serverSignOutOk: boo
     console.log(`Auth Service: ${serverMessage}`);
 
   } catch (error) {
-    if (error instanceof HttpError || error instanceof UnauthorizedError) {
-        serverMessage = `Server sign-out attempt failed: ${error.message}`;
+    if (error instanceof UnauthorizedError) {
+        serverMessage = `Server sign-out failed (401 Unauthorized). Session might have already been invalid. Proceeding with local sign-out. Message: ${error.message}`;
+        console.warn(`Auth Service: ${serverMessage}`, error);
+        // serverSignOutOk remains false, but we don't re-throw here
+    } else if (error instanceof HttpError) {
+        serverMessage = `Server sign-out attempt failed with HTTP error: ${error.message}`;
+        console.error(`Auth Service: ${serverMessage}`, error);
     } else if (error instanceof Error) {
         serverMessage = `Error during server sign-out attempt: ${error.message}`;
+        console.error(`Auth Service: ${serverMessage}`, error);
     } else {
         serverMessage = "Unknown error during server sign-out attempt.";
+        console.error(`Auth Service: ${serverMessage}`, error);
     }
-    console.error(`Auth Service: ${serverMessage}`, error);
   }
 
   if (typeof window !== 'undefined') {
     localStorage.removeItem('authToken'); 
-    localStorage.removeItem('user'); // Assuming user details are stored under 'user' key
-    localStorage.removeItem('userName'); // Clean up individual items if they exist
+    localStorage.removeItem('user'); 
+    localStorage.removeItem('userName'); 
     localStorage.removeItem('userRole');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userId');
