@@ -18,9 +18,9 @@ export interface HireEmployeePayload {
   employeeNumber: string;
   address: string;
   phoneNumber: string;
-  dateOfBirth: string; 
+  dateOfBirth: string;
   gender: string;
-  hireDate: string; 
+  hireDate: string;
   departmentId: string;
   positionId: string;
   officeId: string;
@@ -66,6 +66,21 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
   }
 }
 
+export async function updateEmployee(id: string, employeeData: Partial<Omit<FrontendEmployee, 'id'>>): Promise<FrontendEmployee> {
+  console.log(`API CALL: PUT /employees/${id} with data:`, employeeData);
+  try {
+    const response = await apiClient<ApiEmployee>(`/employees/${id}`, {
+      method: 'PUT',
+      body: employeeData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error(`Unexpected error in updateEmployee for id ${id}:`, error);
+    throw new HttpError(`Failed to update employee ${id}.`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
+  }
+}
+
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<FrontendEmployee[]> {
   console.log(`API CALL: GET /employees/status/${status}`);
   try {
@@ -83,12 +98,9 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
   console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`);
   try {
-    // Changed body to send the status string directly.
-    // If Content-Type is application/json, axios should send this as a JSON string (e.g., "Active").
-    // This assumes the backend controller expects [FromBody] string status.
     const response = await apiClient<ApiEmployee>(`/employees/${employeeId}/status`, {
       method: 'PUT',
-      body: status, 
+      body: status, // Send the status string directly
     });
     return response.data;
   } catch (error) {
