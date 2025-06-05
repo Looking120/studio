@@ -83,18 +83,18 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
   console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`);
   try {
-    // Le payload pour cet endpoint spécifique peut être juste { status: string }
-    // ou l'API peut s'attendre à un objet vide si le statut est dans l'URL.
-    // Pour l'instant, on envoie un objet avec le statut.
+    // Changed body to send the status string directly.
+    // If Content-Type is application/json, axios should send this as a JSON string (e.g., "Active").
+    // This assumes the backend controller expects [FromBody] string status.
     const response = await apiClient<ApiEmployee>(`/employees/${employeeId}/status`, {
       method: 'PUT',
-      body: { status: status }, // Assurez-vous que le backend attend ce format
+      body: status, 
     });
     return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateEmployeeStatus:", error);
-    throw new HttpError(`Failed to update status for employee ${employeeId}.`, 0, null);
+    throw new HttpError(`Failed to update status for employee ${employeeId}. Error: ${error instanceof Error ? error.message : String(error)}`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
   }
 }
 
@@ -106,8 +106,6 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
       method: 'POST',
       body: employeeData,
     });
-    // Assurez-vous que ApiHiredEmployeeResponse est compatible avec FrontendEmployee pour la page d'ajout
-    // La page AddEmployeePage s'attend à ce que `newEmployee.firstName` et `lastName` existent.
     return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
