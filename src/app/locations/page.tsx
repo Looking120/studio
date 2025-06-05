@@ -1,116 +1,248 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import MapComponent, { MapMarkerData } from '@/components/map-component';
-import { mockEmployees, Employee } from '@/lib/data';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import MapComponent, { type MapMarkerData } from '@/components/map-component';
+import type { Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Users, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { fetchEmployees } from '@/services/employee-service';
+import { getEmployeeLocation, type LocationData } from '@/services/location-service';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
+import { signOut } from '@/services/auth-service';
+import { useRouter } from 'next/navigation';
 
-const randomizeCoordinates = (lat: number, lng: number) => {
-  return {
-    lat: lat + (Math.random() - 0.5) * 0.002, 
-    lng: lng + (Math.random() - 0.5) * 0.002,
-  };
-};
-
+interface DisplayableLocationInfo extends LocationData {
+  employeeId: string;
+  employeeName: string;
+  employeeJobTitle?: string;
+  employeeAvatarUrl?: string;
+  employeeStatus: 'Active' | 'Inactive';
+}
 
 export default function LocationsPage() {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees.filter(e => e.latitude && e.longitude));
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [locationsData, setLocationsData] = useState<Record<string, LocationData | null>>({});
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
-  const [isSimulating, setIsSimulating] = useState(true);
+  
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [errorEmployees, setErrorEmployees] = useState<string | null>(null);
+  const [errorLocations, setErrorLocations] = useState<string | null>(null);
+
   const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 }); 
   const [mapZoom, setMapZoom] = useState(12);
 
+  const { toast } = useToast();
+  const router = useRouter();
 
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    if (isSimulating) {
-      intervalId = setInterval(() => {
-        setEmployees(prevEmployees =>
-          prevEmployees.map(emp => {
-            if (emp.status === 'Active' && emp.latitude && emp.longitude) {
-              const { lat, lng } = randomizeCoordinates(emp.latitude, emp.longitude);
-              return { ...emp, latitude: lat, longitude: lng, lastSeen: `${Math.floor(Math.random()*59) + 1}s ago` };
-            }
-            return emp;
-          })
-        );
-      }, 5000); 
+  const loadAllEmployees = useCallback(async () => {
+    setIsLoadingEmployees(true);
+    setErrorEmployees(null);
+    try {
+      const fetchedEmployees = await fetchEmployees();
+      setAllEmployees(fetchedEmployees || []);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+        await signOut();
+        router.push('/');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "Could not fetch employees.";
+      setErrorEmployees(msg);
+      toast({ variant: "destructive", title: "Error Loading Employees", description: msg });
+      setAllEmployees([]);
+    } finally {
+      setIsLoadingEmployees(false);
     }
-    return () => clearInterval(intervalId);
-  }, [isSimulating]);
-
-  const filteredEmployees = useMemo(() => {
-    if (filter === 'all') return employees;
-    return employees.filter(emp => emp.status.toLowerCase() === filter);
-  }, [employees, filter]);
-
-  const markers: MapMarkerData[] = useMemo(() => filteredEmployees.map(employee => ({
-    id: employee.id,
-    latitude: employee.latitude!,
-    longitude: employee.longitude!,
-    title: employee.name,
-    description: `${employee.jobTitle} - ${employee.status} (Last seen: ${employee.lastSeen || 'N/A'})`,
-    icon: (
-        <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
-            <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
-                <AvatarImage src={employee.avatarUrl} alt={employee.name} data-ai-hint="person map" />
-                <AvatarFallback>{employee.name.substring(0,1)}</AvatarFallback>
-            </Avatar>
-            {employee.status === 'Active' && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />}
-        </div>
-    )
-  })), [filteredEmployees]);
+  }, [toast, router]);
 
   useEffect(() => {
-    if (markers.length > 0) {
-      const avgLat = markers.reduce((sum, m) => sum + m.latitude, 0) / markers.length;
-      const avgLng = markers.reduce((sum, m) => sum + m.longitude, 0) / markers.length;
+    loadAllEmployees();
+  }, [loadAllEmployees]);
+
+  const employeesToFetchLocationsFor = useMemo(() => {
+    if (isLoadingEmployees) return [];
+    if (filter === 'all') return allEmployees;
+    return allEmployees.filter(emp => emp.status.toLowerCase() === filter);
+  }, [allEmployees, filter, isLoadingEmployees]);
+
+  const fetchAllLocations = useCallback(async () => {
+    if (employeesToFetchLocationsFor.length === 0 && !isLoadingEmployees) {
+        setLocationsData({});
+        setErrorLocations(null);
+        return;
+    }
+    if (employeesToFetchLocationsFor.length === 0) return;
+
+    setIsLoadingLocations(true);
+    setErrorLocations(null);
+    const newLocations: Record<string, LocationData | null> = {};
+    let fetchErrors = 0;
+
+    for (const emp of employeesToFetchLocationsFor) {
+      if (emp.id) {
+        try {
+          const loc = await getEmployeeLocation(emp.id);
+          newLocations[emp.id] = loc;
+        } catch (error) {
+          fetchErrors++;
+          console.error(`Failed to fetch location for ${emp.name || emp.id}:`, error);
+          newLocations[emp.id] = null; 
+          if (error instanceof UnauthorizedError) { // Handle critical error early
+            toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
+            await signOut();
+            router.push('/');
+            setIsLoadingLocations(false);
+            return;
+          }
+        }
+      }
+    }
+    setLocationsData(newLocations);
+    setIsLoadingLocations(false);
+    if (fetchErrors > 0) {
+        const errorMsg = `Could not fetch locations for ${fetchErrors} employee(s). Some map markers may be missing or outdated.`;
+        setErrorLocations(errorMsg);
+        toast({ variant: "destructive", title: "Location Fetch Issues", description: errorMsg, duration: 5000 });
+    }
+  }, [employeesToFetchLocationsFor, toast, router, isLoadingEmployees]);
+
+  useEffect(() => {
+    fetchAllLocations();
+  }, [fetchAllLocations]);
+
+
+  const displayableEmployeeLocations: MapMarkerData[] = useMemo(() => {
+    return employeesToFetchLocationsFor
+      .map(emp => {
+        const location = locationsData[emp.id];
+        if (location && location.latitude != null && location.longitude != null) { // Check for null or undefined explicitly
+          return {
+            id: emp.id,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            title: emp.name || 'Unknown Employee',
+            description: `${emp.jobTitle || 'N/A'} - ${emp.status}. Last seen: ${location.timestamp ? new Date(location.timestamp).toLocaleString() : 'N/A'} at ${location.address || 'address unavailable'}`,
+            icon: (
+                <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
+                    <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
+                        <AvatarImage src={emp.avatarUrl} alt={emp.name || ''} data-ai-hint="person map" />
+                        <AvatarFallback>{emp.name ? emp.name.substring(0,1) : 'U'}</AvatarFallback>
+                    </Avatar>
+                    {emp.status === 'Active' && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />}
+                </div>
+            )
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as MapMarkerData[];
+  }, [employeesToFetchLocationsFor, locationsData]);
+
+  useEffect(() => {
+    if (displayableEmployeeLocations.length > 0) {
+      const avgLat = displayableEmployeeLocations.reduce((sum, m) => sum + m.latitude, 0) / displayableEmployeeLocations.length;
+      const avgLng = displayableEmployeeLocations.reduce((sum, m) => sum + m.longitude, 0) / displayableEmployeeLocations.length;
       setMapCenter({ lat: avgLat, lng: avgLng });
-      setMapZoom(markers.length === 1 ? 13 : 11); 
-    } else {
+      setMapZoom(displayableEmployeeLocations.length === 1 ? 13 : 10); 
+    } else if (!isLoadingEmployees && !isLoadingLocations) {
       setMapCenter({ lat: 34.0522, lng: -118.2437 }); 
-      setMapZoom(12);
+      setMapZoom(3); // Zoom out if no markers
     }
-  }, [markers]);
+  }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 gap-4">
-          <CardTitle>Employee Live Locations</CardTitle>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-            <RadioGroup defaultValue="active" onValueChange={(value: 'all' | 'active' | 'inactive') => setFilter(value)} className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <CardTitle className="flex items-center gap-2"><MapPinned className="h-6 w-6 text-primary" />Employee Live Locations</CardTitle>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <RadioGroup 
+                value={filter} 
+                onValueChange={(value: 'all' | 'active' | 'inactive') => setFilter(value)} 
+                className="flex flex-wrap items-center gap-x-4 gap-y-2"
+                disabled={isLoadingEmployees || isLoadingLocations}
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="all" id="r-all" />
-                <Label htmlFor="r-all">All</Label>
+                <Label htmlFor="r-all">All ({allEmployees.length})</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="active" id="r-active" />
-                <Label htmlFor="r-active">Active</Label>
+                <Label htmlFor="r-active">Active ({allEmployees.filter(e=>e.status === 'Active').length})</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="inactive" id="r-inactive" />
-                <Label htmlFor="r-inactive">Inactive</Label>
+                <Label htmlFor="r-inactive">Inactive ({allEmployees.filter(e=>e.status === 'Inactive').length})</Label>
               </div>
             </RadioGroup>
-            <Button variant="outline" size="sm" onClick={() => setIsSimulating(!isSimulating)} className="w-full sm:w-auto">
-              <RefreshCw className={`mr-2 h-4 w-4 ${isSimulating ? 'animate-spin' : ''}`} />
-              {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchAllLocations} 
+                disabled={isLoadingEmployees || isLoadingLocations || employeesToFetchLocationsFor.length === 0}
+                className="w-full sm:w-auto"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingLocations ? 'animate-spin' : ''}`} />
+              {isLoadingLocations ? 'Refreshing...' : 'Refresh Locations'}
             </Button>
           </div>
         </CardHeader>
       </Card>
-      <div className="flex-grow rounded-lg overflow-hidden shadow-xl border">
-        <MapComponent markers={markers} center={mapCenter} zoom={mapZoom} />
+      <div className="flex-grow rounded-lg overflow-hidden shadow-xl border relative">
+        { (isLoadingEmployees || (employeesToFetchLocationsFor.length > 0 && isLoadingLocations && displayableEmployeeLocations.length === 0)) && (
+             <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                <div className="flex flex-col items-center space-y-2 p-4 bg-card rounded-lg shadow-lg">
+                    <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">{isLoadingEmployees ? "Loading employees..." : "Fetching locations..."}</p>
+                </div>
+            </div>
+        )}
+        
+        { !isLoadingEmployees && errorEmployees && (
+            <div className="h-full flex flex-col items-center justify-center text-destructive p-4">
+                <AlertTriangle className="h-12 w-12 mb-2"/>
+                <p className="font-semibold text-lg">Error Loading Employees</p>
+                <p className="text-sm">{errorEmployees}</p>
+            </div>
+        )}
+
+        { !isLoadingEmployees && !errorEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all' && (
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
+                <Users className="h-12 w-12 mb-2 opacity-50"/>
+                <p className="font-semibold text-lg">No Employees to Display</p>
+                <p className="text-sm">There are no employees matching the filter '{filter}'.</p>
+            </div>
+        )}
+        
+        { !isLoadingEmployees && !errorEmployees && allEmployees.length === 0 && (
+             <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
+                <Users className="h-12 w-12 mb-2 opacity-50"/>
+                <p className="font-semibold text-lg">No Employees Found</p>
+                <p className="text-sm">There are no employees in the system to display locations for.</p>
+            </div>
+        )}
+
+        <MapComponent markers={displayableEmployeeLocations} center={mapCenter} zoom={mapZoom} />
+
+        { errorLocations && (
+             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg text-xs max-w-md text-center">
+                <AlertTriangle className="inline h-4 w-4 mr-1" />
+                {errorLocations}
+            </div>
+        )}
       </div>
     </div>
   );
 }
+
+    
