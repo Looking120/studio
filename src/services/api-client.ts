@@ -2,7 +2,7 @@
 // src/services/api-client.ts
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-export const API_BASE_URL = 'https://192.168.0.119:7294/api'; // Reverted to HTTPS and port 7294
+export const API_BASE_URL = 'https://192.168.0.119:7294/api';
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -103,14 +103,13 @@ axiosInstance.interceptors.response.use(
     } else if (error.request) {
       // The request was made but no response was received
       const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
-      const logMessage = `Network error or no response received from ${targetUrl}:`;
       
       let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
       if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL)) {
         detailedErrorMessage += ' When accessing a local IP, ensure the server is listening on that IP (not just localhost), and check firewall/HTTPS certificate validity from this device.';
       }
       // Explicitly use console.warn for the "no response" scenario
-      console.warn(logMessage, "Details:", error.message);
+      console.warn(`[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}. Check backend server, firewall, and (if HTTPS) SSL certificate on client device.`, error.request);
       throw new HttpError(detailedErrorMessage, 0, null);
     } else {
       // Something happened in setting up the request that triggered an Error
