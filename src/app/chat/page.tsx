@@ -170,9 +170,11 @@ export default function ChatPage() {
     try {
       const payload: SendMessagePayload = {
         senderId: currentUserId,
+        receiverId: selectedUser.id, // Added receiverId
         conversationId: currentConversationId,
         content: messageToSend.trim(),
       };
+      console.log("ChatPage: Sending message with payload:", payload);
       const sentMessage = await sendMessage(payload);
       setDisplayMessages(prev => prev.map(msg =>
         msg.id === optimisticMessage.id ? {
