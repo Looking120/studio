@@ -43,9 +43,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Helper function to check for zero GUID
+// Helper function to check for zero GUID or problematic GUID strings
 const isZeroGuid = (guid: string | undefined | null): boolean => {
-  if (!guid) return true; // Treat null/undefined as problematic (potentially a zero GUID source)
+  if (!guid || guid.trim() === "") return true; // Treat null, undefined, empty string, or string with only whitespace as problematic
   return guid === "00000000-0000-0000-0000-000000000000";
 };
 
@@ -157,18 +157,19 @@ export default function PositionsPage() {
 
     console.log(
       `[Assign Position] Attempting to assign employee ${selectedEmployeeIdToAssign} to position: `,
-      JSON.stringify(selectedPositionForAssign, null, 2) // Log the full position object
+      JSON.stringify(selectedPositionForAssign, null, 2) 
     );
+    console.log(`[Assign Position] Checking departmentId: "${selectedPositionForAssign.departmentId}" with isZeroGuid: ${isZeroGuid(selectedPositionForAssign.departmentId)}`);
 
-    // Check if the selected position has a problematic departmentId
+
     if (isZeroGuid(selectedPositionForAssign.departmentId)) {
       toast({
         variant: "destructive",
         title: "Assignment Error",
-        description: `The selected position "${selectedPositionForAssign.title}" is not associated with a valid department or its department ID is invalid (e.g., '0000-...'). Please ensure the position is correctly configured with a department before assigning.`,
-        duration: 9000, // Longer duration for important messages
+        description: `The selected position "${selectedPositionForAssign.title}" is not associated with a valid department or its department ID is invalid (e.g., '0000-...', null, or empty). Please ensure the position is correctly configured with a department before assigning.`,
+        duration: 9000, 
       });
-      setIsAssignDialogOpen(false); // Close dialog as this is a pre-API check failure
+      setIsAssignDialogOpen(false); 
       return;
     }
 
@@ -176,12 +177,6 @@ export default function PositionsPage() {
     try {
       const payload: AssignPositionPayload = { employeeId: selectedEmployeeIdToAssign };
       
-      // Optional: If your API expects departmentId in the payload for this specific 'assign' endpoint,
-      // and it's desirable to send it from the position:
-      // if (selectedPositionForAssign.departmentId && !isZeroGuid(selectedPositionForAssign.departmentId)) {
-      //   payload.departmentId = selectedPositionForAssign.departmentId;
-      // }
-
       await assignPositionToEmployee(selectedPositionForAssign.id, payload);
       toast({ title: "Position Assigned", description: `Successfully assigned position to employee.` });
       setIsAssignDialogOpen(false);
