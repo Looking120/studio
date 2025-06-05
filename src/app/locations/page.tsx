@@ -71,7 +71,7 @@ export default function LocationsPage() {
   const employeesToFetchLocationsFor = useMemo(() => {
     if (isLoadingEmployees) return [];
     if (filter === 'all') return allEmployees;
-    return allEmployees.filter(emp => emp.status.toLowerCase() === filter);
+    return allEmployees.filter(emp => emp && emp.status && emp.status.toLowerCase() === filter);
   }, [allEmployees, filter, isLoadingEmployees]);
 
   const fetchAllLocations = useCallback(async () => {
@@ -244,5 +244,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-
-    
