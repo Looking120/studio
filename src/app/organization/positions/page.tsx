@@ -16,6 +16,7 @@ import {
   type AddPositionPayload,
   type AssignPositionPayload
 } from '@/services/organization-service';
+import { fetchUsers, type User } from '@/services/user-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
@@ -31,7 +32,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription as DialogDesc, // Renamed to avoid conflict
+  DialogFooter as DialogFoot, // Renamed to avoid conflict
+  DialogHeader as DialogHead, // Renamed to avoid conflict
+  DialogTitle as DialogTitl, // Renamed to avoid conflict
+  DialogTrigger as DialogTrig, // Renamed to avoid conflict
+  DialogClose
+} from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -43,13 +55,18 @@ export default function PositionsPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newPositionTitle, setNewPositionTitle] = useState("");
 
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedPositionForAssign, setSelectedPositionForAssign] = useState<Position | null>(null);
+  const [selectedEmployeeIdToAssign, setSelectedEmployeeIdToAssign] = useState<string>("");
+  const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
+
   const loadPositions = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting to fetch positions from service...");
       const data = await fetchPositions();
-      console.log("Positions fetched:", data);
       setPositions(data || []);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -67,8 +84,22 @@ export default function PositionsPage() {
     }
   };
 
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const fetchedUsers = await fetchUsers();
+      setUsers(fetchedUsers.filter(u => u.id)); // Ensure users have IDs
+    } catch (err) {
+      toast({ variant: "destructive", title: "Failed to load users", description: err instanceof Error ? err.message : "Could not fetch users for assignment." });
+      setUsers([]);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
     loadPositions();
+    loadUsers();
   }, []);
 
   const handleAddPositionSubmit = async () => {
@@ -108,140 +139,226 @@ export default function PositionsPage() {
      alert(`Delete position ${positionId} - functionality to be implemented.`);
   };
 
-  const handleAssignPosition = (pos: Position) => {
-    console.log(`Placeholder: Open assign employee to position ${pos.title} dialog.`);
-    alert(`Assign employee to ${pos.title} - functionality to be implemented with a form/dialog.`);
+  const openAssignDialog = (position: Position) => {
+    setSelectedPositionForAssign(position);
+    setSelectedEmployeeIdToAssign("");
+    setIsAssignDialogOpen(true);
+  };
+
+  const handleAssignPositionSubmit = async () => {
+    if (!selectedPositionForAssign || !selectedEmployeeIdToAssign) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please select a position and an employee." });
+      return;
+    }
+    setIsSubmittingAssignment(true);
+    try {
+      const payload: AssignPositionPayload = { employeeId: selectedEmployeeIdToAssign };
+      await assignPositionToEmployee(selectedPositionForAssign.id, payload);
+      toast({ title: "Position Assigned", description: `Successfully assigned position to employee.` });
+      setIsAssignDialogOpen(false);
+      setSelectedPositionForAssign(null);
+      setSelectedEmployeeIdToAssign("");
+      loadPositions(); // Refresh positions data to show updated assigned counts, etc.
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+            await signOut();
+            router.push('/');
+            return;
+        }
+        const errorMessage = err instanceof Error ? err.message : 'Could not assign position.';
+        toast({ variant: "destructive", title: "Failed to assign position", description: errorMessage });
+        console.error("Assign position failed:", err);
+    } finally {
+      setIsSubmittingAssignment(false);
+    }
   };
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
-          <CardDescription>Define and assign job positions within the organization.</CardDescription>
-        </div>
-         <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <AlertDialogTrigger asChild>
-                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Position
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Add New Position</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Enter the title for the new position. Optionally, link it to a department.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="newPositionTitle">Position Title</Label>
-                        <Input
-                            id="newPositionTitle"
-                            placeholder="E.g., Software Engineer, Marketing Manager"
-                            value={newPositionTitle}
-                            onChange={(e) => setNewPositionTitle(e.target.value)}
-                        />
-                    </div>
-                </div>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => { setNewPositionTitle(""); }}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-      </CardHeader>
-      <CardContent>
-         {isLoading && (
-            <Table>
+    <>
+      <Card className="shadow-lg">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
+            <CardDescription>Define and assign job positions within the organization.</CardDescription>
+          </div>
+          <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+              <AlertDialogTrigger asChild>
+                  <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Position
+                  </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle>Add New Position</AlertDialogTitle>
+                      <AlertDialogDescription>
+                          Enter the title for the new position.
+                      </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                          <Label htmlFor="newPositionTitle">Position Title</Label>
+                          <Input
+                              id="newPositionTitle"
+                              placeholder="E.g., Software Engineer, Marketing Manager"
+                              value={newPositionTitle}
+                              onChange={(e) => setNewPositionTitle(e.target.value)}
+                          />
+                      </div>
+                  </div>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => { setNewPositionTitle(""); }}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+          </AlertDialog>
+        </CardHeader>
+        <CardContent>
+          {isLoading && (
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                      <TableHead>Position Title</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Assigned Employees</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {Array.from({ length: 3 }).map((_, index) => (
+                          <TableRow key={`skeleton-pos-${index}`}>
+                          <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                          <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+          )}
+          {!isLoading && error && (
+            <div className="flex flex-col items-center justify-center py-8 text-destructive">
+              <AlertTriangle className="h-12 w-12 mb-4" />
+              <p className="text-xl font-semibold">Failed to load positions</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+          {!isLoading && !error && positions.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                  No positions found. Click "Add Position" to create one.
+              </p>
+          )}
+          {!isLoading && !error && positions.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
                 <TableHeader>
-                    <TableRow>
+                  <TableRow>
                     <TableHead>Position Title</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Assigned Employees</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {Array.from({ length: 3 }).map((_, index) => (
-                        <TableRow key={`skeleton-pos-${index}`}>
-                        <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                        <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
-                        </TableRow>
-                    ))}
+                  {positions.map((pos) => (
+                      <TableRow key={pos.id}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                          <Briefcase className="h-4 w-4 text-muted-foreground" />
+                          {pos.title}
+                      </TableCell>
+                      <TableCell>{pos.departmentName || 'N/A'}</TableCell>
+                      <TableCell>{pos.assignedEmployees !== undefined ? pos.assignedEmployees : 'N/A'}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                          <Button variant="outline" size="xs" onClick={() => openAssignDialog(pos)} title="Assign Employee">
+                            <UserCheck className="mr-1 h-3 w-3" /> Assign
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPosition(pos)} title="Edit Position">
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete Position">
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Delete</span>
+                                  </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                      This action will permanently delete the "{pos.title}" position. This cannot be undone.
+                                  </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeletePositionConfirm(pos.id)}>Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                      </TableCell>
+                      </TableRow>
+                  ))}
                 </TableBody>
-            </Table>
-         )}
-        {!isLoading && error && (
-          <div className="flex flex-col items-center justify-center py-8 text-destructive">
-            <AlertTriangle className="h-12 w-12 mb-4" />
-            <p className="text-xl font-semibold">Failed to load positions</p>
-            <p className="text-sm">{error}</p>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHead>
+            <DialogTitl>Assign Employee to Position</DialogTitl>
+            <DialogDesc>
+              Select an employee to assign to the position: "{selectedPositionForAssign?.title}".
+            </DialogDesc>
+          </DialogHead>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="employee" className="text-right">
+                Employee
+              </Label>
+              <div className="col-span-3">
+                <Select
+                  value={selectedEmployeeIdToAssign}
+                  onValueChange={setSelectedEmployeeIdToAssign}
+                  disabled={isLoadingUsers}
+                >
+                  <SelectTrigger id="employee">
+                    <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select an employee"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {isLoadingUsers ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : users.length > 0 ? (
+                        users.map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name || user.email} ({user.email})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-users" disabled>No users available</SelectItem>
+                      )}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
-        )}
-        {!isLoading && !error && positions.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">
-                No positions found. Click "Add Position" to create one.
-            </p>
-        )}
-        {!isLoading && !error && positions.length > 0 && (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Position Title</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Assigned Employees</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {positions.map((pos) => (
-                    <TableRow key={pos.id}>
-                    <TableCell className="font-medium flex items-center gap-2">
-                        <Briefcase className="h-4 w-4 text-muted-foreground" />
-                        {pos.title}
-                    </TableCell>
-                    <TableCell>{pos.departmentName || 'N/A'}</TableCell>
-                    <TableCell>{pos.assignedEmployees !== undefined ? pos.assignedEmployees : 'N/A'}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="xs" onClick={() => handleAssignPosition(pos)} title="Assign Employee">
-                        <UserCheck className="mr-1 h-3 w-3" /> Assign
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPosition(pos)} title="Edit Position">
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                        </Button>
-                         <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete Position">
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Delete</span>
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action will permanently delete the "{pos.title}" position. This cannot be undone.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeletePositionConfirm(pos.id)}>Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </TableCell>
-                    </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <DialogFoot>
+            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)} disabled={isSubmittingAssignment}>Cancel</Button>
+            <Button 
+              type="submit" 
+              onClick={handleAssignPositionSubmit}
+              disabled={!selectedEmployeeIdToAssign || isSubmittingAssignment || isLoadingUsers}
+            >
+              {isSubmittingAssignment ? "Assigning..." : "Assign Position"}
+            </Button>
+          </DialogFoot>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

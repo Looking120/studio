@@ -11,7 +11,7 @@ import { fetchOffices, addOffice, updateOffice, deleteOffice } from '@/services/
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UnauthorizedError } from '@/services/api-client';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import {
   AlertDialog,
@@ -38,9 +38,9 @@ export default function OfficesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting to fetch offices from service...");
-      const paginatedData = await fetchOffices(); // fetchOffices now returns PaginatedResult
-      console.log("Offices fetched:", paginatedData);
+      console.log("[OfficesPage] Attempting to fetch offices from service...");
+      const paginatedData = await fetchOffices();
+      console.log("[OfficesPage] Offices fetched:", paginatedData);
       setOffices(paginatedData.items || []); 
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -52,7 +52,7 @@ export default function OfficesPage() {
         await signOut();
         router.push('/');
       } else {
-        console.error("Failed to fetch offices:", err);
+        console.error("[OfficesPage] Failed to fetch offices:", err);
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching offices.';
         setError(errorMessage);
         setOffices([]); 
@@ -104,38 +104,58 @@ export default function OfficesPage() {
     const newOfficeData: AddOfficePayload = { 
         name: "New Branch " + Math.floor(Math.random() * 1000), 
         address: "123 Placeholder Ave, New City, NC " + Math.floor(Math.random() * 10000), 
-        latitude: 35.7596 + (Math.random() - 0.5) * 2, 
-        longitude: -79.0193 + (Math.random() - 0.5) * 2, 
+        latitude: 35.7596 + (Math.random() - 0.5) * 2, // Random lat around NC
+        longitude: -79.0193 + (Math.random() - 0.5) * 2, // Random lng around NC
         headcount: Math.floor(Math.random() * 50) + 10 
     };
+    console.log("[OfficesPage] Attempting to add office with data:", JSON.stringify(newOfficeData, null, 2));
     try {
       const addedOffice = await addOffice(newOfficeData);
+      console.log("[OfficesPage] Office added successfully via service:", addedOffice);
       setOffices(prev => [...prev, addedOffice]); 
       toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
     } catch (err) {
+      console.error("[OfficesPage] Add office failed:", err);
       if (err instanceof UnauthorizedError) {
         toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
         await signOut();
         router.push('/');
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'Could not add office.';
+      let errorMessage = 'Could not add office.';
+      if (err instanceof HttpError) {
+        errorMessage = `API Error (${err.status}): ${err.message}.`;
+        if (err.responseData) {
+          console.error("[OfficesPage] Add office API error response data:", err.responseData);
+          errorMessage += ` Details: ${JSON.stringify(err.responseData)}`;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
       toast({ variant: "destructive", title: "Failed to add office", description: errorMessage });
-      console.error("Add office failed:", err);
     }
   };
 
   const handleEditOffice = async (officeId: string) => {
-    console.log(`Placeholder: Open edit office dialog for ${officeId}`);
+    console.log(`[OfficesPage] Placeholder: Open edit office dialog for ${officeId}`);
     alert(`Edit office ${officeId} - functionality to be fully implemented with a form/dialog.`);
+    // To implement:
+    // 1. Create state for edit dialog visibility and office data.
+    // 2. Fetch office by ID if needed or use existing data.
+    // 3. Create a form in a Dialog component.
+    // 4. On submit, call `updateOffice(officeId, updatedData)`.
+    // 5. Handle success/error and refresh office list.
   };
 
   const handleDeleteOffice = async (officeId: string) => {
+      console.log(`[OfficesPage] Attempting to delete office with ID: ${officeId}`);
       try {
         await deleteOffice(officeId);
+        console.log(`[OfficesPage] Office ${officeId} deleted successfully via service.`);
         setOffices(prev => prev.filter(off => off.id !== officeId)); 
         toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
       } catch (err) {
+        console.error(`[OfficesPage] Delete office ${officeId} failed:`, err);
         if (err instanceof UnauthorizedError) {
           toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
           await signOut();
@@ -144,7 +164,6 @@ export default function OfficesPage() {
         }
         const errorMessage = err instanceof Error ? err.message : 'Could not delete office.';
         toast({ variant: "destructive", title: "Failed to delete office", description: errorMessage });
-        console.error("Delete office failed:", err);
       }
   };
 
