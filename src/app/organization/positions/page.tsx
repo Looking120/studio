@@ -35,15 +35,19 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription as DialogDesc, // Renamed to avoid conflict
-  DialogFooter as DialogFoot, // Renamed to avoid conflict
-  DialogHeader as DialogHead, // Renamed to avoid conflict
-  DialogTitle as DialogTitl, // Renamed to avoid conflict
-  DialogTrigger as DialogTrig, // Renamed to avoid conflict
-  DialogClose
+  DialogDescription as DialogDesc, 
+  DialogFooter as DialogFoot, 
+  DialogHeader as DialogHead, 
+  DialogTitle as DialogTitl, 
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Helper function to check for zero GUID
+const isZeroGuid = (guid: string | undefined | null): boolean => {
+  if (!guid) return true; // Treat null/undefined as problematic (potentially a zero GUID source)
+  return guid === "00000000-0000-0000-0000-000000000000";
+};
 
 export default function PositionsPage() {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -88,7 +92,7 @@ export default function PositionsPage() {
     setIsLoadingUsers(true);
     try {
       const fetchedUsers = await fetchUsers();
-      setUsers(fetchedUsers.filter(u => u.id)); // Ensure users have IDs
+      setUsers(fetchedUsers.filter(u => u.id)); 
     } catch (err) {
       toast({ variant: "destructive", title: "Failed to load users", description: err instanceof Error ? err.message : "Could not fetch users for assignment." });
       setUsers([]);
@@ -150,20 +154,46 @@ export default function PositionsPage() {
       toast({ variant: "destructive", title: "Validation Error", description: "Please select a position and an employee." });
       return;
     }
+
+    console.log(
+      `[Assign Position] Attempting to assign employee ${selectedEmployeeIdToAssign} to position: `,
+      JSON.stringify(selectedPositionForAssign, null, 2) // Log the full position object
+    );
+
+    // Check if the selected position has a problematic departmentId
+    if (isZeroGuid(selectedPositionForAssign.departmentId)) {
+      toast({
+        variant: "destructive",
+        title: "Assignment Error",
+        description: `The selected position "${selectedPositionForAssign.title}" is not associated with a valid department or its department ID is invalid (e.g., '0000-...'). Please ensure the position is correctly configured with a department before assigning.`,
+        duration: 9000, // Longer duration for important messages
+      });
+      setIsAssignDialogOpen(false); // Close dialog as this is a pre-API check failure
+      return;
+    }
+
     setIsSubmittingAssignment(true);
     try {
       const payload: AssignPositionPayload = { employeeId: selectedEmployeeIdToAssign };
+      
+      // Optional: If your API expects departmentId in the payload for this specific 'assign' endpoint,
+      // and it's desirable to send it from the position:
+      // if (selectedPositionForAssign.departmentId && !isZeroGuid(selectedPositionForAssign.departmentId)) {
+      //   payload.departmentId = selectedPositionForAssign.departmentId;
+      // }
+
       await assignPositionToEmployee(selectedPositionForAssign.id, payload);
       toast({ title: "Position Assigned", description: `Successfully assigned position to employee.` });
       setIsAssignDialogOpen(false);
       setSelectedPositionForAssign(null);
       setSelectedEmployeeIdToAssign("");
-      loadPositions(); // Refresh positions data to show updated assigned counts, etc.
+      loadPositions(); 
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
             await signOut();
             router.push('/');
+            setIsSubmittingAssignment(false); 
             return;
         }
         const errorMessage = err instanceof Error ? err.message : 'Could not assign position.';
