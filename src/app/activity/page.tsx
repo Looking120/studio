@@ -59,11 +59,9 @@ export default function ActivityLogsPage() {
       try {
         // TODO: Implement a way to select an employeeId dynamically
         const employeeId = "emp001"; // Placeholder
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - 7); // Fetch logs for the last 7 days
-
-        const data = await fetchActivityLogsByEmployee(employeeId, startDate.toISOString(), endDate.toISOString());
+        
+        // API call no longer takes startDate and endDate
+        const data = await fetchActivityLogsByEmployee(employeeId);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         let errorMessage = 'An unknown error occurred while fetching activity logs.';
@@ -79,7 +77,7 @@ export default function ActivityLogsPage() {
         } else if (err instanceof HttpError) {
           errorMessage = err.message;
           if (err.status === 400) {
-            errorMessage = "Failed to load activity logs. There was an issue with the request parameters (e.g., date range or employee ID). Please check and try again. Details: " + err.message;
+            errorMessage = "Failed to load activity logs. There was an issue with the request (e.g., employee ID). Please check and try again. Details: " + err.message;
           }
         } else if (err instanceof Error) {
           errorMessage = err.message;
@@ -108,6 +106,8 @@ export default function ActivityLogsPage() {
 
   const filteredLogs = useMemo(() => {
     if (!activityLogs) return [];
+    // Client-side filtering for date can be added here if needed in the future
+    // For now, it filters by search term and activity type
     return activityLogs
     .filter(log =>
       (log.employeeName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -166,8 +166,8 @@ export default function ActivityLogsPage() {
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible, and that the selected employee has logs in the specified date range.</p>
-            <p className="text-xs mt-1">Currently fetching for a default employee and date range. Implement dynamic selection for better results.</p>
+            <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible, and that the selected employee has logs.</p>
+            <p className="text-xs mt-1">Currently fetching for a default employee. Implement dynamic selection for better results.</p>
           </div>
         )}
         {!fetchError && (
@@ -206,9 +206,10 @@ export default function ActivityLogsPage() {
           </div>
         )}
         {!isLoading && !fetchError && filteredLogs.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">No activity logs found for the current employee, date range, and filters.</p>
+          <p className="text-center text-muted-foreground py-8">No activity logs found for the current employee and filters.</p>
         )}
       </CardContent>
     </Card>
   );
 }
+

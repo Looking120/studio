@@ -17,12 +17,12 @@ export interface EndActivityPayload {
 // Pour l'instant, on suppose que l'API retourne une structure compatible avec FrontendActivityLog
 interface ApiActivityLog extends FrontendActivityLog {} // Placeholder
 
-export async function fetchActivityLogsByEmployee(employeeId: string, startDate: string, endDate: string): Promise<FrontendActivityLog[]> {
-  console.log(`API CALL: GET /activity-logs/${employeeId} with params: startDate=${startDate}, endDate=${endDate}`);
+export async function fetchActivityLogsByEmployee(employeeId: string): Promise<FrontendActivityLog[]> {
+  console.log(`API CALL: GET /activity-logs/${employeeId}`);
   try {
     const response = await apiClient<ApiActivityLog[]>(`/activity-logs/${employeeId}`, {
       method: 'GET',
-      params: { startDate, endDate },
+      // Removed params: { startDate, endDate }
     });
     return response.data; 
   } catch (error) {
@@ -61,3 +61,4 @@ export async function endCurrentEmployeeActivity(employeeId: string, endActivity
     throw new HttpError('Failed to end current employee activity.', 0, null);
   }
 }
+
