@@ -38,10 +38,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
   useEffect(() => {
     const envAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-    if (mapboxAccessToken) {
+    // Token provided by the user
+    const userProvidedToken = 'pk.eyJ1Ijoiam4wMDciLCJhIjoiY21haW9yeXFxMGNuODJrcjQzamlyenF6aCJ9.nfHTNAMGgwwbawLTNJrLLg';
+
+    if (mapboxAccessToken) { // Prop takes precedence
       setCurrentAccessToken(mapboxAccessToken);
-    } else if (envAccessToken) {
+    } else if (envAccessToken) { // Then env var
       setCurrentAccessToken(envAccessToken);
+    } else { // Fallback to the user-provided token
+      setCurrentAccessToken(userProvidedToken);
     }
   }, [mapboxAccessToken]);
 
@@ -56,15 +61,16 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
 
   if (!currentAccessToken) {
+    // This block should ideally not be reached if userProvidedToken is valid
     return (
       <div className="flex items-center justify-center h-full w-full bg-muted rounded-lg shadow-md">
         <div className="text-center p-8">
-          <h3 className="text-xl font-semibold text-destructive mb-2">Mapbox Access Token Missing</h3>
+          <h3 className="text-xl font-semibold text-destructive mb-2">Mapbox Access Token Configuration Issue</h3>
           <p className="text-muted-foreground">
-            Please provide a Mapbox Access Token either through the 'mapboxAccessToken' prop or by setting the NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN environment variable.
+            A Mapbox Access Token is required but could not be determined.
           </p>
           <p className="text-sm text-muted-foreground mt-4">
-            Refer to <code className="bg-card px-1 py-0.5 rounded">.env.local.example</code> for setup or visit Mapbox documentation to get an access token.
+            Please ensure a valid token is provided via the 'mapboxAccessToken' prop, the NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN environment variable, or that the fallback token is correctly set.
           </p>
         </div>
       </div>
