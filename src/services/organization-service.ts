@@ -1,7 +1,7 @@
 
 // src/services/organization-service.ts
 import type { Office as FrontendOffice } from '@/lib/data';
-// import { apiClient, UnauthorizedError, HttpError } from './api-client'; // apiClient not used
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 export interface PaginatedResult<T> {
   items: T[];
@@ -13,6 +13,7 @@ export interface PaginatedResult<T> {
   hasPreviousPage?: boolean;
 }
 
+// Office types
 export interface AddOfficePayload {
   name: string;
   address: string;
@@ -29,16 +30,9 @@ export interface UpdateOfficePayload {
   radius?: number;
   description?: string;
 }
+interface ApiOffice extends FrontendOffice {} // Supposons une compatibilité directe pour l'instant
 
-const createMockOffice = (id: string, data: Partial<FrontendOffice>): FrontendOffice => ({
-  id: id,
-  name: data.name || `Mock Office ${id.substring(0,3)}`,
-  address: data.address || '123 Mock Street',
-  latitude: data.latitude || 34.0522,
-  longitude: data.longitude || -118.2437,
-  headcount: data.headcount || 50,
-});
-
+// Department types
 export interface Department {
   id: string;
   name: string;
@@ -50,14 +44,9 @@ export interface AddDepartmentPayload {
 export interface UpdateDepartmentPayload {
   name: string;
 }
+interface ApiDepartment extends Department {}
 
-const createMockDepartment = (id: string, data: Partial<Department>): Department => ({
-    id: id,
-    name: data.name || `Mock Dept ${id.substring(0,3)}`,
-    employeeCount: data.employeeCount || 10,
-});
-
-
+// Position types
 export interface Position {
   id: string;
   title: string;
@@ -70,99 +59,202 @@ export interface AddPositionPayload {
   departmentId?: string;
 }
 export interface AssignPositionPayload {
-  employeeId?: string;
-  departmentId?: string;
+  employeeId?: string; // L'API s'attend probablement à employeeId, pas departmentId ici
+  departmentId?: string; // Redondant si positionId est fourni
+}
+interface ApiPosition extends Position {}
+interface ApiAssignPositionResponse { // Exemple de réponse, ajustez si nécessaire
+    success: boolean;
+    message?: string;
+}
+interface ApiDeleteResponse {
+    success: boolean;
+    message?: string;
 }
 
-const createMockPosition = (id: string, data: Partial<Position>): Position => ({
-    id: id,
-    title: data.title || `Mock Position ${id.substring(0,3)}`,
-    departmentId: data.departmentId || 'mock-dept-id',
-    departmentName: data.departmentName || 'Mock Department',
-    assignedEmployees: data.assignedEmployees || 5,
-});
 
-
+// --- Office Functions ---
 export async function addOffice(officeData: AddOfficePayload): Promise<FrontendOffice> {
-  console.log('MOCK addOffice with data:', officeData);
-  const newId = `mock-off-${Date.now()}`;
-  return Promise.resolve(createMockOffice(newId, officeData));
+  console.log('API CALL: POST /organization/offices with data:', officeData);
+  try {
+    const response = await apiClient<ApiOffice>('/organization/offices', {
+      method: 'POST',
+      body: officeData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in addOffice:", error);
+    throw new HttpError('Failed to add office.', 0, null);
+  }
 }
 
-export async function fetchOffices(): Promise<PaginatedResult<FrontendOffice>> {
-  console.log('MOCK fetchOffices called');
-  const mockItems = [
-      createMockOffice('off-m1', {name: "HQ Mock", headcount: 120}),
-      createMockOffice('off-m2', {name: "Branch Mock", headcount: 30}),
-  ];
-  return Promise.resolve({
-    items: mockItems,
-    totalCount: mockItems.length,
-    pageNumber: 1,
-    pageSize: 10,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPreviousPage: false,
-  });
+export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<PaginatedResult<FrontendOffice>> {
+  console.log(`API CALL: GET /organization/offices with params: pageNumber=${pageNumber}, pageSize=${pageSize}`);
+  try {
+    const response = await apiClient<PaginatedResult<ApiOffice>>('/organization/offices', {
+      method: 'GET',
+      params: { pageNumber, pageSize },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchOffices:", error);
+    throw new HttpError('Failed to fetch offices.', 0, null);
+  }
 }
 
 export async function fetchOfficeById(officeId: string): Promise<FrontendOffice | null> {
-  console.log(`MOCK fetchOfficeById for ID: ${officeId}`);
-  if (officeId === 'off-m1' || officeId === 'off-m2') {
-    return Promise.resolve(createMockOffice(officeId, {name: `Office ${officeId}`}));
+  console.log(`API CALL: GET /organization/offices/${officeId}`);
+  try {
+    const response = await apiClient<ApiOffice | null>(`/organization/offices/${officeId}`, {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+        console.warn(`Office with id ${officeId} not found.`);
+        return null;
+    }
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchOfficeById:", error);
+    throw new HttpError(`Failed to fetch office ${officeId}.`, 0, null);
   }
-  return Promise.resolve(null);
 }
 
 export async function updateOffice(officeId: string, officeData: UpdateOfficePayload): Promise<FrontendOffice> {
-  console.log(`MOCK updateOffice for ID ${officeId} with data:`, officeData);
-  return Promise.resolve(createMockOffice(officeId, officeData));
+  console.log(`API CALL: PUT /organization/offices/${officeId} with data:`, officeData);
+  try {
+    const response = await apiClient<ApiOffice>(`/organization/offices/${officeId}`, {
+      method: 'PUT',
+      body: officeData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in updateOffice:", error);
+    throw new HttpError(`Failed to update office ${officeId}.`, 0, null);
+  }
 }
 
-export async function deleteOffice(officeId: string): Promise<{ success: boolean; message?: string }> {
-  console.log(`MOCK deleteOffice for ID: ${officeId}`);
-  return Promise.resolve({ success: true, message: "Mock office deleted successfully." });
+export async function deleteOffice(officeId: string): Promise<ApiDeleteResponse> {
+  console.log(`API CALL: DELETE /organization/offices/${officeId}`);
+  try {
+    const response = await apiClient<ApiDeleteResponse>(`/organization/offices/${officeId}`, {
+      method: 'DELETE',
+    });
+    return response.data; // API devrait retourner { success: true } ou similaire
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in deleteOffice:", error);
+    throw new HttpError(`Failed to delete office ${officeId}.`, 0, null);
+  }
 }
 
+// --- Department Functions ---
 export async function addDepartment(departmentData: AddDepartmentPayload): Promise<Department> {
-  console.log('MOCK addDepartment with data:', departmentData);
-  const newId = `mock-dept-${Date.now()}`;
-  return Promise.resolve(createMockDepartment(newId, departmentData));
+  console.log('API CALL: POST /organization/departments with data:', departmentData);
+  try {
+    const response = await apiClient<ApiDepartment>('/organization/departments', {
+      method: 'POST',
+      body: departmentData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in addDepartment:", error);
+    throw new HttpError('Failed to add department.', 0, null);
+  }
 }
 
 export async function fetchDepartments(): Promise<Department[]> {
-  console.log('MOCK fetchDepartments called');
-  return Promise.resolve([
-      createMockDepartment('dept-m1', {name: "Engineering", employeeCount: 25}),
-      createMockDepartment('dept-m2', {name: "Sales", employeeCount: 15}),
-  ]);
+  console.log('API CALL: GET /organization/departments');
+  try {
+    const response = await apiClient<ApiDepartment[]>('/organization/departments', {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchDepartments:", error);
+    throw new HttpError('Failed to fetch departments.', 0, null);
+  }
 }
 
 export async function updateDepartment(departmentId: string, departmentData: UpdateDepartmentPayload): Promise<Department> {
-  console.log(`MOCK updateDepartment for ID ${departmentId} with data:`, departmentData);
-  return Promise.resolve(createMockDepartment(departmentId, departmentData));
+  console.log(`API CALL: PUT /organization/departments/${departmentId} with data:`, departmentData);
+   // L'endpoint n'est pas dans la liste fournie, mais le UI le suggère.
+   // Supposons que PUT /organization/departments/{id} existe.
+  try {
+    const response = await apiClient<ApiDepartment>(`/organization/departments/${departmentId}`, {
+      method: 'PUT',
+      body: departmentData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in updateDepartment:", error);
+    throw new HttpError(`Failed to update department ${departmentId}.`, 0, null);
+  }
 }
 
-export async function deleteDepartment(departmentId: string): Promise<{ success: boolean; message?: string }> {
-  console.log(`MOCK deleteDepartment for ID: ${departmentId}`);
-  return Promise.resolve({ success: true, message: "Mock department deleted successfully." });
+export async function deleteDepartment(departmentId: string): Promise<ApiDeleteResponse> {
+  console.log(`API CALL: DELETE /organization/departments/${departmentId}`);
+  // L'endpoint n'est pas dans la liste fournie, mais le UI le suggère.
+  // Supposons que DELETE /organization/departments/{id} existe.
+  try {
+    const response = await apiClient<ApiDeleteResponse>(`/organization/departments/${departmentId}`, {
+      method: 'DELETE',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in deleteDepartment:", error);
+    throw new HttpError(`Failed to delete department ${departmentId}.`, 0, null);
+  }
 }
 
+// --- Position Functions ---
 export async function addPosition(positionData: AddPositionPayload): Promise<Position> {
-  console.log('MOCK addPosition with data:', positionData);
-  const newId = `mock-pos-${Date.now()}`;
-  return Promise.resolve(createMockPosition(newId, positionData));
+  console.log('API CALL: POST /organization/positions with data:', positionData);
+  try {
+    const response = await apiClient<ApiPosition>('/organization/positions', {
+      method: 'POST',
+      body: positionData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in addPosition:", error);
+    throw new HttpError('Failed to add position.', 0, null);
+  }
 }
 
 export async function fetchPositions(): Promise<Position[]> {
-  console.log('MOCK fetchPositions called');
-  return Promise.resolve([
-      createMockPosition('pos-m1', {title: "Software Engineer", departmentName: "Engineering"}),
-      createMockPosition('pos-m2', {title: "Sales Manager", departmentName: "Sales"}),
-  ]);
+  console.log('API CALL: GET /organization/positions');
+  try {
+    const response = await apiClient<ApiPosition[]>('/organization/positions', {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchPositions:", error);
+    throw new HttpError('Failed to fetch positions.', 0, null);
+  }
 }
 
-export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<any> {
-  console.log(`MOCK assignPositionToEmployee for position ${positionId} with data:`, assignmentData);
-  return Promise.resolve({ success: true, message: "Mock position assigned successfully." });
+export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<ApiAssignPositionResponse> {
+  console.log(`API CALL: PUT /organization/positions/${positionId}/assign with data:`, assignmentData);
+  try {
+    const response = await apiClient<ApiAssignPositionResponse>(`/organization/positions/${positionId}/assign`, {
+      method: 'PUT',
+      body: assignmentData, // L'API attendra probablement l'employeeId ici
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in assignPositionToEmployee:", error);
+    throw new HttpError(`Failed to assign position ${positionId}.`, 0, null);
+  }
 }

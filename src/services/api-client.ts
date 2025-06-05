@@ -2,7 +2,7 @@
 // src/services/api-client.ts
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-export const API_BASE_URL = 'https://192.168.0.119:7294/api'; // Updated port to 7294
+export const API_BASE_URL = 'https://localhost:7294/api'; // Mis à jour pour localhost
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -44,40 +44,29 @@ axiosInstance.interceptors.request.use(
     return config;
   },
   (error: AxiosError) => {
-    // This is for request errors (e.g. network issue before request is sent)
     console.error('Axios request error:', error);
     return Promise.reject(new HttpError(error.message || 'Failed to send request.', 0, null));
   }
 );
 
-// Heuristic to check if a string looks like an IP address based URL's hostname
 const isHostnameIpAddress = (url: string | undefined): boolean => {
   if (!url) return false;
   try {
     const hostname = new URL(url).hostname;
-    // Basic IPv4 regex
     const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
     return ipRegex.test(hostname);
   } catch (e) {
-    // If it's a relative URL (like from error.config.url), new URL will fail.
-    // In that case, we assume it's not an IP for this specific check.
     return false;
   }
 };
 
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
-    // For successful responses (2xx range)
-    // Axios automatically parses JSON, so response.data is the parsed body
-    // If status is 204 No Content, response.data will be null or an empty string.
     return response;
   },
   (error: AxiosError) => {
     if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
       const { status, data } = error.response;
-      
       let errorMessage = 'An error occurred';
       if (data && typeof data === 'object') {
         errorMessage = (data as any).message || (data as any).title || (data as any).detail || JSON.stringify(data);
@@ -94,29 +83,28 @@ axiosInstance.interceptors.response.use(
       
       const logMessage = `API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`;
       if (status === 415 && error.config?.url?.includes('/auth/signout')) {
-        // Don't log 415 for signout as error, it's a known issue we are trying to work around.
         console.warn(`${logMessage}. This might be related to Content-Type on signout.`, data);
       } else if (status !== 404 && status !== 500) {
         console.error(logMessage, data);
       } else if (status === 500) {
-        console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
+         console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
       }
       throw new HttpError(errorMessage, status, data);
     } else if (error.request) {
-      // The request was made but no response was received
       const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
-      
       let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
-      const logMessage = `[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}. Check backend server, firewall, and (if HTTPS) SSL certificate on client device.`;
-      
-      if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL)) {
-        detailedErrorMessage += ' When accessing a local IP, ensure the server is listening on that IP (not just localhost), and check firewall/HTTPS certificate validity from this device.';
+      const logMessageBase = `[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}.`;
+
+      if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL) && targetUrl.startsWith('https://')) {
+        detailedErrorMessage += ' When accessing a local IP via HTTPS, ensure you have accepted/bypassed any SSL certificate warnings in your browser for this IP address.';
+      } else if (targetUrl.startsWith('https://localhost') && error.message.includes('Network Error')) {
+         detailedErrorMessage += ' Ensure the backend server is running and the Kestrel development certificate is trusted (run `dotnet dev-certs https --trust`).';
+      } else {
+        detailedErrorMessage += ' Check backend server, firewall, and (if HTTPS) SSL certificate validity.';
       }
-      // Explicitly use console.warn for the "no response" scenario
-      console.warn(`[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}. Check backend server, firewall, and (if HTTPS) SSL certificate on client device. Details:`, error.request);
+      console.warn(`${logMessageBase} ${detailedErrorMessage}`, error.request);
       throw new HttpError(detailedErrorMessage, 0, null);
     } else {
-      // Something happened in setting up the request that triggered an Error
       console.error('Axios setup error for request to ' + error.config?.url + ':', error.message);
       throw new HttpError(error.message || 'An unknown error occurred while setting up the request.', 0, null);
     }
@@ -125,17 +113,11 @@ axiosInstance.interceptors.response.use(
 
 interface ApiClientOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  body?: any; // For axios, this will be 'data'
-  headers?: Record<string, string | null> | {}; // Allow null to remove header
-  params?: Record<string, any>; // For URL query parameters
+  body?: any;
+  headers?: Record<string, string | null> | {};
+  params?: Record<string, any>;
 }
 
-/**
- * A wrapper around an axios instance to centralize API calls.
- * @param endpoint The API endpoint to call (e.g., '/employees').
- * @param options Options including method, body (as data), headers, params.
- * @returns Promise<AxiosResponse<T>> which includes .data property with parsed body
- */
 export async function apiClient<T = any>(endpoint: string, options: ApiClientOptions = {}): Promise<AxiosResponse<T>> {
   const { method = 'GET', body, headers, params } = options;
 
@@ -143,15 +125,12 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     const response = await axiosInstance.request<T>({
       url: endpoint,
       method: method,
-      data: body, // 'data' is the Axios equivalent of 'body' in fetch
-      headers: headers as Record<string, string>, // Cast because axios expects string values for headers
+      data: body,
+      headers: headers as Record<string, string>,
       params: params,
     });
     return response;
   } catch (error) {
-    // The error will be processed by the response interceptor and re-thrown
-    // as UnauthorizedError or HttpError. We just re-throw it here.
     throw error;
   }
 }
-

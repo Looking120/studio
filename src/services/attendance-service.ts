@@ -1,13 +1,13 @@
 
 // src/services/attendance-service.ts
-// import { apiClient, UnauthorizedError, HttpError } from './api-client'; // apiClient not used in mock
-import type { ActivityLog } from '@/lib/data';
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
+import type { ActivityLog } from '@/lib/data'; // Using frontend type for now
 
 export interface AttendanceReport {
   totalHours: number;
   daysPresent: number;
   daysAbsent: number;
-  [key: string]: any;
+  [key: string]: any; // Pour d'autres champs potentiels
 }
 
 export interface CheckInData {
@@ -19,41 +19,51 @@ export interface CheckOutData {
   notes?: string;
 }
 
+// Supposons que l'API retourne un type compatible avec ActivityLog
+interface ApiActivityLog extends ActivityLog {} 
+interface ApiAttendanceReport extends AttendanceReport {}
+
 export async function checkIn(employeeId: string, checkInData?: CheckInData): Promise<ActivityLog> {
-  console.log(`MOCK checkIn for employee ${employeeId} with data:`, checkInData);
-  const logData: ActivityLog = {
-    id: `mock-checkin-${Date.now()}`,
-    employeeId: employeeId,
-    employeeName: "Mock Employee",
-    activityType: "Checked In",
-    startTime: new Date().toISOString(),
-    location: checkInData?.location || "Mock Location (Check-In)",
-    description: checkInData?.notes
-  };
-  return Promise.resolve(logData);
+  console.log(`API CALL: POST /attendance/${employeeId}/check-in with data:`, checkInData);
+  try {
+    const response = await apiClient<ApiActivityLog>(`/attendance/${employeeId}/check-in`, {
+      method: 'POST',
+      body: checkInData || {},
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in checkIn:", error);
+    throw new HttpError('Failed to check in.', 0, null);
+  }
 }
 
 export async function checkOut(employeeId: string, checkOutData?: CheckOutData): Promise<ActivityLog> {
-  console.log(`MOCK checkOut for employee ${employeeId} with data:`, checkOutData);
-  const logData: ActivityLog = {
-    id: `mock-checkout-${Date.now()}`,
-    employeeId: employeeId,
-    employeeName: "Mock Employee",
-    activityType: "Checked Out",
-    endTime: new Date().toISOString(),
-    startTime: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // Assume 8 hr shift
-    location: "Mock Location (Check-Out)",
-    description: checkOutData?.notes
-  };
-  return Promise.resolve(logData);
+  console.log(`API CALL: POST /attendance/${employeeId}/check-out with data:`, checkOutData);
+  try {
+    const response = await apiClient<ApiActivityLog>(`/attendance/${employeeId}/check-out`, {
+      method: 'POST',
+      body: checkOutData || {},
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in checkOut:", error);
+    throw new HttpError('Failed to check out.', 0, null);
+  }
 }
 
 export async function getAttendanceReport(employeeId: string, reportParams?: { startDate?: string; endDate?: string }): Promise<AttendanceReport> {
-  console.log(`MOCK getAttendanceReport for employee ${employeeId} with params:`, reportParams);
-  return Promise.resolve({
-    totalHours: 40,
-    daysPresent: 5,
-    daysAbsent: 0,
-    // Add more mock fields if your UI uses them
-  });
+  console.log(`API CALL: GET /attendance/${employeeId}/report with params:`, reportParams);
+  try {
+    const response = await apiClient<ApiAttendanceReport>(`/attendance/${employeeId}/report`, {
+      method: 'GET',
+      params: reportParams,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in getAttendanceReport:", error);
+    throw new HttpError('Failed to get attendance report.', 0, null);
+  }
 }

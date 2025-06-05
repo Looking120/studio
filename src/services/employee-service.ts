@@ -1,7 +1,7 @@
 
 // src/services/employee-service.ts
 import type { Employee as FrontendEmployee } from '@/lib/data';
-// import { apiClient, UnauthorizedError, HttpError } from './api-client'; // apiClient not used in mock
+import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 export interface EmployeeLocation {
   latitude: number;
@@ -18,95 +18,128 @@ export interface HireEmployeePayload {
   employeeNumber: string;
   address: string;
   phoneNumber: string;
-  dateOfBirth: string;
+  dateOfBirth: string; 
   gender: string;
-  hireDate: string;
+  hireDate: string; 
   departmentId: string;
   positionId: string;
   officeId: string;
 }
 
-export interface HiredEmployeeResponse extends FrontendEmployee {
-  firstName: string;
-  lastName: string;
+// Supposons que l'API retourne des types compatibles
+interface ApiEmployee extends FrontendEmployee {}
+interface ApiHiredEmployeeResponse extends ApiEmployee { // L'API peut avoir des champs supplémentaires
+    firstName: string; // Assurez-vous que ces champs sont bien dans la réponse API
+    lastName: string;
 }
-
-const createMockEmployee = (id: string, status: 'Active' | 'Inactive' = 'Active', partialData?: Partial<FrontendEmployee>): FrontendEmployee => ({
-  id: id,
-  name: `Mock Employee ${id.substring(0,3)}`,
-  email: `mock.${id.substring(0,3)}@example.com`,
-  department: 'Mock Department',
-  status: status,
-  avatarUrl: `https://placehold.co/40x40.png?text=${id.substring(0,2).toUpperCase()}`,
-  jobTitle: 'Mock Job Title',
-  latitude: 34.0522 + (Math.random() - 0.5) * 0.1,
-  longitude: -118.2437 + (Math.random() - 0.5) * 0.1,
-  lastSeen: `${Math.floor(Math.random() * 60)}m ago`,
-  officeId: 'mock-office-001',
-  ...partialData,
-});
-
+interface ApiEmployeeLocation extends EmployeeLocation {}
 
 export async function fetchEmployees(): Promise<FrontendEmployee[]> {
-  console.log('MOCK fetchEmployees called');
-  // Return a few mock employees for display purposes
-  return Promise.resolve([
-    createMockEmployee('emp001-mock', 'Active', {name: "Alice Mock", department: "Engineering", jobTitle: "Software Engineer"}),
-    createMockEmployee('emp002-mock', 'Active', {name: "Bob Mock", department: "Sales", jobTitle: "Sales Lead"}),
-    createMockEmployee('emp003-mock', 'Inactive', {name: "Charlie Mock", department: "Marketing", jobTitle: "Marketing Specialist"}),
-  ]);
+  console.log('API CALL: GET /employees');
+  try {
+    const response = await apiClient<ApiEmployee[]>('/employees', {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchEmployees:", error);
+    throw new HttpError('Failed to fetch employees.', 0, null);
+  }
 }
 
 export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | null> {
-  console.log(`MOCK fetchEmployeeById for ID: ${id}`);
-  if (id === 'emp001-mock' || id === 'emp002-mock' || id === 'emp003-mock') {
-    return Promise.resolve(createMockEmployee(id));
+  console.log(`API CALL: GET /employees/${id}`);
+  try {
+    const response = await apiClient<ApiEmployee | null>(`/employees/${id}`, {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+        console.warn(`Employee with id ${id} not found.`);
+        return null;
+    }
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchEmployeeById:", error);
+    throw new HttpError(`Failed to fetch employee ${id}.`, 0, null);
   }
-  return Promise.resolve(null);
 }
 
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<FrontendEmployee[]> {
-  console.log(`MOCK fetchEmployeesByStatus for status: ${status}`);
-  if (status === 'Active') {
-    return Promise.resolve([createMockEmployee('emp001-mock', 'Active'), createMockEmployee('emp002-mock', 'Active')]);
+  console.log(`API CALL: GET /employees/status/${status}`);
+  try {
+    const response = await apiClient<ApiEmployee[]>(`/employees/status/${status}`, {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchEmployeesByStatus:", error);
+    throw new HttpError(`Failed to fetch employees with status ${status}.`, 0, null);
   }
-  return Promise.resolve([createMockEmployee('emp003-mock', 'Inactive')]);
 }
 
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
-  console.log(`MOCK updateEmployeeStatus for employee ${employeeId} to ${status}`);
-  return Promise.resolve(createMockEmployee(employeeId, status));
+  console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`);
+  try {
+    // Le payload pour cet endpoint spécifique peut être juste { status: string }
+    // ou l'API peut s'attendre à un objet vide si le statut est dans l'URL.
+    // Pour l'instant, on envoie un objet avec le statut.
+    const response = await apiClient<ApiEmployee>(`/employees/${employeeId}/status`, {
+      method: 'PUT',
+      body: { status: status }, // Assurez-vous que le backend attend ce format
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in updateEmployeeStatus:", error);
+    throw new HttpError(`Failed to update status for employee ${employeeId}.`, 0, null);
+  }
 }
 
-export async function hireEmployee(employeeData: HireEmployeePayload): Promise<HiredEmployeeResponse> {
-  console.log('MOCK hireEmployee with data:', employeeData);
-  const newId = `emp-mock-${Date.now()}`;
-  const hiredEmployee: HiredEmployeeResponse = {
-    ...createMockEmployee(newId, 'Active', {
-        name: `${employeeData.firstName} ${employeeData.lastName}`,
-        email: employeeData.email,
-        jobTitle: "Newly Hired", // Or map from positionId if desired
-        department: "Newly Assigned" // Or map from departmentId
-    }),
-    firstName: employeeData.firstName,
-    lastName: employeeData.lastName,
-  };
-  return Promise.resolve(hiredEmployee);
+// Utilise l'endpoint /users/hire comme spécifié
+export async function hireEmployee(employeeData: HireEmployeePayload): Promise<ApiHiredEmployeeResponse> {
+  console.log('API CALL: POST /users/hire with data:', employeeData);
+  try {
+    const response = await apiClient<ApiHiredEmployeeResponse>('/users/hire', {
+      method: 'POST',
+      body: employeeData,
+    });
+    // Assurez-vous que ApiHiredEmployeeResponse est compatible avec FrontendEmployee pour la page d'ajout
+    // La page AddEmployeePage s'attend à ce que `newEmployee.firstName` et `lastName` existent.
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in hireEmployee:", error);
+    throw new HttpError('Failed to hire employee.', 0, null);
+  }
 }
 
 export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
-  console.log(`MOCK getCurrentEmployeeLocation for employee ${employeeId}`);
-  return Promise.resolve({
-    latitude: 34.0522 + (Math.random() - 0.5) * 0.01,
-    longitude: -118.2437 + (Math.random() - 0.5) * 0.01,
-    lastSeen: 'Just now (mocked)',
-  });
+  console.log(`API CALL: GET /employees/${employeeId}/location/current`);
+  try {
+    const response = await apiClient<ApiEmployeeLocation>(`/employees/${employeeId}/location/current`, {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in getCurrentEmployeeLocation:", error);
+    throw new HttpError(`Failed to get current location for employee ${employeeId}.`, 0, null);
+  }
 }
 
 export async function getNearbyEmployees(employeeId: string): Promise<FrontendEmployee[]> {
-  console.log(`MOCK getNearbyEmployees for employee ${employeeId}`);
-  return Promise.resolve([
-      createMockEmployee('near-emp-1', 'Active'),
-      createMockEmployee('near-emp-2', 'Active')
-    ]);
+  console.log(`API CALL: GET /employees/${employeeId}/location/nearby`);
+  try {
+    const response = await apiClient<ApiEmployee[]>(`/employees/${employeeId}/location/nearby`, {
+      method: 'GET',
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in getNearbyEmployees:", error);
+    throw new HttpError(`Failed to get nearby employees for employee ${employeeId}.`, 0, null);
+  }
 }
