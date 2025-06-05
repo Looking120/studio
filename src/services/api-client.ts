@@ -2,7 +2,7 @@
 // src/services/api-client.ts
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
-export const API_BASE_URL = 'https://192.168.0.119:7294/api';
+export const API_BASE_URL = 'https://192.168.0.119:5001/api';
 
 /**
  * Custom error class for Unauthorized (401) responses.
@@ -92,10 +92,12 @@ axiosInstance.interceptors.response.use(
         throw new UnauthorizedError(`Unauthorized: ${errorMessage}`);
       }
       
-      // Conditionally log error for non-404 statuses, as 404s might be handled specifically by services
-      if (status !== 404 && status !== 500) {
-        // Changed from console.error to console.warn for non-critical API errors that might be handled
-        console.warn(`API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`, data);
+      const logMessage = `API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`;
+      if (status === 415 && error.config?.url?.includes('/auth/signout')) {
+        // Don't log 415 for signout as error, it's a known issue we are trying to work around.
+        console.warn(`${logMessage}. This might be related to Content-Type on signout.`, data);
+      } else if (status !== 404 && status !== 500) {
+        console.error(logMessage, data);
       } else if (status === 500) {
         console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
       }
@@ -105,11 +107,13 @@ axiosInstance.interceptors.response.use(
       const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
       
       let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
+      const logMessage = `[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}. Check backend server, firewall, and (if HTTPS) SSL certificate on client device.`;
+      
       if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL)) {
         detailedErrorMessage += ' When accessing a local IP, ensure the server is listening on that IP (not just localhost), and check firewall/HTTPS certificate validity from this device.';
       }
       // Explicitly use console.warn for the "no response" scenario
-      console.warn(`[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}. Check backend server, firewall, and (if HTTPS) SSL certificate on client device.`, error.request);
+      console.warn(logMessage, "Details:", error.message);
       throw new HttpError(detailedErrorMessage, 0, null);
     } else {
       // Something happened in setting up the request that triggered an Error
@@ -150,4 +154,3 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
-
