@@ -47,6 +47,15 @@ export default function LoginPage() {
       const response: SignInResponse | null = await signIn({ email, password });
       console.log('Login page - signIn service call returned (raw):', JSON.stringify(response, null, 2));
 
+      // Log the role received from the API
+      if (response && response.user) {
+        console.log('Login Page DEBUG: Role received from API in response.user.role:', response.user.role);
+      } else if (response) {
+        console.warn('Login Page DEBUG: response.user is missing from API response. Full response:', response);
+      } else {
+        console.warn('Login Page DEBUG: signIn response from service is null.');
+      }
+
       if (response && typeof response === 'object' && response.token && typeof response.token === 'string' && response.token.trim() !== '') {
         console.log('Login page - Token received:', response.token ? response.token.substring(0, 20) + "..." : "N/A");
         localStorage.setItem('authToken', response.token);
@@ -134,19 +143,19 @@ export default function LoginPage() {
     } catch (error) {
       setIsLoading(false);
       let toastDescription = "An unknown error occurred during login.";
-      if (error instanceof Error) {
-        toastDescription = error.message;
-      }
-
+      
       if (error instanceof HttpError && error.status === 0) {
         // Specific handling for "no server response"
-        console.warn('Login page - Sign in failed due to network issue (no server response):', error.message);
         toastDescription = `${error.message} If using HTTPS with an IP, ensure you've accepted SSL certificate warnings on your phone's browser for this IP address.`;
+        console.warn('Login page - Sign in failed due to network issue (no server response):', error.message);
       } else if (error instanceof UnauthorizedError) {
         toastDescription = "Incorrect email or password.";
         console.warn('Login page - Sign in failed (Unauthorized):', error.message);
-      } else {
+      } else if (error instanceof Error) {
+        toastDescription = error.message;
         console.error('Login page - Sign in failed with general error:', error);
+      } else {
+         console.error('Login page - Sign in failed with an unknown error type:', error);
       }
       
       toast({
