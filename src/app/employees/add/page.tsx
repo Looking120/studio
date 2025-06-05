@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,11 +9,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { hireEmployee, type HireEmployeePayload } from '@/services/employee-service';
+import { 
+  fetchDepartments, 
+  fetchPositions, 
+  fetchOffices, 
+  type Department, 
+  type Position, 
+  type Office as OrgOffice // Renamed to avoid conflict if any
+} from '@/services/organization-service';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const employeeFormSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters." }),
@@ -28,9 +38,9 @@ const employeeFormSchema = z.object({
   gender: z.string().min(1, { message: "Gender is required (e.g., Male, Female, Other)." }), 
   hireDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid hire date."}),
   
-  departmentId: z.string().uuid({ message: "Department ID must be a valid GUID." }), 
-  positionId: z.string().uuid({ message: "Position ID must be a valid GUID." }),     
-  officeId: z.string().uuid({ message: "Office ID must be a valid GUID." }),       
+  departmentId: z.string().uuid({ message: "Please select a valid department." }), 
+  positionId: z.string().uuid({ message: "Please select a valid position." }),     
+  officeId: z.string().uuid({ message: "Please select a valid office." }),       
 
   avatarUrl: z.string().url({ message: "Please enter a valid URL for the avatar." }).optional().or(z.literal('')),
 });
@@ -40,6 +50,12 @@ type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 export default function AddEmployeePage() {
   const router = useRouter();
   const { toast } = useToast();
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [offices, setOffices] = useState<OrgOffice[]>([]);
+  const [isLoadingOrgData, setIsLoadingOrgData] = useState(true);
+  const [orgDataError, setOrgDataError] = useState<string | null>(null);
 
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
@@ -54,12 +70,36 @@ export default function AddEmployeePage() {
       dateOfBirth: '', 
       gender: '', 
       hireDate: new Date().toISOString().split('T')[0], 
-      departmentId: '', 
-      positionId: '',   
-      officeId: '',     
+      departmentId: undefined, 
+      positionId: undefined,   
+      officeId: undefined,     
       avatarUrl: '',
     },
   });
+
+  useEffect(() => {
+    const loadOrgData = async () => {
+      setIsLoadingOrgData(true);
+      setOrgDataError(null);
+      try {
+        const [deptData, posData, officePaginatedData] = await Promise.all([
+          fetchDepartments(),
+          fetchPositions(),
+          fetchOffices() 
+        ]);
+        setDepartments(deptData || []);
+        setPositions(posData || []);
+        setOffices(officePaginatedData?.items || []);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Could not load organizational data (departments, positions, offices).";
+        setOrgDataError(errorMessage);
+        toast({ variant: "destructive", title: "Data Load Error", description: errorMessage });
+      } finally {
+        setIsLoadingOrgData(false);
+      }
+    };
+    loadOrgData();
+  }, [toast]);
 
   const onSubmit = async (data: EmployeeFormValues) => {
     form.clearErrors();
@@ -239,9 +279,21 @@ export default function AddEmployeePage() {
                   name="gender"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gender * (Ex: Male, Female, Other)</FormLabel>
+                      <FormLabel>Gender *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Male" {...field} />
+                         <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="Male">Male</SelectItem>
+                                    <SelectItem value="Female">Female</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
+                                    <SelectItem value="PreferNotToSay">Prefer not to say</SelectItem>
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -262,48 +314,108 @@ export default function AddEmployeePage() {
                 />
               </div>
               
-              <p className="text-sm text-muted-foreground pt-2">Organizational IDs (UUID/GUID expected) - Placeholder, will be replaced by selectors</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                 <FormField
-                  control={form.control}
-                  name="departmentId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department ID *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Department GUID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="positionId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Position ID *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Position GUID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="officeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Office ID *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Office GUID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <p className="text-sm text-muted-foreground pt-2 font-semibold">Organizational Details *</p>
+              {isLoadingOrgData && (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              )}
+              {orgDataError && !isLoadingOrgData && (
+                 <div className="flex items-center p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm">
+                    <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
+                    <span>{orgDataError}</span>
+                </div>
+              )}
+              {!isLoadingOrgData && !orgDataError && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="departmentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Departments</SelectLabel>
+                              {departments.map(dept => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                              {departments.length === 0 && <SelectItem value="nodata" disabled>No departments found</SelectItem>}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="positionId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Position *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select position" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Positions</SelectLabel>
+                              {positions.map(pos => (
+                                <SelectItem key={pos.id} value={pos.id}>
+                                  {pos.title}
+                                </SelectItem>
+                              ))}
+                              {positions.length === 0 && <SelectItem value="nodata" disabled>No positions found</SelectItem>}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="officeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Office *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select office" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Offices</SelectLabel>
+                              {offices.map(office => (
+                                <SelectItem key={office.id} value={office.id}>
+                                  {office.name}
+                                </SelectItem>
+                              ))}
+                              {offices.length === 0 && <SelectItem value="nodata" disabled>No offices found</SelectItem>}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -320,7 +432,7 @@ export default function AddEmployeePage() {
               />
             </CardContent>
             <CardFooter className="flex justify-end pt-6">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button type="submit" disabled={form.formState.isSubmitting || isLoadingOrgData}>
                 {form.formState.isSubmitting ? "Adding..." : "Add Employee"}
               </Button>
             </CardFooter>
@@ -330,3 +442,6 @@ export default function AddEmployeePage() {
     </div>
   );
 }
+
+
+    
