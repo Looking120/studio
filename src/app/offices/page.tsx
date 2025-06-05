@@ -6,6 +6,8 @@ import MapComponent, { MapMarkerData } from '@/components/map-component';
 import type { Office, AddOfficePayload } from '@/services/organization-service'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Building2, Users, PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { fetchOffices, addOffice, updateOffice, deleteOffice } from '@/services/organization-service';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +35,15 @@ export default function OfficesPage() {
   const [mapZoom, setMapZoom] = useState(3);
   const { toast } = useToast();
   const router = useRouter();
+
+  const [showAddOfficeDialog, setShowAddOfficeDialog] = useState(false);
+  const [newOfficeData, setNewOfficeData] = useState<Partial<AddOfficePayload>>({
+    name: "",
+    address: "",
+    latitude: undefined, // Use undefined for easier check
+    longitude: undefined,
+    headcount: undefined,
+  });
 
   const loadOffices = async () => {
     setIsLoading(true);
@@ -100,20 +111,40 @@ export default function OfficesPage() {
     }
   }, [markers, isLoading, offices]);
 
-  const handleAddOffice = async () => {
-    const newOfficeData: AddOfficePayload = { 
-        name: "New Branch " + Math.floor(Math.random() * 1000), 
-        address: "123 Placeholder Ave, New City, NC " + Math.floor(Math.random() * 10000), 
-        latitude: 35.7596 + (Math.random() - 0.5) * 2, // Random lat around NC
-        longitude: -79.0193 + (Math.random() - 0.5) * 2, // Random lng around NC
-        headcount: Math.floor(Math.random() * 50) + 10 
+  const handleNewOfficeDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewOfficeData(prev => ({
+        ...prev,
+        [name]: name === 'latitude' || name === 'longitude' || name === 'headcount' ? parseFloat(value) || undefined : value,
+    }));
+  };
+
+  const handleSaveNewOffice = async () => {
+    console.log("[OfficesPage] Validating new office data:", newOfficeData);
+    if (!newOfficeData.name?.trim() || !newOfficeData.address?.trim() ||
+        newOfficeData.latitude === undefined || isNaN(newOfficeData.latitude) ||
+        newOfficeData.longitude === undefined || isNaN(newOfficeData.longitude) ||
+        newOfficeData.headcount === undefined || isNaN(newOfficeData.headcount) || newOfficeData.headcount <= 0) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields correctly. Latitude, Longitude, and Headcount must be valid numbers (Headcount > 0)." });
+      return;
+    }
+
+    const payload: AddOfficePayload = {
+        name: newOfficeData.name,
+        address: newOfficeData.address,
+        latitude: newOfficeData.latitude,
+        longitude: newOfficeData.longitude,
+        headcount: newOfficeData.headcount,
     };
-    console.log("[OfficesPage] Attempting to add office with data:", JSON.stringify(newOfficeData, null, 2));
+
+    console.log("[OfficesPage] Attempting to add office with data:", JSON.stringify(payload, null, 2));
     try {
-      const addedOffice = await addOffice(newOfficeData);
+      const addedOffice = await addOffice(payload);
       console.log("[OfficesPage] Office added successfully via service:", addedOffice);
       setOffices(prev => [...prev, addedOffice]); 
       toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
+      setShowAddOfficeDialog(false);
+      setNewOfficeData({ name: "", address: "", latitude: undefined, longitude: undefined, headcount: undefined }); // Reset form
     } catch (err) {
       console.error("[OfficesPage] Add office failed:", err);
       if (err instanceof UnauthorizedError) {
@@ -127,24 +158,26 @@ export default function OfficesPage() {
         errorMessage = `API Error (${err.status}): ${err.message}.`;
         if (err.responseData) {
           console.error("[OfficesPage] Add office API error response data:", err.responseData);
-          errorMessage += ` Details: ${JSON.stringify(err.responseData)}`;
+          // Try to parse and display specific validation errors if backend provides them
+          if (typeof err.responseData.errors === 'object') {
+            const validationErrors = Object.entries(err.responseData.errors)
+              .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+              .join('; ');
+            errorMessage += ` Details: ${validationErrors}`;
+          } else {
+            errorMessage += ` Details: ${JSON.stringify(err.responseData)}`;
+          }
         }
       } else if (err instanceof Error) {
         errorMessage = err.message;
       }
-      toast({ variant: "destructive", title: "Failed to add office", description: errorMessage });
+      toast({ variant: "destructive", title: "Failed to add office", description: errorMessage, duration: 7000 });
     }
   };
 
   const handleEditOffice = async (officeId: string) => {
     console.log(`[OfficesPage] Placeholder: Open edit office dialog for ${officeId}`);
     alert(`Edit office ${officeId} - functionality to be fully implemented with a form/dialog.`);
-    // To implement:
-    // 1. Create state for edit dialog visibility and office data.
-    // 2. Fetch office by ID if needed or use existing data.
-    // 3. Create a form in a Dialog component.
-    // 4. On submit, call `updateOffice(officeId, updatedData)`.
-    // 5. Handle success/error and refresh office list.
   };
 
   const handleDeleteOffice = async (officeId: string) => {
@@ -174,9 +207,49 @@ export default function OfficesPage() {
         <Card className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
             <CardHeader className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle>Our Offices</CardTitle>
-                <Button size="sm" onClick={handleAddOffice} disabled={isLoading} className="w-full sm:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Office
-                </Button>
+                <AlertDialog open={showAddOfficeDialog} onOpenChange={setShowAddOfficeDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" onClick={() => setShowAddOfficeDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Office
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Add New Office</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Fill in the details for the new office. All fields are required.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="name">Office Name</Label>
+                        <Input id="name" name="name" value={newOfficeData.name || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., Downtown Branch" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="address">Address</Label>
+                        <Input id="address" name="address" value={newOfficeData.address || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 123 Main St, Anytown" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="latitude">Latitude</Label>
+                          <Input id="latitude" name="latitude" type="number" value={newOfficeData.latitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 34.0522" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="longitude">Longitude</Label>
+                          <Input id="longitude" name="longitude" type="number" value={newOfficeData.longitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., -118.2437" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="headcount">Headcount</Label>
+                        <Input id="headcount" name="headcount" type="number" value={newOfficeData.headcount || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 50" min="1"/>
+                      </div>
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setNewOfficeData({})}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleSaveNewOffice}>Save Office</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
             </CardHeader>
         </Card>
 
@@ -264,3 +337,5 @@ export default function OfficesPage() {
     </div>
   );
 }
+
+    
