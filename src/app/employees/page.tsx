@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search, AlertTriangle, UserCog } from 'lucide-react';
+import { UserPlus, Search, AlertTriangle, UserCog, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 export default function EmployeesPage() {
@@ -101,6 +102,7 @@ export default function EmployeesPage() {
     );
 
     try {
+      // The API expects the status string directly in the body
       await apiUpdateEmployeeStatus(employeeId, newStatus);
       toast({
         title: "Status Updated",
@@ -127,6 +129,7 @@ export default function EmployeesPage() {
   const filteredEmployees = useMemo(() => {
     if (!employees) return [];
     return employees.filter(employee =>
+        (employee.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.department?.toLowerCase() || '').includes(searchTerm.toLowerCase())
@@ -137,6 +140,7 @@ export default function EmployeesPage() {
   const isAccessDetermined = isClient && currentUserRole !== null;
 
   return (
+    <TooltipProvider>
     <Card className="shadow-lg">
       <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <CardTitle>Employee Directory</CardTitle>
@@ -146,7 +150,7 @@ export default function EmployeesPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search employees..."
+                placeholder="Search employees (ID, name, email...)"
                 className="pl-8 w-full sm:w-[200px] md:w-[250px] lg:w-[300px] bg-background"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -167,6 +171,7 @@ export default function EmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead><Skeleton className="h-5 w-16" /></TableHead>
                   <TableHead><Skeleton className="h-5 w-24" /></TableHead>
                   <TableHead><Skeleton className="h-5 w-32" /></TableHead>
                   <TableHead><Skeleton className="h-5 w-20" /></TableHead>
@@ -178,6 +183,7 @@ export default function EmployeesPage() {
               <TableBody>
                 {Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={`skeleton-emp-initial-${index}`}>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Skeleton className="h-10 w-10 rounded-full" />
@@ -220,6 +226,7 @@ export default function EmployeesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[150px]">Employee ID</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Department</TableHead>
@@ -232,6 +239,7 @@ export default function EmployeesPage() {
                     {isLoading ? (
                       Array.from({ length: 5 }).map((_, index) => (
                         <TableRow key={`skeleton-emp-admin-${index}`}>
+                          <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Skeleton className="h-10 w-10 rounded-full" />
@@ -248,6 +256,19 @@ export default function EmployeesPage() {
                     ) : (
                       filteredEmployees.map((employee) => (
                         <TableRow key={employee.id}>
+                          <TableCell>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <div className="flex items-center">
+                                        <span className="truncate font-mono text-xs w-[100px]">{employee.id || 'N/A'}</span>
+                                        <Info className="h-3 w-3 ml-1 text-muted-foreground hover:text-foreground cursor-pointer" />
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start">
+                                    <p>{employee.id || 'N/A'}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar>
@@ -288,11 +309,18 @@ export default function EmployeesPage() {
               </div>
             )}
             {!isLoading && !fetchError && filteredEmployees.length === 0 && isAdminAccess && (
-                <p className="text-center text-muted-foreground py-8">No employees found.</p>
+                <p className="text-center text-muted-foreground py-8">No employees found matching your search criteria.</p>
+            )}
+             {!isLoading && !fetchError && employees.length === 0 && isAdminAccess && searchTerm === '' && (
+                <p className="text-center text-muted-foreground py-8">No employees found in the system.</p>
             )}
           </>
         )}
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }
+
+
+    
