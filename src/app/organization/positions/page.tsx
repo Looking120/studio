@@ -19,7 +19,7 @@ import {
 import { fetchUsers, type User } from '@/services/user-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UnauthorizedError } from '@/services/api-client';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import {
   AlertDialog,
@@ -45,8 +45,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 
 // Helper function to check for zero GUID or problematic GUID strings
 const isZeroGuid = (guid: string | undefined | null): boolean => {
-  if (!guid || guid.trim() === "") return true; // Treat null, undefined, empty string, or string with only whitespace as problematic
-  return guid === "00000000-0000-0000-0000-000000000000";
+  if (!guid || guid.trim() === "" || guid === "00000000-0000-0000-0000-000000000000") return true;
+  return false;
 };
 
 export default function PositionsPage() {
@@ -92,7 +92,12 @@ export default function PositionsPage() {
     setIsLoadingUsers(true);
     try {
       const fetchedUsers = await fetchUsers();
-      setUsers(fetchedUsers.filter(u => u.id)); 
+      console.log("[PositionsPage] Fetched users for assignment dialog:", JSON.stringify(fetchedUsers, null, 2));
+      const validUsers = fetchedUsers.filter(u => u && u.id);
+      if (validUsers.length !== fetchedUsers.length) {
+        console.warn("[PositionsPage] Some fetched users were filtered out due to missing ID or being null/undefined.");
+      }
+      setUsers(validUsers);
     } catch (err) {
       toast({ variant: "destructive", title: "Failed to load users", description: err instanceof Error ? err.message : "Could not fetch users for assignment." });
       setUsers([]);
@@ -387,3 +392,5 @@ export default function PositionsPage() {
     </>
   );
 }
+
+    
