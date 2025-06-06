@@ -38,7 +38,10 @@ export default function DashboardPage() {
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [assignedOffice, setAssignedOffice] = useState<Office | null>(null);
   const [employeeTasks, setEmployeeTasks] = useState<Task[]>([]);
-  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true);
+  
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true); // For employee-specific data like tasks
+
   const { toast } = useToast();
 
   const [processedActivityLogs, setProcessedActivityLogs] = useState<ProcessedActivityLog[]>([]);
@@ -75,12 +78,16 @@ export default function DashboardPage() {
   
   useEffect(() => {
     if (isClient) { 
+      setIsRoleLoading(true);
       const roleFromStorage = localStorage.getItem('userRole');
       const emailFromStorage = localStorage.getItem('userEmail');
       setUserRole(roleFromStorage);
+      setIsRoleLoading(false); // Role determination is complete
 
-      if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
-        setIsLoadingEmployeeData(true);
+      const isAdmin = roleFromStorage && roleFromStorage.toLowerCase().includes('admin');
+
+      if (!isAdmin) { // Employee or role not determined as admin
+        setIsLoadingEmployeeData(true); // Start loading employee specific data
         const employee = mockEmployees.find(emp => emp.email === emailFromStorage);
         setCurrentEmployee(employee || null);
 
@@ -102,14 +109,12 @@ export default function DashboardPage() {
               console.error("Failed to fetch tasks:", err);
               toast({ variant: "destructive", title: "Error Loading Tasks", description: "Could not load tasks."});
             })
-            .finally(() => setIsLoadingEmployeeData(false));
+            .finally(() => setIsLoadingEmployeeData(false)); // Finish loading employee specific data
         } else {
-          setIsLoadingEmployeeData(false);
+          setIsLoadingEmployeeData(false); // No employee found, finish loading
         }
-      } else {
-        // For admin or if role not determined yet
-        setIsLoadingEmployeeData(false); 
-        // Setup HQ Map for Admin
+      } else { // Admin
+        setIsLoadingEmployeeData(false); // No employee-specific data to load for admin on this main dashboard view
         const headquarters = mockOffices.find(office => office.name.toLowerCase() === 'headquarters');
         if (headquarters) {
           setHqMapMarkers([{
@@ -153,20 +158,27 @@ export default function DashboardPage() {
     }
   };
   
-  if (!isClient) { 
+  // Loading state for client hydration and role determination
+  if (!isClient || isRoleLoading) { 
     return (
       <div className="space-y-6 p-4 animate-pulse">
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-8 w-2/5 mb-6" /> 
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );
   }
 
-  if (userRole && !userRole.toLowerCase().includes('admin')) {
-    if (isLoadingEmployeeData) {
+  const isAdminView = userRole && userRole.toLowerCase().includes('admin');
+
+  // Employee Dashboard View
+  if (!isAdminView) {
+    if (isLoadingEmployeeData) { // Specific loading for employee data (tasks, office)
       return (
         <div className="space-y-6 p-2 sm:p-4 animate-pulse">
           <h1 className="text-2xl font-semibold text-foreground mb-4"><Skeleton className="h-8 w-3/5" /></h1>
@@ -284,7 +296,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoadingEmployeeData && processedActivityLogs.length === 0 && ( 
+            {(isLoadingEmployeeData && isAdminView) && processedActivityLogs.length === 0 && ( // isLoadingEmployeeData is false for admin, this check is redundant for admin but harmless
                  Array.from({ length: 3 }).map((_, index) => (
                     <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
                         <div>
@@ -295,7 +307,8 @@ export default function DashboardPage() {
                     </div>
                 ))
             )}
-            {!isLoadingEmployeeData && processedActivityLogs.length === 0 && (
+            {/* This condition is for when admin view is active, and data is loaded (isLoadingEmployeeData is false for admin) */}
+            {isAdminView && processedActivityLogs.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No recent activity to display.</p>
             )}
             {processedActivityLogs.map(log => (
