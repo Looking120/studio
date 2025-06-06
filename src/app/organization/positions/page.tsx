@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, Trash2, Briefcase, UserCheck, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Briefcase, UserCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   fetchPositions,
@@ -43,7 +43,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Helper function to check for zero GUID or problematic GUID strings
 const isZeroGuid = (guid: string | undefined | null): boolean => {
   if (!guid || guid.trim() === "" || guid === "00000000-0000-0000-0000-000000000000") return true;
   return false;
@@ -65,6 +64,22 @@ export default function PositionsPage() {
   const [selectedPositionForAssign, setSelectedPositionForAssign] = useState<Position | null>(null);
   const [selectedEmployeeIdToAssign, setSelectedEmployeeIdToAssign] = useState<string>("");
   const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
+
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+
+  useEffect(() => {
+    setIsClient(true);
+    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    setCurrentUserRole(role);
+    setIsRoleLoading(false);
+  }, []);
+
+  const isAdmin = useMemo(() => {
+    if (!isClient || isRoleLoading) return false;
+    return currentUserRole?.toLowerCase().includes('admin') ?? false;
+  }, [isClient, isRoleLoading, currentUserRole]);
 
   const loadPositions = async () => {
     setIsLoading(true);
@@ -93,9 +108,9 @@ export default function PositionsPage() {
     try {
       const fetchedUsers = await fetchUsers();
       console.log("[PositionsPage] Fetched users for assignment dialog:", JSON.stringify(fetchedUsers, null, 2));
-      const validUsers = fetchedUsers.filter(u => u && u.id);
+      const validUsers = fetchedUsers.filter(u => u && u.id && u.id.trim() !== "" && u.id !== "00000000-0000-0000-0000-000000000000");
       if (validUsers.length !== fetchedUsers.length) {
-        console.warn("[PositionsPage] Some fetched users were filtered out due to missing ID or being null/undefined.");
+        console.warn("[PositionsPage] Some fetched users were filtered out due to missing, empty or zero GUID ID.");
       }
       setUsers(validUsers);
     } catch (err) {
@@ -107,11 +122,21 @@ export default function PositionsPage() {
   };
 
   useEffect(() => {
-    loadPositions();
-    loadUsers();
-  }, []);
+    if (isClient && !isRoleLoading) {
+      loadPositions();
+      if (isAdmin) { // Only load users if admin, as non-admins likely can't assign
+        loadUsers();
+      } else {
+        setIsLoadingUsers(false); // No need to load users for non-admins
+      }
+    }
+  }, [isClient, isRoleLoading, isAdmin]);
 
   const handleAddPositionSubmit = async () => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to add positions." });
+      return;
+    }
     if (!newPositionTitle.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Position title cannot be empty." });
         return;
@@ -139,22 +164,39 @@ export default function PositionsPage() {
   };
 
   const handleEditPosition = (pos: Position) => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit positions." });
+      return;
+    }
     console.log(`Placeholder: Open edit position form for ${pos.title}.`);
     alert(`Edit position ${pos.title} - functionality to be implemented with a form/dialog.`);
   };
 
   const handleDeletePositionConfirm = async (positionId: string) => {
-     console.log(`Placeholder: Delete position ${positionId}.`);
-     alert(`Delete position ${positionId} - functionality to be implemented.`);
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to delete positions." });
+      return;
+    }
+    console.log(`Placeholder: Delete position ${positionId}.`);
+    alert(`Delete position ${positionId} - functionality to be implemented.`);
   };
 
   const openAssignDialog = (position: Position) => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to assign positions." });
+      return;
+    }
     setSelectedPositionForAssign(position);
     setSelectedEmployeeIdToAssign("");
     setIsAssignDialogOpen(true);
   };
 
   const handleAssignPositionSubmit = async () => {
+    if (!isAdmin) {
+       // Redundant check if openAssignDialog already checks, but good for safety
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to assign positions." });
+      return;
+    }
     if (!selectedPositionForAssign || !selectedEmployeeIdToAssign) {
       toast({ variant: "destructive", title: "Validation Error", description: "Please select a position and an employee." });
       return;
@@ -165,7 +207,6 @@ export default function PositionsPage() {
       JSON.stringify(selectedPositionForAssign, null, 2) 
     );
     console.log(`[Assign Position] Checking departmentId: "${selectedPositionForAssign.departmentId}" with isZeroGuid: ${isZeroGuid(selectedPositionForAssign.departmentId)}`);
-
 
     if (isZeroGuid(selectedPositionForAssign.departmentId)) {
       toast({
@@ -204,6 +245,20 @@ export default function PositionsPage() {
     }
   };
 
+  if (isRoleLoading || !isClient) {
+    return (
+      <Card className="shadow-lg p-6">
+        <Skeleton className="h-8 w-1/2 mb-4" />
+        <Skeleton className="h-10 w-1/4 mb-6" />
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card className="shadow-lg">
@@ -212,39 +267,48 @@ export default function PositionsPage() {
             <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
             <CardDescription>Define and assign job positions within the organization.</CardDescription>
           </div>
-          <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-              <AlertDialogTrigger asChild>
-                  <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Position
-                  </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <AlertDialogTitle>Add New Position</AlertDialogTitle>
-                      <AlertDialogDescription>
-                          Enter the title for the new position.
-                      </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <div className="grid gap-4 py-4">
-                      <div className="space-y-2">
-                          <Label htmlFor="newPositionTitle">Position Title</Label>
-                          <Input
-                              id="newPositionTitle"
-                              placeholder="E.g., Software Engineer, Marketing Manager"
-                              value={newPositionTitle}
-                              onChange={(e) => setNewPositionTitle(e.target.value)}
-                          />
-                      </div>
-                  </div>
-                  <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => { setNewPositionTitle(""); }}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
-                  </AlertDialogFooter>
-              </AlertDialogContent>
-          </AlertDialog>
+          {isAdmin && (
+            <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                <AlertDialogTrigger asChild>
+                    <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Position
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Add New Position</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Enter the title for the new position.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="newPositionTitle">Position Title</Label>
+                            <Input
+                                id="newPositionTitle"
+                                placeholder="E.g., Software Engineer, Marketing Manager"
+                                value={newPositionTitle}
+                                onChange={(e) => setNewPositionTitle(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => { setNewPositionTitle(""); }}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleAddPositionSubmit}>Add Position</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+          )}
         </CardHeader>
         <CardContent>
-          {isLoading && (
+          {!isAdmin && !isRoleLoading && (
+             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <ShieldAlert className="h-16 w-16 mb-6 text-destructive" />
+                <p className="text-2xl font-semibold text-foreground mb-2">Access Denied</p>
+                <p className="text-md">You do not have permission to manage positions.</p>
+            </div>
+          )}
+          {isAdmin && isLoading && (
               <Table>
                   <TableHeader>
                       <TableRow>
@@ -266,19 +330,19 @@ export default function PositionsPage() {
                   </TableBody>
               </Table>
           )}
-          {!isLoading && error && (
+          {isAdmin && !isLoading && error && (
             <div className="flex flex-col items-center justify-center py-8 text-destructive">
               <AlertTriangle className="h-12 w-12 mb-4" />
               <p className="text-xl font-semibold">Failed to load positions</p>
               <p className="text-sm">{error}</p>
             </div>
           )}
-          {!isLoading && !error && positions.length === 0 && (
+          {isAdmin && !isLoading && !error && positions.length === 0 && (
               <p className="text-center text-muted-foreground py-8">
                   No positions found. Click "Add Position" to create one.
               </p>
           )}
-          {!isLoading && !error && positions.length > 0 && (
+          {isAdmin && !isLoading && !error && positions.length > 0 && (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -336,59 +400,61 @@ export default function PositionsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHead>
-            <DialogTitl>Assign Employee to Position</DialogTitl>
-            <DialogDesc>
-              Select an employee to assign to the position: "{selectedPositionForAssign?.title}".
-            </DialogDesc>
-          </DialogHead>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="employee" className="text-right">
-                Employee
-              </Label>
-              <div className="col-span-3">
-                <Select
-                  value={selectedEmployeeIdToAssign}
-                  onValueChange={setSelectedEmployeeIdToAssign}
-                  disabled={isLoadingUsers}
-                >
-                  <SelectTrigger id="employee">
-                    <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select an employee"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {isLoadingUsers ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
-                      ) : users.length > 0 ? (
-                        users.map(user => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name || user.email} ({user.email})
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-users" disabled>No users available</SelectItem>
-                      )}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+      {isAdmin && (
+        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHead>
+              <DialogTitl>Assign Employee to Position</DialogTitl>
+              <DialogDesc>
+                Select an employee to assign to the position: "{selectedPositionForAssign?.title}".
+              </DialogDesc>
+            </DialogHead>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="employee" className="text-right">
+                  Employee
+                </Label>
+                <div className="col-span-3">
+                  <Select
+                    value={selectedEmployeeIdToAssign}
+                    onValueChange={setSelectedEmployeeIdToAssign}
+                    disabled={isLoadingUsers}
+                  >
+                    <SelectTrigger id="employee">
+                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select an employee"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {isLoadingUsers ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : users.length > 0 ? (
+                          users.map(user => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name || user.email} ({user.email})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>No users available</SelectItem>
+                        )}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFoot>
-            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)} disabled={isSubmittingAssignment}>Cancel</Button>
-            <Button 
-              type="submit" 
-              onClick={handleAssignPositionSubmit}
-              disabled={!selectedEmployeeIdToAssign || isSubmittingAssignment || isLoadingUsers}
-            >
-              {isSubmittingAssignment ? "Assigning..." : "Assign Position"}
-            </Button>
-          </DialogFoot>
-        </DialogContent>
-      </Dialog>
+            <DialogFoot>
+              <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)} disabled={isSubmittingAssignment}>Cancel</Button>
+              <Button 
+                type="submit" 
+                onClick={handleAssignPositionSubmit}
+                disabled={!selectedEmployeeIdToAssign || isSubmittingAssignment || isLoadingUsers}
+              >
+                {isSubmittingAssignment ? "Assigning..." : "Assign Position"}
+              </Button>
+            </DialogFoot>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

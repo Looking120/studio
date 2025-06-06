@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase, ShieldAlert } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     fetchDepartments,
@@ -49,6 +49,22 @@ export default function DepartmentsPage() {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [editDepartmentName, setEditDepartmentName] = useState("");
 
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+
+  useEffect(() => {
+    setIsClient(true);
+    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    setCurrentUserRole(role);
+    setIsRoleLoading(false);
+  }, []);
+
+  const isAdmin = useMemo(() => {
+    if (!isClient || isRoleLoading) return false;
+    return currentUserRole?.toLowerCase().includes('admin') ?? false;
+  }, [isClient, isRoleLoading, currentUserRole]);
+
 
   const loadDepartments = async () => {
     setIsLoading(true);
@@ -79,10 +95,16 @@ export default function DepartmentsPage() {
   };
 
   useEffect(() => {
-    loadDepartments();
-  }, []);
+    if (isClient && !isRoleLoading) { // Only load data if client and role check is done
+        loadDepartments();
+    }
+  }, [isClient, isRoleLoading]);
 
   const handleAddDepartmentSubmit = async () => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to add departments." });
+      return;
+    }
     if (!newDepartmentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
         return;
@@ -108,12 +130,21 @@ export default function DepartmentsPage() {
   };
 
   const openEditDialog = (dept: Department) => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit departments." });
+      return;
+    }
     setEditingDepartment(dept);
     setEditDepartmentName(dept.name);
     setShowEditDialog(true);
   };
 
   const handleEditDepartmentSubmit = async () => {
+    if (!isAdmin) {
+      // This check is redundant if openEditDialog already checks, but good for safety.
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit departments." });
+      return;
+    }
     if (!editingDepartment || !editDepartmentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
         return;
@@ -140,6 +171,10 @@ export default function DepartmentsPage() {
 
 
   const handleDeleteDepartmentConfirm = async (departmentId: string) => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to delete departments." });
+      return;
+    }
     try {
       await deleteDepartment(departmentId);
       setDepartments(prev => prev.filter(d => d.id !== departmentId));
@@ -167,6 +202,19 @@ export default function DepartmentsPage() {
     }
   };
 
+  if (isRoleLoading || !isClient) {
+    return (
+      <Card className="shadow-lg p-6">
+        <Skeleton className="h-8 w-1/2 mb-4" />
+        <Skeleton className="h-10 w-1/4 mb-6" />
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-lg">
@@ -175,39 +223,48 @@ export default function DepartmentsPage() {
           <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Departments</CardTitle>
           <CardDescription>View, add, edit, or delete organizational departments.</CardDescription>
         </div>
-        <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <AlertDialogTrigger asChild>
-                <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Department
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Add New Department</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Enter the name for the new department.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="newDepartmentName">Department Name</Label>
-                        <Input
-                            id="newDepartmentName"
-                            placeholder="E.g., Engineering, Marketing"
-                            value={newDepartmentName}
-                            onChange={(e) => setNewDepartmentName(e.target.value)}
-                        />
+        {isAdmin && (
+            <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                <AlertDialogTrigger asChild>
+                    <Button onClick={() => setShowAddDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Department
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Add New Department</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Enter the name for the new department.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="newDepartmentName">Department Name</Label>
+                            <Input
+                                id="newDepartmentName"
+                                placeholder="E.g., Engineering, Marketing"
+                                value={newDepartmentName}
+                                onChange={(e) => setNewDepartmentName(e.target.value)}
+                            />
+                        </div>
                     </div>
-                </div>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setNewDepartmentName("")}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAddDepartmentSubmit}>Add Department</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setNewDepartmentName("")}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleAddDepartmentSubmit}>Add Department</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
       </CardHeader>
       <CardContent>
-        {isLoading && (
+        {!isAdmin && !isRoleLoading && (
+             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <ShieldAlert className="h-16 w-16 mb-6 text-destructive" />
+                <p className="text-2xl font-semibold text-foreground mb-2">Access Denied</p>
+                <p className="text-md">You do not have permission to manage departments.</p>
+            </div>
+        )}
+        {isAdmin && isLoading && (
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -227,19 +284,19 @@ export default function DepartmentsPage() {
                 </TableBody>
             </Table>
         )}
-        {!isLoading && error && (
+        {isAdmin && !isLoading && error && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mb-4" />
             <p className="text-xl font-semibold">Failed to load departments</p>
             <p className="text-sm">{error}</p>
           </div>
         )}
-        {!isLoading && !error && departments.length === 0 && (
+        {isAdmin && !isLoading && !error && departments.length === 0 && (
              <p className="text-center text-muted-foreground py-8">
                 No departments found. Click "Add Department" to create one.
             </p>
         )}
-        {!isLoading && !error && departments.length > 0 && (
+        {isAdmin && !isLoading && !error && departments.length > 0 && (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -288,7 +345,8 @@ export default function DepartmentsPage() {
         )}
       </CardContent>
 
-      <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      {isAdmin && (
+        <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Department</AlertDialogTitle>
@@ -313,6 +371,9 @@ export default function DepartmentsPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+      )}
     </Card>
   );
 }
+
+    

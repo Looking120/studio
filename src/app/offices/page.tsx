@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Building2, Users, PlusCircle, Edit, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { fetchOffices, addOffice, updateOffice, deleteOffice } from '@/services/organization-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -27,12 +27,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
+const DEFAULT_CITY_ZOOM_OFFICES = 6;
+
+
 export default function OfficesPage() {
   const [offices, setOffices] = useState<Office[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState({ lat: 39.8283, lng: -98.5795 }); 
-  const [mapZoom, setMapZoom] = useState(3);
+  const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
+  const [mapZoom, setMapZoom] = useState(DEFAULT_CITY_ZOOM_OFFICES);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -40,10 +44,27 @@ export default function OfficesPage() {
   const [newOfficeData, setNewOfficeData] = useState<Partial<AddOfficePayload>>({
     name: "",
     address: "",
-    latitude: undefined, // Use undefined for easier check
+    latitude: undefined,
     longitude: undefined,
     headcount: undefined,
   });
+
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+
+  useEffect(() => {
+    setIsClient(true);
+    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    setCurrentUserRole(role);
+    setIsRoleLoading(false);
+  }, []);
+
+  const isAdmin = useMemo(() => {
+    if (!isClient || isRoleLoading) return false;
+    return currentUserRole?.toLowerCase().includes('admin') ?? false;
+  }, [isClient, isRoleLoading, currentUserRole]);
+
 
   const loadOffices = async () => {
     setIsLoading(true);
@@ -79,8 +100,10 @@ export default function OfficesPage() {
   };
 
   useEffect(() => {
-    loadOffices();
-  }, []); 
+    if (isClient && !isRoleLoading) { // Only load data if client and role check is done
+        loadOffices();
+    }
+  }, [isClient, isRoleLoading]); 
 
   const markers: MapMarkerData[] = useMemo(() => {
     if (!Array.isArray(offices)) return [];
@@ -106,8 +129,8 @@ export default function OfficesPage() {
         setMapZoom(3); 
       }
     } else if (!isLoading && offices.length === 0) {
-        setMapCenter({ lat: 39.8283, lng: -98.5795 });
-        setMapZoom(3);
+        setMapCenter(GOMEL_COORDS);
+        setMapZoom(DEFAULT_CITY_ZOOM_OFFICES);
     }
   }, [markers, isLoading, offices]);
 
@@ -120,6 +143,10 @@ export default function OfficesPage() {
   };
 
   const handleSaveNewOffice = async () => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to add offices." });
+      return;
+    }
     console.log("[OfficesPage] Validating new office data:", newOfficeData);
     if (!newOfficeData.name?.trim() || !newOfficeData.address?.trim() ||
         newOfficeData.latitude === undefined || isNaN(newOfficeData.latitude) ||
@@ -144,7 +171,7 @@ export default function OfficesPage() {
       setOffices(prev => [...prev, addedOffice]); 
       toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
       setShowAddOfficeDialog(false);
-      setNewOfficeData({ name: "", address: "", latitude: undefined, longitude: undefined, headcount: undefined }); // Reset form
+      setNewOfficeData({ name: "", address: "", latitude: undefined, longitude: undefined, headcount: undefined });
     } catch (err) {
       console.error("[OfficesPage] Add office failed:", err);
       if (err instanceof UnauthorizedError) {
@@ -158,7 +185,6 @@ export default function OfficesPage() {
         errorMessage = `API Error (${err.status}): ${err.message}.`;
         if (err.responseData) {
           console.error("[OfficesPage] Add office API error response data:", err.responseData);
-          // Try to parse and display specific validation errors if backend provides them
           if (typeof err.responseData.errors === 'object') {
             const validationErrors = Object.entries(err.responseData.errors)
               .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
@@ -176,30 +202,46 @@ export default function OfficesPage() {
   };
 
   const handleEditOffice = async (officeId: string) => {
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit offices." });
+      return;
+    }
     console.log(`[OfficesPage] Placeholder: Open edit office dialog for ${officeId}`);
     alert(`Edit office ${officeId} - functionality to be fully implemented with a form/dialog.`);
   };
 
   const handleDeleteOffice = async (officeId: string) => {
-      console.log(`[OfficesPage] Attempting to delete office with ID: ${officeId}`);
-      try {
-        await deleteOffice(officeId);
-        console.log(`[OfficesPage] Office ${officeId} deleted successfully via service.`);
-        setOffices(prev => prev.filter(off => off.id !== officeId)); 
-        toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
-      } catch (err) {
-        console.error(`[OfficesPage] Delete office ${officeId} failed:`, err);
-        if (err instanceof UnauthorizedError) {
-          toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
-          await signOut();
-          router.push('/');
-          return;
-        }
-        const errorMessage = err instanceof Error ? err.message : 'Could not delete office.';
-        toast({ variant: "destructive", title: "Failed to delete office", description: errorMessage });
+    if (!isAdmin) {
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to delete offices." });
+      return;
+    }
+    console.log(`[OfficesPage] Attempting to delete office with ID: ${officeId}`);
+    try {
+      await deleteOffice(officeId);
+      console.log(`[OfficesPage] Office ${officeId} deleted successfully via service.`);
+      setOffices(prev => prev.filter(off => off.id !== officeId)); 
+      toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
+    } catch (err) {
+      console.error(`[OfficesPage] Delete office ${officeId} failed:`, err);
+      if (err instanceof UnauthorizedError) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
+        await signOut();
+        router.push('/');
+        return;
       }
+      const errorMessage = err instanceof Error ? err.message : 'Could not delete office.';
+      toast({ variant: "destructive", title: "Failed to delete office", description: errorMessage });
+    }
   };
 
+  if (isRoleLoading || !isClient) {
+    return (
+        <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)] p-4">
+            <div className="lg:w-1/3 space-y-4"><Skeleton className="h-16 w-full" /><Skeleton className="h-32 w-full" /><Skeleton className="h-32 w-full" /></div>
+            <div className="flex-grow lg:w-2/3"><Skeleton className="h-full w-full rounded-lg" /></div>
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)]">
@@ -207,53 +249,65 @@ export default function OfficesPage() {
         <Card className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
             <CardHeader className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle>Our Offices</CardTitle>
-                <AlertDialog open={showAddOfficeDialog} onOpenChange={setShowAddOfficeDialog}>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" onClick={() => setShowAddOfficeDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add Office
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Add New Office</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Fill in the details for the new office. All fields are required.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="name">Office Name</Label>
-                        <Input id="name" name="name" value={newOfficeData.name || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., Downtown Branch" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="address">Address</Label>
-                        <Input id="address" name="address" value={newOfficeData.address || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 123 Main St, Anytown" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
+                {isAdmin && (
+                  <AlertDialog open={showAddOfficeDialog} onOpenChange={setShowAddOfficeDialog}>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" onClick={() => setShowAddOfficeDialog(true)} disabled={isLoading} className="w-full sm:w-auto">
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add Office
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Add New Office</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Fill in the details for the new office. All fields are required.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="grid gap-4 py-4">
                         <div className="space-y-1">
-                          <Label htmlFor="latitude">Latitude</Label>
-                          <Input id="latitude" name="latitude" type="number" value={newOfficeData.latitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 34.0522" />
+                          <Label htmlFor="name">Office Name</Label>
+                          <Input id="name" name="name" value={newOfficeData.name || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., Downtown Branch" />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="longitude">Longitude</Label>
-                          <Input id="longitude" name="longitude" type="number" value={newOfficeData.longitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., -118.2437" />
+                          <Label htmlFor="address">Address</Label>
+                          <Input id="address" name="address" value={newOfficeData.address || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 123 Main St, Anytown" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="latitude">Latitude</Label>
+                            <Input id="latitude" name="latitude" type="number" value={newOfficeData.latitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 34.0522" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="longitude">Longitude</Label>
+                            <Input id="longitude" name="longitude" type="number" value={newOfficeData.longitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., -118.2437" />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="headcount">Headcount</Label>
+                          <Input id="headcount" name="headcount" type="number" value={newOfficeData.headcount || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 50" min="1"/>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="headcount">Headcount</Label>
-                        <Input id="headcount" name="headcount" type="number" value={newOfficeData.headcount || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 50" min="1"/>
-                      </div>
-                    </div>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => setNewOfficeData({})}>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleSaveNewOffice}>Save Office</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setNewOfficeData({})}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveNewOffice}>Save Office</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
             </CardHeader>
         </Card>
 
-        {isLoading && Array.from({ length: 3 }).map((_, index) => (
+        {!isAdmin && !isRoleLoading && (
+            <Card className="shadow-md">
+                 <CardContent className="py-6 flex flex-col items-center text-destructive">
+                    <ShieldAlert className="h-12 w-12 mb-4" />
+                    <CardTitle className="text-xl mb-2">Access Denied</CardTitle>
+                    <CardDescription>You do not have permission to manage offices.</CardDescription>
+                </CardContent>
+            </Card>
+        )}
+
+        {isAdmin && isLoading && Array.from({ length: 3 }).map((_, index) => (
             <Card key={`skeleton-office-${index}`} className="shadow-md">
                 <CardHeader className="pb-2">
                     <Skeleton className="h-5 w-3/4" />
@@ -265,7 +319,7 @@ export default function OfficesPage() {
             </Card>
         ))}
 
-        {!isLoading && error && (
+        {isAdmin && !isLoading && error && (
           <Card className="shadow-md">
             <CardContent className="py-6 flex flex-col items-center text-destructive">
               <AlertTriangle className="h-8 w-8 mb-2" />
@@ -275,7 +329,7 @@ export default function OfficesPage() {
           </Card>
         )}
 
-        {!isLoading && !error && offices.length === 0 && (
+        {isAdmin && !isLoading && !error && offices.length === 0 && (
              <Card className="shadow-md">
                 <CardContent className="py-6 text-center text-muted-foreground">
                     No offices found. Click "Add Office" to create one.
@@ -283,7 +337,7 @@ export default function OfficesPage() {
             </Card>
         )}
 
-        {!isLoading && !error && offices.map(office => (
+        {isAdmin && !isLoading && !error && offices.map(office => (
           <Card key={office.id} className="shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-2">
               <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1">
@@ -291,34 +345,36 @@ export default function OfficesPage() {
                   <Building2 className="h-5 w-5 text-primary" /> 
                   {office.name}
                 </CardTitle>
-                <div className="flex gap-1 self-end xs:self-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)} title="Edit Office">
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Delete Office">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the office "{office.name}".
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteOffice(office.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                </div>
+                {isAdmin && (
+                  <div className="flex gap-1 self-end xs:self-center">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)} title="Edit Office">
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Delete Office">
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the office "{office.name}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteOffice(office.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
