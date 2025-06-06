@@ -71,9 +71,9 @@ export default function OfficesPage() {
     setError(null);
     try {
       console.log("[OfficesPage] Attempting to fetch offices from service...");
-      const paginatedData = await fetchOffices();
-      console.log("[OfficesPage] Offices fetched:", paginatedData);
-      setOffices(paginatedData.items || []); 
+      const officeDataArray = await fetchOffices(); // Directly returns Office[]
+      console.log("[OfficesPage] Offices fetched:", officeDataArray);
+      setOffices(officeDataArray || []); 
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         toast({
@@ -393,5 +393,3 @@ export default function OfficesPage() {
     </div>
   );
 }
-
-    

@@ -89,14 +89,15 @@ export async function addOffice(officeData: AddOfficePayload): Promise<FrontendO
   }
 }
 
-export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<PaginatedResult<FrontendOffice>> {
+export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<FrontendOffice[]> {
   console.log(`API CALL: GET /organization/offices with params: pageNumber=${pageNumber}, pageSize=${pageSize}`);
   try {
-    const response = await apiClient<PaginatedResult<ApiOffice>>('/organization/offices', {
+    // Expecting API to return a direct array of offices for the given page
+    const response = await apiClient<ApiOffice[]>('/organization/offices', {
       method: 'GET',
       params: { pageNumber, pageSize },
     });
-    return response.data;
+    return response.data; // response.data is ApiOffice[]
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchOffices:", error);

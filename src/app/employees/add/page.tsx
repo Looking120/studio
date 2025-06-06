@@ -21,7 +21,7 @@ import {
   fetchOffices, 
   type Department, 
   type Position, 
-  type Office as OrgOffice
+  type Office as OrgOffice // Renamed to avoid conflict with Office from lib/data
 } from '@/services/organization-service';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -55,7 +55,7 @@ export default function AddEmployeePage() {
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [offices, setOffices] = useState<OrgOffice[]>([]);
+  const [offices, setOffices] = useState<OrgOffice[]>([]); // Use OrgOffice type
   const [isLoadingOrgData, setIsLoadingOrgData] = useState(true);
   const [orgDataError, setOrgDataError] = useState<string | null>(null);
 
@@ -104,14 +104,14 @@ export default function AddEmployeePage() {
       setIsLoadingOrgData(true);
       setOrgDataError(null);
       try {
-        const [deptData, posData, officePaginatedData] = await Promise.all([
+        const [deptData, posData, officeData] = await Promise.all([
           fetchDepartments(),
           fetchPositions(),
-          fetchOffices() 
+          fetchOffices() // Directly returns Office[] now
         ]);
         setDepartments(deptData || []);
         setPositions(posData || []);
-        setOffices(officePaginatedData?.items || []);
+        setOffices(officeData || []); // Directly use the array
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Could not load organizational data (departments, positions, offices).";
         setOrgDataError(errorMessage);
