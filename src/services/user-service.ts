@@ -10,29 +10,57 @@ export interface User {
   firstName?: string;
   lastName?: string;
   name?: string; // Combinaison de firstName et lastName
-  middleName?: string;
+  middleName?: string | null; // API can return null for middleName
   email: string;
-  role?: string;
-  avatarUrl?: string; // Ajouté pour la cohérence avec ChatPage
+  role?: string; // Frontend uses single role string
+  avatarUrl?: string;
   phoneNumber?: string;
-  isHired?: boolean; // Optional flag to differentiate
+  isHired?: boolean; 
 }
 
-// Supposons que l'API retourne un type compatible
-interface ApiUser extends User {}
+// Interface pour correspondre à la structure de l'API pour un utilisateur individuel
+interface ApiUserResponse {
+  id: string;
+  userName?: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string | null;
+  roles: string[]; // API returns an array of roles
+}
+
+// Supposons que l'API retourne un type compatible pour les listes
+interface ApiUserListUser extends ApiUserResponse {} // Utilisé pour la liste
+
 interface ApiDeleteResponse {
     success: boolean;
     message?: string;
 }
 
+// This function is used by ChatPage. If /api/users ONLY returns unhired users,
+// then this function will also only return unhired users, which might be an issue for Chat.
+// This needs to be reviewed based on backend capabilities for fetching ALL users or specific types.
 export async function fetchUsers(): Promise<User[]> {
-  console.log('API CALL: GET /users');
+  console.log('API CALL: GET /users (fetchUsers - for Chat, potentially needs review)');
   try {
-    const response = await apiClient<ApiUser[]>('/users', {
+    // Assuming this endpoint /users, without specific filters, might return all users
+    // or be intended for a different purpose than unhired users.
+    // If it strictly returns unhired users, ChatPage will only list unhired users.
+    const response = await apiClient<ApiUserListUser[]>('/users', {
       method: 'GET',
+      // Consider if pagination or filters are needed here for chat users
     });
-    // Assurez-vous que l'API retourne `name` ou construisez-le ici si nécessaire
-    return response.data.map(user => ({ ...user, name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() }));
+    return response.data.map(apiUser => ({
+        id: apiUser.id,
+        userName: apiUser.userName,
+        firstName: apiUser.firstName,
+        lastName: apiUser.lastName,
+        name: apiUser.firstName && apiUser.lastName ? `${apiUser.firstName} ${apiUser.lastName}`.trim() : apiUser.userName || apiUser.email,
+        middleName: apiUser.middleName,
+        email: apiUser.email,
+        role: apiUser.roles && apiUser.roles.length > 0 ? apiUser.roles[0] : 'User', // Take the first role
+        isHired: undefined, // isHired status might not be directly available or relevant here
+    }));
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchUsers:", error);
@@ -40,19 +68,29 @@ export async function fetchUsers(): Promise<User[]> {
   }
 }
 
+// This function is for fetching UNHIRED users (applicants).
+// As per user instruction, GET /api/users (with pagination) returns these users.
 export async function fetchUnhiredUsers(): Promise<User[]> {
-  console.log('API CALL: GET /users/unhired (or equivalent that filters for unhired)');
-  // This assumes an endpoint /api/users/unhired or that /api/users?hired=false works.
-  // Adjust if your endpoint is different.
+  console.log('API CALL: GET /users (fetchUnhiredUsers - for Applicants)');
   try {
-    // Option 1: dedicated endpoint
-    // const response = await apiClient<ApiUser[]>('/users/unhired', {
-    // Option 2: filter existing endpoint (example, actual param name might vary)
-    const response = await apiClient<ApiUser[]>('/users', { // Assuming /users can be filtered
+    // The endpoint /api/users with pagination is stated to return unhired users.
+    const response = await apiClient<ApiUserListUser[]>('/users', { 
       method: 'GET',
-      params: { isHired: false } // Example: adjust param based on your API
+      params: { PageNumber: 1, PageSize: 100 } // Fetch up to 100 applicants
     });
-    return response.data.map(user => ({ ...user, name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() }));
+    return response.data.map(apiUser => ({
+      id: apiUser.id,
+      userName: apiUser.userName,
+      firstName: apiUser.firstName,
+      lastName: apiUser.lastName,
+      name: apiUser.firstName && apiUser.lastName ? `${apiUser.firstName} ${apiUser.lastName}`.trim() : apiUser.userName || apiUser.email,
+      middleName: apiUser.middleName,
+      email: apiUser.email,
+      role: apiUser.roles && apiUser.roles.length > 0 ? apiUser.roles[0] : 'User', // Take the first role
+      isHired: false, // Explicitly set as false as these are unhired users
+      // avatarUrl and phoneNumber might not be in the /users list response, depends on API.
+      // They are available when navigating to "Hire" form from an applicant if passed via query params.
+    }));
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchUnhiredUsers:", error);
@@ -64,11 +102,22 @@ export async function fetchUnhiredUsers(): Promise<User[]> {
 export async function fetchUserById(userId: string): Promise<User | null> {
   console.log(`API CALL: GET /users/${userId}`);
   try {
-    const response = await apiClient<ApiUser | null>(`/users/${userId}`, {
+    const response = await apiClient<ApiUserResponse | null>(`/users/${userId}`, { // Expect single user structure
       method: 'GET',
     });
     if (response.data) {
-        return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
+        const apiUser = response.data;
+        return { 
+            id: apiUser.id,
+            userName: apiUser.userName,
+            firstName: apiUser.firstName,
+            lastName: apiUser.lastName,
+            name: apiUser.firstName && apiUser.lastName ? `${apiUser.firstName} ${apiUser.lastName}`.trim() : apiUser.userName || apiUser.email,
+            middleName: apiUser.middleName,
+            email: apiUser.email,
+            role: apiUser.roles && apiUser.roles.length > 0 ? apiUser.roles[0] : 'User',
+            // isHired status would ideally come from this specific user fetch if available
+        };
     }
     return null;
   } catch (error) {
@@ -96,19 +145,31 @@ export async function deleteUser(userId: string): Promise<ApiDeleteResponse> {
   }
 }
 
-export interface UpdateUserPayload extends Partial<Omit<User, 'id' | 'name'>> {
-  // Exclut 'id' car il est dans l'URL, 'name' est dérivé
-  // Le backend s'attend peut-être à des champs spécifiques
+export interface UpdateUserPayload extends Partial<Omit<User, 'id' | 'name' | 'role' | 'isHired'>> {
+  // Exclut 'id', 'name' (dérivé), 'role' (géré par endpoint dédié), 'isHired' (géré par processus d'embauche)
+  // L'API peut s'attendre à `roles: string[]` si le rôle doit être mis à jour ici.
+  // Pour l'instant, ce payload est pour les champs de base modifiables directement sur un User.
+  roles?: string[]; // Si la mise à jour du rôle se fait aussi par cet endpoint.
 }
 
 export async function updateUser(userId: string, userData: UpdateUserPayload): Promise<User> {
   console.log(`API CALL: PUT /users/${userId} with data:`, userData);
   try {
-    const response = await apiClient<ApiUser>(`/users/${userId}`, {
+    const response = await apiClient<ApiUserResponse>(`/users/${userId}`, { // Attend la structure API
       method: 'PUT',
       body: userData,
     });
-     return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
+    const apiUser = response.data;
+    return { 
+        id: apiUser.id,
+        userName: apiUser.userName,
+        firstName: apiUser.firstName,
+        lastName: apiUser.lastName,
+        name: apiUser.firstName && apiUser.lastName ? `${apiUser.firstName} ${apiUser.lastName}`.trim() : apiUser.userName || apiUser.email,
+        middleName: apiUser.middleName,
+        email: apiUser.email,
+        role: apiUser.roles && apiUser.roles.length > 0 ? apiUser.roles[0] : 'User',
+    };
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateUser:", error);
@@ -118,17 +179,27 @@ export async function updateUser(userId: string, userData: UpdateUserPayload): P
 
 
 export interface UpdateUserRolePayload {
-  role: string;
+  roles: string[]; // L'API pour /role attend probablement un tableau de rôles
 }
 
 export async function updateUserRole(userId: string, roleData: UpdateUserRolePayload): Promise<User> {
   console.log(`API CALL: PUT /users/${userId}/role with data:`, roleData);
   try {
-    const response = await apiClient<ApiUser>(`/users/${userId}/role`, {
+    const response = await apiClient<ApiUserResponse>(`/users/${userId}/role`, { // Attend la structure API
       method: 'PUT',
       body: roleData,
     });
-    return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
+    const apiUser = response.data;
+    return { 
+        id: apiUser.id,
+        userName: apiUser.userName,
+        firstName: apiUser.firstName,
+        lastName: apiUser.lastName,
+        name: apiUser.firstName && apiUser.lastName ? `${apiUser.firstName} ${apiUser.lastName}`.trim() : apiUser.userName || apiUser.email,
+        middleName: apiUser.middleName,
+        email: apiUser.email,
+        role: apiUser.roles && apiUser.roles.length > 0 ? apiUser.roles[0] : 'User',
+    };
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateUserRole:", error);
