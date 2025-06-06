@@ -12,7 +12,9 @@ import { fetchUsers, type User } from '@/services/user-service';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { HttpError } from "@/services/api-client";
+import { HttpError, UnauthorizedError } from "@/services/api-client";
+import { signOut } from '@/services/auth-service';
+import { useRouter } from 'next/navigation';
 
 interface DisplayMessage {
   id: string;
@@ -43,6 +45,7 @@ export default function ChatPage() {
   const [errorMessages, setErrorMessages] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const userId = localStorage.getItem('userId');
@@ -73,6 +76,16 @@ export default function ChatPage() {
         setUsers(fetchedUsers.filter(user => user.id !== currentUserId && user.id));
         console.log("ChatPage: Users fetched and filtered:", users);
       } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+          });
+          await signOut();
+          router.push('/');
+          return; 
+        }
         const errorText = err instanceof Error ? err.message : "Could not load users.";
         if (err instanceof HttpError && err.status === 500) {
             console.warn(`ChatPage: Failed to load users due to a server error (500). Details: ${errorText}`, err);
@@ -86,7 +99,7 @@ export default function ChatPage() {
       }
     };
     loadUsers();
-  }, [currentUserId, toast]);
+  }, [currentUserId, toast, router]);
 
 
   // Load messages when a conversation is selected/active
@@ -119,6 +132,16 @@ export default function ChatPage() {
         }
 
       } catch (err) {
+        if (err instanceof UnauthorizedError) { // Added UnauthorizedError handling here too
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired while fetching messages. Please log in again.",
+          });
+          await signOut();
+          router.push('/');
+          return;
+        }
         console.error(`ChatPage: Failed to load messages for ${currentConversationId}:`, err);
         const errorText = err instanceof Error ? err.message : "Could not load messages.";
         setErrorMessages(errorText);
@@ -129,7 +152,7 @@ export default function ChatPage() {
     };
 
     loadMessages();
-  }, [currentConversationId, currentUserId, currentUserName, selectedUser?.name, toast]);
+  }, [currentConversationId, currentUserId, currentUserName, selectedUser?.name, toast, router]);
 
   const handleSelectUser = (user: User) => {
     if (!currentUserId) {
@@ -186,6 +209,19 @@ export default function ChatPage() {
         } : msg
       ));
     } catch (err) {
+      if (err instanceof UnauthorizedError) { // Added UnauthorizedError handling here too
+          toast({
+            variant: "destructive",
+            title: "Session Expired",
+            description: "Your session has expired while sending a message. Please log in again.",
+          });
+          await signOut();
+          router.push('/');
+          // Potentially revert optimistic message if needed, or clear chat
+          setDisplayMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+          setNewMessage(messageToSend); // Restore message to input
+          return;
+      }
       console.error("ChatPage: Failed to send message:", err);
       const errorText = err instanceof Error ? err.message : "Could not send message.";
       toast({ variant: "destructive", title: "Send Error", description: `Failed to send message: ${errorText}` });
