@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building, CalendarClock, ScrollText, Fingerprint } from "lucide-react";
+import { Users, MapPin, ListChecks, BarChart3, Building2, LayoutDashboard, PanelLeft, Sun, Moon, MessageSquare, User as UserIcon, Settings, LogOut, Building, CalendarClock, ScrollText, Fingerprint, UserPlus as UserPlusIcon } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -39,6 +39,7 @@ const adminNavItems = [
     label: "Organization", icon: Building, subItems: [
       { href: "/organization/departments", label: "Departments", icon: Users },
       { href: "/organization/positions", label: "Positions", icon: Users },
+      { href: "/applicants", label: "Applicants", icon: UserPlusIcon },
     ]
   },
   { href: "/chat", label: "Messaging", icon: MessageSquare, notificationKey: "chat" },
@@ -156,7 +157,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
         console.log('[AppClientLayout NavEffect] Nav items changed. Setting new nav items.');
         setCurrentNavItems(navItemsToSet);
     }
-  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]); // Removed currentNavItems from here
+  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]); 
 
 
   const getPageTitle = () => {
@@ -177,6 +178,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     if (pathname === '/employees/add') return 'Add Employee';
     if (pathname === '/profile') return 'My Profile';
     if (pathname === '/settings') return 'Settings';
+    if (pathname === '/applicants') return 'Applicants';
     return "EmployTrack"; 
   };
 
@@ -195,7 +197,6 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
   
-  // Log state values just before constructing userToDisplay
   console.log('[AppClientLayout] Rendering. User state for display - Name:', loggedInUserName, 'Role:', loggedInUserRole, 'Email:', loggedInUserEmail);
 
   const userToDisplay = {
@@ -346,4 +347,3 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-

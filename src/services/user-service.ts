@@ -15,6 +15,7 @@ export interface User {
   role?: string;
   avatarUrl?: string; // Ajouté pour la cohérence avec ChatPage
   phoneNumber?: string;
+  isHired?: boolean; // Optional flag to differentiate
 }
 
 // Supposons que l'API retourne un type compatible
@@ -31,13 +32,34 @@ export async function fetchUsers(): Promise<User[]> {
       method: 'GET',
     });
     // Assurez-vous que l'API retourne `name` ou construisez-le ici si nécessaire
-    return response.data.map(user => ({ ...user, name: user.name || `${user.firstName} ${user.lastName}`.trim() }));
+    return response.data.map(user => ({ ...user, name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() }));
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchUsers:", error);
     throw new HttpError('Failed to fetch users.', 0, null);
   }
 }
+
+export async function fetchUnhiredUsers(): Promise<User[]> {
+  console.log('API CALL: GET /users/unhired (or equivalent that filters for unhired)');
+  // This assumes an endpoint /api/users/unhired or that /api/users?hired=false works.
+  // Adjust if your endpoint is different.
+  try {
+    // Option 1: dedicated endpoint
+    // const response = await apiClient<ApiUser[]>('/users/unhired', {
+    // Option 2: filter existing endpoint (example, actual param name might vary)
+    const response = await apiClient<ApiUser[]>('/users', { // Assuming /users can be filtered
+      method: 'GET',
+      params: { isHired: false } // Example: adjust param based on your API
+    });
+    return response.data.map(user => ({ ...user, name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() }));
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
+    console.error("Unexpected error in fetchUnhiredUsers:", error);
+    throw new HttpError('Failed to fetch unhired users.', 0, null);
+  }
+}
+
 
 export async function fetchUserById(userId: string): Promise<User | null> {
   console.log(`API CALL: GET /users/${userId}`);
@@ -46,7 +68,7 @@ export async function fetchUserById(userId: string): Promise<User | null> {
       method: 'GET',
     });
     if (response.data) {
-        return { ...response.data, name: response.data.name || `${response.data.firstName} ${response.data.lastName}`.trim() };
+        return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
     }
     return null;
   } catch (error) {
@@ -86,7 +108,7 @@ export async function updateUser(userId: string, userData: UpdateUserPayload): P
       method: 'PUT',
       body: userData,
     });
-     return { ...response.data, name: response.data.name || `${response.data.firstName} ${response.data.lastName}`.trim() };
+     return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateUser:", error);
@@ -106,10 +128,11 @@ export async function updateUserRole(userId: string, roleData: UpdateUserRolePay
       method: 'PUT',
       body: roleData,
     });
-    return { ...response.data, name: response.data.name || `${response.data.firstName} ${response.data.lastName}`.trim() };
+    return { ...response.data, name: response.data.name || `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() };
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateUserRole:", error);
     throw new HttpError(`Failed to update role for user ${userId}.`, 0, null);
   }
 }
+
