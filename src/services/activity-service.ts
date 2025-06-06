@@ -17,14 +17,18 @@ export interface EndActivityPayload {
 // Pour l'instant, on suppose que l'API retourne une structure compatible avec FrontendActivityLog
 interface ApiActivityLog extends FrontendActivityLog {} // Placeholder
 
-export async function fetchActivityLogsByEmployee(employeeId: string): Promise<FrontendActivityLog[]> {
-  console.log(`API CALL: GET /activity-logs/${employeeId}`);
+export async function fetchActivityLogsByEmployee(
+  employeeId: string,
+  pageNumber: number = 1,
+  pageSize: number = 25 // Default PageSize, adjust as needed
+): Promise<FrontendActivityLog[]> {
+  console.log(`API CALL: GET /activity-logs/${employeeId} with params: PageNumber=${pageNumber}, PageSize=${pageSize}`);
   try {
     const response = await apiClient<ApiActivityLog[]>(`/activity-logs/${employeeId}`, {
       method: 'GET',
-      // Removed params: { startDate, endDate }
+      params: { PageNumber: pageNumber, PageSize: pageSize },
     });
-    return response.data; 
+    return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchActivityLogsByEmployee:", error);

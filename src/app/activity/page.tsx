@@ -80,6 +80,7 @@ export default function ActivityLogsPage() {
       setFetchError(null);
       try {
         console.log(`ActivityLogsPage: Fetching logs for employeeId: ${currentEmployeeId}`);
+        // The service function now handles default pagination
         const data = await fetchActivityLogsByEmployee(currentEmployeeId);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -92,7 +93,7 @@ export default function ActivityLogsPage() {
           });
           await signOut();
           router.push('/');
-          return; 
+          return;
         } else if (err instanceof HttpError) {
           errorMessage = err.message;
           if (err.status === 400) {
@@ -135,7 +136,7 @@ export default function ActivityLogsPage() {
     .sort((a, b) => {
         const dateA = a.startTime ? new Date(a.startTime).getTime() : 0;
         const dateB = b.startTime ? new Date(b.startTime).getTime() : 0;
-        return dateB - dateA; 
+        return dateB - dateA;
     });
   }, [activityLogs, searchTerm, activityFilter]);
 
