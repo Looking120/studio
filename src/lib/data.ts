@@ -9,17 +9,18 @@ export interface Employee {
   jobTitle: string;
   latitude?: number;
   longitude?: number;
-  lastSeen?: string; 
-  officeId?: string; 
+  lastSeen?: string;
+  officeId?: string;
+  hireDate?: string; // Added hireDate
 }
 
 export interface ActivityLog {
   id: string;
   employeeId: string;
   employeeName: string;
-  startTime?: string; 
-  endTime?: string;   
-  activityType: string; 
+  startTime?: string;
+  endTime?: string;
+  activityType: string;
   description?: string;
   location?: string;
 }
@@ -38,15 +39,15 @@ export interface Task {
   title: string;
   description?: string;
   isCompleted: boolean;
-  dueDate?: string; 
+  dueDate?: string;
 }
 
 export const mockEmployees: Employee[] = [
-  { id: 'emp001', name: 'Alice Wonderland', email: 'alice@example.com', department: 'Engineering', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Software Engineer', latitude: 34.052235, longitude: -118.243683, lastSeen: '5m ago', officeId: 'off001' },
-  { id: 'emp002', name: 'Bob The Builder', email: 'bob@example.com', department: 'Construction', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Lead Architect', latitude: 34.055130, longitude: -118.245890, lastSeen: '15m ago', officeId: 'off002' },
-  { id: 'emp003', name: 'Charlie Brown', email: 'charlie@example.com', department: 'Animation', status: 'Inactive', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Character Designer', latitude: 34.050000, longitude: -118.230000, lastSeen: '2h ago' },
-  { id: 'emp004', name: 'Diana Prince', email: 'diana@example.com', department: 'Justice League', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Ambassador', latitude: 34.056000, longitude: -118.250000, lastSeen: 'Online', officeId: 'off001' },
-  { id: 'emp005', name: 'Edward Scissorhands', email: 'edward@example.com', department: 'Landscaping', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Topiary Artist', latitude: 34.048000, longitude: -118.240000, lastSeen: '30m ago', officeId: 'off003' },
+  { id: 'emp001', name: 'Alice Wonderland', email: 'alice@example.com', department: 'Engineering', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Software Engineer', latitude: 34.052235, longitude: -118.243683, lastSeen: '5m ago', officeId: 'off001', hireDate: '2021-03-15' },
+  { id: 'emp002', name: 'Bob The Builder', email: 'bob@example.com', department: 'Construction', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Lead Architect', latitude: 34.055130, longitude: -118.245890, lastSeen: '15m ago', officeId: 'off002', hireDate: '2020-07-20' },
+  { id: 'emp003', name: 'Charlie Brown', email: 'charlie@example.com', department: 'Animation', status: 'Inactive', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Character Designer', latitude: 34.050000, longitude: -118.230000, lastSeen: '2h ago', hireDate: '2019-01-10' },
+  { id: 'emp004', name: 'Diana Prince', email: 'diana@example.com', department: 'Justice League', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Ambassador', latitude: 34.056000, longitude: -118.250000, lastSeen: 'Online', officeId: 'off001', hireDate: '2017-06-02' },
+  { id: 'emp005', name: 'Edward Scissorhands', email: 'edward@example.com', department: 'Landscaping', status: 'Active', avatarUrl: 'https://placehold.co/40x40.png', jobTitle: 'Topiary Artist', latitude: 34.048000, longitude: -118.240000, lastSeen: '30m ago', officeId: 'off003', hireDate: '2022-11-05' },
 ];
 
 export const mockActivityLogs: ActivityLog[] = [
@@ -68,7 +69,7 @@ export const mockAttendanceSummary = {
   totalEmployees: mockEmployees.length,
   activeToday: mockActivityLogs.filter(log => log.startTime && !log.endTime && new Date(log.startTime).toDateString() === new Date().toDateString()).length,
   checkedInToday: new Set(mockActivityLogs.filter(log => log.startTime && new Date(log.startTime).toDateString() === new Date().toDateString()).map(log => log.employeeId)).size,
-  avgWorkHours: 7.5, 
+  avgWorkHours: 7.5,
 };
 
 export const mockTasks: Task[] = [

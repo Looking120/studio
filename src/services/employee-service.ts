@@ -27,15 +27,21 @@ export interface HireEmployeePayload {
   officeId: string;
 
   // Optional details
-  address?: string;
-  phoneNumber?: string;
-  dateOfBirth?: string; // Should be ISO string if provided
-  gender?: string;
-  avatarUrl?: string;
+  address?: string | undefined;
+  phoneNumber?: string | undefined;
+  dateOfBirth?: string | undefined; // Should be ISO string if provided
+  gender?: string | undefined;
+  avatarUrl?: string | undefined;
 }
 
 // Supposons que l'API retourne des types compatibles
-interface ApiEmployee extends FrontendEmployee {}
+interface ApiEmployee extends FrontendEmployee {
+    // Potentially more fields from API for a single employee view, e.g.
+    // hireDate?: string; // Already added to FrontendEmployee
+    phoneNumber?: string;
+    address?: string;
+    // Add other fields if your API /employees/{id} returns more details
+}
 interface ApiHiredEmployeeResponse extends ApiEmployee { // L'API peut avoir des champs supplémentaires
     firstName: string; // Assurez-vous que ces champs sont bien dans la réponse API
     lastName: string;

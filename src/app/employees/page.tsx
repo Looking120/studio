@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search, AlertTriangle, UserCog, Info } from 'lucide-react';
+import { UserPlus, Search, AlertTriangle, UserCog, Info, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -250,7 +250,7 @@ export default function EmployeesPage() {
                           <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                           <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                           <TableCell className="text-center"><Skeleton className="h-6 w-16 mx-auto" /></TableCell>
-                          <TableCell className="text-center"><Skeleton className="h-8 w-[120px] mx-auto" /></TableCell>
+                          <TableCell className="text-center"><Skeleton className="h-8 w-[160px] mx-auto" /></TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -270,13 +270,13 @@ export default function EmployeesPage() {
                             </Tooltip>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-3">
+                            <Link href={`/employees/${employee.id}`} className="flex items-center gap-3 group hover:underline">
                               <Avatar>
                                 <AvatarImage src={employee.avatarUrl || `https://placehold.co/40x40.png?text=${employee.name?.substring(0,2)}`} alt={employee.name || ''} data-ai-hint="person portrait" />
                                 <AvatarFallback>{employee.name?.substring(0, 2).toUpperCase() || 'N/A'}</AvatarFallback>
                               </Avatar>
-                              <span className="font-medium">{employee.name || 'N/A'}</span>
-                            </div>
+                              <span className="font-medium group-hover:text-primary">{employee.name || 'N/A'}</span>
+                            </Link>
                           </TableCell>
                           <TableCell>{employee.email || 'N/A'}</TableCell>
                           <TableCell>{employee.department || 'N/A'}</TableCell>
@@ -286,13 +286,18 @@ export default function EmployeesPage() {
                               {employee.status || 'N/A'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center space-x-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="View Profile">
+                                <Link href={`/employees/${employee.id}`}>
+                                    <Eye className="h-4 w-4" />
+                                </Link>
+                            </Button>
                             <Select
                               value={employee.status}
                               onValueChange={(value: 'Active' | 'Inactive') => handleStatusChange(employee.id, value)}
                               disabled={!employee.id}
                             >
-                              <SelectTrigger className="w-full max-w-[120px] h-8 text-xs mx-auto">
+                              <SelectTrigger className="w-auto max-w-[120px] h-8 text-xs inline-flex">
                                 <SelectValue placeholder="Change status" />
                               </SelectTrigger>
                               <SelectContent>
@@ -321,6 +326,3 @@ export default function EmployeesPage() {
     </TooltipProvider>
   );
 }
-
-
-    
