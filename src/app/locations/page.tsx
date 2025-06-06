@@ -36,8 +36,8 @@ export default function LocationsPage() {
   const [errorEmployees, setErrorEmployees] = useState<string | null>(null);
   const [errorLocations, setErrorLocations] = useState<string | null>(null);
 
-  const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 }); 
-  const [mapZoom, setMapZoom] = useState(12);
+  const [mapCenter, setMapCenter] = useState({ lat: 39.8283, lng: -98.5795 }); // Default to US center
+  const [mapZoom, setMapZoom] = useState(4); // Default zoom for US center
 
   const { toast } = useToast();
   const router = useRouter();
@@ -154,8 +154,8 @@ export default function LocationsPage() {
       setMapCenter({ lat: avgLat, lng: avgLng });
       setMapZoom(displayableEmployeeLocations.length === 1 ? 13 : 10); 
     } else if (!isLoadingEmployees && !isLoadingLocations) {
-      setMapCenter({ lat: 34.0522, lng: -118.2437 }); 
-      setMapZoom(3); // Zoom out if no markers
+      setMapCenter({ lat: 39.8283, lng: -98.5795 }); // US Center
+      setMapZoom(4); // Default zoom for US Center if no markers
     }
   }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 

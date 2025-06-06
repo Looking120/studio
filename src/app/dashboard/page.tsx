@@ -9,10 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data";
 import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home } from "lucide-react";
 import Link from "next/link";
-// import { useIsMobile } from '@/hooks/use-mobile'; // No longer needed for role-based dashboard view
 import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import MapComponent, { type MapMarkerData } from '@/components/map-component';
 
 interface ProcessedActivityLog extends ActivityLog {
   displayTime: string;
@@ -31,7 +31,6 @@ export default function DashboardPage() {
     { title: "Avg. Work Hours", value: `${mockAttendanceSummary.avgWorkHours}h`, icon: Clock, href: "/attendance" },
   ];
 
-  // const isMobile = useIsMobile(); // Not directly used for role differentiation anymore
   const [userRole, setUserRole] = useState<string | null>(null);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [assignedOffice, setAssignedOffice] = useState<Office | null>(null);
@@ -42,6 +41,11 @@ export default function DashboardPage() {
   const [processedActivityLogs, setProcessedActivityLogs] = useState<ProcessedActivityLog[]>([]);
   const [processedEmployeeTasks, setProcessedEmployeeTasks] = useState<ProcessedTask[]>([]);
   const [isClient, setIsClient] = useState(false);
+
+  const [hqMapMarkers, setHqMapMarkers] = useState<MapMarkerData[]>([]);
+  const [hqMapCenter, setHqMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 });
+  const [hqMapZoom, setHqMapZoom] = useState(3);
+
 
   useEffect(() => {
     setIsClient(true); 
@@ -72,7 +76,6 @@ export default function DashboardPage() {
       const emailFromStorage = localStorage.getItem('userEmail');
       setUserRole(roleFromStorage);
 
-      // Employee-specific data loading logic, independent of screen size
       if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
         setIsLoadingEmployeeData(true);
         const employee = mockEmployees.find(emp => emp.email === emailFromStorage);
@@ -101,11 +104,29 @@ export default function DashboardPage() {
           setIsLoadingEmployeeData(false);
         }
       } else {
-        // For admin or if role not determined yet for non-admin path
+        // For admin or if role not determined yet
         setIsLoadingEmployeeData(false); 
+        // Setup HQ Map for Admin
+        const headquarters = mockOffices.find(office => office.name.toLowerCase() === 'headquarters');
+        if (headquarters) {
+          setHqMapMarkers([{
+            id: headquarters.id,
+            latitude: headquarters.latitude,
+            longitude: headquarters.longitude,
+            title: headquarters.name,
+            description: headquarters.address,
+            icon: <Building2 className="text-primary h-6 w-6" />
+          }]);
+          setHqMapCenter({ lat: headquarters.latitude, lng: headquarters.longitude });
+          setHqMapZoom(12);
+        } else {
+          setHqMapMarkers([]);
+          setHqMapCenter({ lat: 39.8283, lng: -98.5795 }); // Default US center
+          setHqMapZoom(3);
+        }
       }
     }
-  }, [toast, isClient]); // Removed isMobile as it's not used for role differentiation
+  }, [toast, isClient]);
 
   const handleTaskStatusChange = async (taskId: string, isCompleted: boolean) => {
     const originalTasks = [...employeeTasks];
@@ -141,7 +162,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Employee-specific dashboard view for all screen sizes
   if (userRole && !userRole.toLowerCase().includes('admin')) {
     if (isLoadingEmployeeData) {
       return (
@@ -299,15 +319,12 @@ export default function DashboardPage() {
               Quick Map Overview (HQ)
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[300px] p-0">
-            <div className="w-full h-full bg-muted rounded-b-lg flex items-center justify-center">
-               <img 
-                src="https://placehold.co/600x300.png" 
-                alt="Map placeholder" 
-                data-ai-hint="map office"
-                className="object-cover w-full h-full rounded-b-lg"
-                />
-            </div>
+          <CardContent className="h-[300px] p-0 rounded-b-lg overflow-hidden">
+            <MapComponent 
+                markers={hqMapMarkers}
+                center={hqMapCenter}
+                zoom={hqMapZoom}
+            />
           </CardContent>
         </Card>
       </div>
