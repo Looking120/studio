@@ -26,6 +26,9 @@ interface DisplayableLocationInfo extends LocationData {
   employeeStatus: 'Active' | 'Inactive';
 }
 
+const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
+const DEFAULT_CITY_ZOOM = 11;
+
 export default function LocationsPage() {
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [locationsData, setLocationsData] = useState<Record<string, LocationData | null>>({});
@@ -36,8 +39,8 @@ export default function LocationsPage() {
   const [errorEmployees, setErrorEmployees] = useState<string | null>(null);
   const [errorLocations, setErrorLocations] = useState<string | null>(null);
 
-  const [mapCenter, setMapCenter] = useState({ lat: 39.8283, lng: -98.5795 }); // Default to US center
-  const [mapZoom, setMapZoom] = useState(4); // Default zoom for US center
+  const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
+  const [mapZoom, setMapZoom] = useState(DEFAULT_CITY_ZOOM);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -154,8 +157,8 @@ export default function LocationsPage() {
       setMapCenter({ lat: avgLat, lng: avgLng });
       setMapZoom(displayableEmployeeLocations.length === 1 ? 13 : 10); 
     } else if (!isLoadingEmployees && !isLoadingLocations) {
-      setMapCenter({ lat: 39.8283, lng: -98.5795 }); // US Center
-      setMapZoom(4); // Default zoom for US Center if no markers
+      setMapCenter(GOMEL_COORDS); 
+      setMapZoom(DEFAULT_CITY_ZOOM); 
     }
   }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 
@@ -244,3 +247,4 @@ export default function LocationsPage() {
     </div>
   );
 }
+

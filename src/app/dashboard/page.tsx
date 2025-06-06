@@ -23,6 +23,9 @@ interface ProcessedTask extends Task {
   isOverdue?: boolean;
 }
 
+const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
+const DEFAULT_CITY_ZOOM_DASHBOARD = 11;
+
 export default function DashboardPage() {
   const summaryData = [
     { title: "Total Employees", value: mockEmployees.length, icon: Users, href: "/employees" },
@@ -43,8 +46,8 @@ export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
 
   const [hqMapMarkers, setHqMapMarkers] = useState<MapMarkerData[]>([]);
-  const [hqMapCenter, setHqMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 });
-  const [hqMapZoom, setHqMapZoom] = useState(3);
+  const [hqMapCenter, setHqMapCenter] = useState<{ lat: number; lng: number }>(GOMEL_COORDS);
+  const [hqMapZoom, setHqMapZoom] = useState(DEFAULT_CITY_ZOOM_DASHBOARD);
 
 
   useEffect(() => {
@@ -121,8 +124,8 @@ export default function DashboardPage() {
           setHqMapZoom(12);
         } else {
           setHqMapMarkers([]);
-          setHqMapCenter({ lat: 39.8283, lng: -98.5795 }); // Default US center
-          setHqMapZoom(3);
+          setHqMapCenter(GOMEL_COORDS); 
+          setHqMapZoom(DEFAULT_CITY_ZOOM_DASHBOARD); 
         }
       }
     }
@@ -331,3 +334,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
