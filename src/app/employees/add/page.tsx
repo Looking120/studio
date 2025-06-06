@@ -89,8 +89,6 @@ export default function AddEmployeePage() {
 
   useEffect(() => {
     // If these values are pre-filled from searchParams, update the form state
-    // This is useful if the component mounts after searchParams are available
-    // or if searchParams change (though less likely for this page)
     if (initialFirstName) form.setValue('firstName', initialFirstName);
     if (initialLastName) form.setValue('lastName', initialLastName);
     if (initialEmail) form.setValue('email', initialEmail);
@@ -107,11 +105,11 @@ export default function AddEmployeePage() {
         const [deptData, posData, officeData] = await Promise.all([
           fetchDepartments(),
           fetchPositions(),
-          fetchOffices() // Directly returns Office[] now
+          fetchOffices() 
         ]);
         setDepartments(deptData || []);
         setPositions(posData || []);
-        setOffices(officeData || []); // Directly use the array
+        setOffices(officeData || []); 
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Could not load organizational data (departments, positions, offices).";
         setOrgDataError(errorMessage);
@@ -127,6 +125,7 @@ export default function AddEmployeePage() {
     form.clearErrors();
     try {
       const payload: HireEmployeePayload = {
+        userId: data.userIdToHire || undefined, // Ensure userIdToHire is passed as userId
         firstName: data.firstName,
         lastName: data.lastName,
         middleName: data.middleName || undefined,
@@ -136,7 +135,6 @@ export default function AddEmployeePage() {
         employeeNumber: data.employeeNumber,
         address: data.address || undefined,
         phoneNumber: data.phoneNumber || undefined,
-        // Ensure dateOfBirth and gender are only sent if provided
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString() : undefined, 
         gender: data.gender || undefined, 
         hireDate: new Date(data.hireDate).toISOString(),   
@@ -144,21 +142,14 @@ export default function AddEmployeePage() {
         departmentId: data.departmentId, 
         positionId: data.positionId,     
         officeId: data.officeId,
-        // Include existingUserId if available, for the backend to link
-        // This field might not be directly in HireEmployeePayload, depends on API design.
-        // If your `hireEmployee` service/backend handles linking via email, this might not be needed in payload.
-        // For now, assuming the payload is as defined and backend handles linking if email matches.
       };
+      
       if (data.userIdToHire) {
-        // If your backend expects an explicit ID for an existing user to hire:
-        // (payload as any).existingUserId = data.userIdToHire; 
-        // Or adjust HireEmployeePayload to include it.
-        // For now, the backend logic for POST /users/hire must handle this.
-        console.log("Hiring existing user with ID:", data.userIdToHire);
+        console.log("Attempting to hire existing user with ID:", data.userIdToHire, "Payload:", JSON.stringify(payload, null, 2));
+      } else {
+        console.log("Attempting to hire new user. Payload:", JSON.stringify(payload, null, 2));
       }
 
-
-      console.log("Submitting payload for hireEmployee:", payload);
       const newEmployee = await hireEmployee(payload);
       console.log('Employee data saved via service:', newEmployee);
 
@@ -166,7 +157,7 @@ export default function AddEmployeePage() {
         title: "Employee Hired",
         description: `${newEmployee.firstName} ${newEmployee.lastName} has been hired successfully.`,
       });
-      form.reset({ // Reset with potentially new random employee number
+      form.reset({ 
         firstName: '', lastName: '', middleName: '', email: '',
         employeeNumber: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
         address: '', phoneNumber: '', dateOfBirth: '', gender: '',

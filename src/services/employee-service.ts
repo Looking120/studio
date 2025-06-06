@@ -10,20 +10,28 @@ export interface EmployeeLocation {
 }
 
 export interface HireEmployeePayload {
+  userId?: string; // For hiring an existing user
+
+  // Personal details, potentially redundant if userId is provided and backend fetches them
+  // But the form collects them, so we can send them. Backend can choose to ignore.
   firstName: string;
   lastName: string;
   middleName?: string;
   email: string;
-  avatarUrl?: string;
+
+  // Employee-specific details
   employeeNumber: string;
-  address: string;
-  phoneNumber: string;
-  dateOfBirth: string;
-  gender: string;
   hireDate: string;
   departmentId: string;
   positionId: string;
   officeId: string;
+
+  // Optional details
+  address?: string;
+  phoneNumber?: string;
+  dateOfBirth?: string; // Should be ISO string if provided
+  gender?: string;
+  avatarUrl?: string;
 }
 
 // Supposons que l'API retourne des types compatibles
@@ -112,7 +120,7 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
 
 // Utilise l'endpoint /users/hire comme spécifié
 export async function hireEmployee(employeeData: HireEmployeePayload): Promise<ApiHiredEmployeeResponse> {
-  console.log('API CALL: POST /users/hire with data:', employeeData);
+  console.log('API CALL: POST /users/hire with data:', JSON.stringify(employeeData, null, 2));
   try {
     const response = await apiClient<ApiHiredEmployeeResponse>('/users/hire', {
       method: 'POST',
@@ -122,7 +130,7 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in hireEmployee:", error);
-    throw new HttpError('Failed to hire employee.', 0, null);
+    throw new HttpError('Failed to hire employee.', (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
   }
 }
 
