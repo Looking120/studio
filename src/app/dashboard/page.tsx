@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { mockActivityLogs, mockEmployees, mockOffices, mockAttendanceSummary, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data";
-import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home } from "lucide-react";
+import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service';
+import { fetchUnhiredUsers } from '@/services/user-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import MapComponent, { type MapMarkerData } from '@/components/map-component';
@@ -27,20 +28,14 @@ const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
 const DEFAULT_CITY_ZOOM_DASHBOARD = 11;
 
 export default function DashboardPage() {
-  const summaryData = [
-    { title: "Total Employees", value: mockEmployees.length, icon: Users, href: "/employees" },
-    { title: "Active Today", value: mockAttendanceSummary.activeToday, icon: CheckCircle, href: "/activity" },
-    { title: "Total Offices", value: mockOffices.length, icon: Building2, href: "/offices" },
-    { title: "Avg. Work Hours", value: `${mockAttendanceSummary.avgWorkHours}h`, icon: Clock, href: "/attendance" },
-  ];
-
   const [userRole, setUserRole] = useState<string | null>(null);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const [assignedOffice, setAssignedOffice] = useState<Office | null>(null);
   const [employeeTasks, setEmployeeTasks] = useState<Task[]>([]);
   
   const [isRoleLoading, setIsRoleLoading] = useState(true);
-  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true); // For employee-specific data like tasks
+  const [isLoadingEmployeeData, setIsLoadingEmployeeData] = useState(true);
+  const [isLoadingAdminData, setIsLoadingAdminData] = useState(true); // For admin specific data like unhired count
 
   const { toast } = useToast();
 
@@ -52,69 +47,29 @@ export default function DashboardPage() {
   const [hqMapCenter, setHqMapCenter] = useState<{ lat: number; lng: number }>(GOMEL_COORDS);
   const [hqMapZoom, setHqMapZoom] = useState(DEFAULT_CITY_ZOOM_DASHBOARD);
 
+  const [unhiredUserCount, setUnhiredUserCount] = useState<number | null>(null);
+  const [isUnhiredCountLoading, setIsUnhiredCountLoading] = useState(true);
 
   useEffect(() => {
     setIsClient(true); 
+    const roleFromStorage = localStorage.getItem('userRole');
+    const emailFromStorage = localStorage.getItem('userEmail');
+    
+    setUserRole(roleFromStorage);
+
+    if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
+      const employeeDetails = mockEmployees.find(emp => emp.email === emailFromStorage);
+      setCurrentEmployee(employeeDetails || null);
+    }
+    setIsRoleLoading(false);
   }, []);
 
   useEffect(() => {
-    if (isClient) {
-      const processed = mockActivityLogs.slice(0, 5).map(log => ({
-        ...log,
-        displayTime: log.startTime ? new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
-      }));
-      setProcessedActivityLogs(processed);
-    }
-  }, [isClient]); 
+    if (isClient && !isRoleLoading) {
+      const isAdmin = userRole && userRole.toLowerCase().includes('admin');
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
-  };
-  
-  useEffect(() => {
-    if (isClient) { 
-      setIsRoleLoading(true);
-      const roleFromStorage = localStorage.getItem('userRole');
-      const emailFromStorage = localStorage.getItem('userEmail');
-      setUserRole(roleFromStorage);
-      setIsRoleLoading(false); // Role determination is complete
-
-      const isAdmin = roleFromStorage && roleFromStorage.toLowerCase().includes('admin');
-
-      if (!isAdmin) { // Employee or role not determined as admin
-        setIsLoadingEmployeeData(true); // Start loading employee specific data
-        const employee = mockEmployees.find(emp => emp.email === emailFromStorage);
-        setCurrentEmployee(employee || null);
-
-        if (employee) {
-          if (employee.officeId) {
-            setAssignedOffice(mockOffices.find(office => office.id === employee.officeId) || null);
-          }
-          fetchTasksForEmployee(employee.id)
-            .then(tasks => {
-              setEmployeeTasks(tasks); 
-              const processed = tasks.map(task => ({
-                ...task,
-                displayDueDate: formatDate(task.dueDate),
-                isOverdue: task.dueDate ? new Date(task.dueDate).getTime() < new Date().setHours(0,0,0,0) && !task.isCompleted : false,
-              }));
-              setProcessedEmployeeTasks(processed);
-            })
-            .catch(err => {
-              console.error("Failed to fetch tasks:", err);
-              toast({ variant: "destructive", title: "Error Loading Tasks", description: "Could not load tasks."});
-            })
-            .finally(() => setIsLoadingEmployeeData(false)); // Finish loading employee specific data
-        } else {
-          setIsLoadingEmployeeData(false); // No employee found, finish loading
-        }
-      } else { // Admin
-        setIsLoadingEmployeeData(false); // No employee-specific data to load for admin on this main dashboard view
+      if (isAdmin) {
+        setIsLoadingAdminData(true);
         const headquarters = mockOffices.find(office => office.name.toLowerCase() === 'headquarters');
         if (headquarters) {
           setHqMapMarkers([{
@@ -132,10 +87,66 @@ export default function DashboardPage() {
           setHqMapCenter(GOMEL_COORDS); 
           setHqMapZoom(DEFAULT_CITY_ZOOM_DASHBOARD); 
         }
+
+        setIsUnhiredCountLoading(true);
+        fetchUnhiredUsers()
+          .then(data => {
+            setUnhiredUserCount(data ? data.length : 0);
+          })
+          .catch(err => {
+            console.error("Failed to fetch unhired users for dashboard:", err);
+            toast({ variant: "destructive", title: "Error Loading Applicants", description: "Could not load applicants count."});
+            setUnhiredUserCount(null);
+          })
+          .finally(() => {
+            setIsUnhiredCountLoading(false);
+            setIsLoadingAdminData(false); // Assuming this is the last piece of admin data
+          });
+        
+        const processedLogs = mockActivityLogs.slice(0, 5).map(log => ({
+          ...log,
+          displayTime: log.startTime ? new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+        }));
+        setProcessedActivityLogs(processedLogs);
+
+      } else { // Employee view
+        setIsLoadingEmployeeData(true);
+        if (currentEmployee) {
+          if (currentEmployee.officeId) {
+            setAssignedOffice(mockOffices.find(office => office.id === currentEmployee.officeId) || null);
+          }
+          fetchTasksForEmployee(currentEmployee.id)
+            .then(tasks => {
+              setEmployeeTasks(tasks); 
+              const processed = tasks.map(task => ({
+                ...task,
+                displayDueDate: formatDate(task.dueDate),
+                isOverdue: task.dueDate ? new Date(task.dueDate).getTime() < new Date().setHours(0,0,0,0) && !task.isCompleted : false,
+              }));
+              setProcessedEmployeeTasks(processed);
+            })
+            .catch(err => {
+              console.error("Failed to fetch tasks:", err);
+              toast({ variant: "destructive", title: "Error Loading Tasks", description: "Could not load tasks."});
+            })
+            .finally(() => setIsLoadingEmployeeData(false));
+        } else {
+          setIsLoadingEmployeeData(false); 
+        }
       }
     }
-  }, [toast, isClient]);
+  }, [isClient, isRoleLoading, userRole, currentEmployee, toast]);
 
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
+  
   const handleTaskStatusChange = async (taskId: string, isCompleted: boolean) => {
     const originalTasks = [...employeeTasks];
     const originalProcessedTasks = [...processedEmployeeTasks];
@@ -158,7 +169,6 @@ export default function DashboardPage() {
     }
   };
   
-  // Loading state for client hydration and role determination
   if (!isClient || isRoleLoading) { 
     return (
       <div className="space-y-6 p-4 animate-pulse">
@@ -176,9 +186,8 @@ export default function DashboardPage() {
 
   const isAdminView = userRole && userRole.toLowerCase().includes('admin');
 
-  // Employee Dashboard View
-  if (!isAdminView) {
-    if (isLoadingEmployeeData) { // Specific loading for employee data (tasks, office)
+  if (!isAdminView) { // Employee Dashboard View
+    if (isLoadingEmployeeData) {
       return (
         <div className="space-y-6 p-2 sm:p-4 animate-pulse">
           <h1 className="text-2xl font-semibold text-foreground mb-4"><Skeleton className="h-8 w-3/5" /></h1>
@@ -266,26 +275,46 @@ export default function DashboardPage() {
   }
 
   // Admin dashboard view
+  const adminSummaryData = [
+    { title: "Total Employees", value: mockEmployees.length, icon: Users, href: "/employees" },
+    { title: "Active Today", value: mockAttendanceSummary.activeToday, icon: CheckCircle, href: "/activity" },
+    { title: "Total Offices", value: mockOffices.length, icon: Building2, href: "/offices" },
+    { 
+      title: "Applicants", 
+      value: isUnhiredCountLoading ? <Skeleton className="h-6 w-10 inline-block" /> : (unhiredUserCount !== null ? unhiredUserCount : "N/A"), 
+      icon: UserPlus, 
+      href: "/applicants" 
+    },
+  ];
+
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {summaryData.map((item) => (
-          <Link href={item.href} key={item.title} legacyBehavior>
-            <a className="block hover:shadow-lg transition-shadow duration-200 rounded-lg">
-              <Card className="bg-card text-card-foreground hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                  <item.icon className="h-5 w-5 text-primary" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{item.value}</div>
-                  <p className="text-xs text-muted-foreground pt-1">View Details</p>
-                </CardContent>
-              </Card>
-            </a>
-          </Link>
-        ))}
-      </div>
+      {isLoadingAdminData && isAdminView && ( // Show skeleton for entire admin summary section if admin data is loading
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({length: adminSummaryData.length}).map((_, i) => <Skeleton key={`admin-summary-skel-${i}`} className="h-28 w-full" />)}
+        </div>
+      )}
+      {!isLoadingAdminData && isAdminView && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {adminSummaryData.map((item) => (
+            <Link href={item.href} key={item.title} legacyBehavior>
+              <a className="block hover:shadow-lg transition-shadow duration-200 rounded-lg">
+                <Card className="bg-card text-card-foreground hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+                    <item.icon className="h-5 w-5 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{item.value}</div>
+                    <p className="text-xs text-muted-foreground pt-1">View Details</p>
+                  </CardContent>
+                </Card>
+              </a>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <Card className="bg-card text-card-foreground">
@@ -296,7 +325,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(isLoadingEmployeeData && isAdminView) && processedActivityLogs.length === 0 && ( // isLoadingEmployeeData is false for admin, this check is redundant for admin but harmless
+            {isLoadingAdminData && isAdminView && processedActivityLogs.length === 0 && (
                  Array.from({ length: 3 }).map((_, index) => (
                     <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
                         <div>
@@ -307,8 +336,7 @@ export default function DashboardPage() {
                     </div>
                 ))
             )}
-            {/* This condition is for when admin view is active, and data is loaded (isLoadingEmployeeData is false for admin) */}
-            {isAdminView && processedActivityLogs.length === 0 && (
+            {!isLoadingAdminData && isAdminView && processedActivityLogs.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No recent activity to display.</p>
             )}
             {processedActivityLogs.map(log => (
@@ -320,7 +348,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{log.displayTime}</p>
               </div>
             ))}
-            {processedActivityLogs.length > 0 && (
+            {!isLoadingAdminData && processedActivityLogs.length > 0 && (
               <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
                 View All Activity Logs
               </Link>
@@ -336,11 +364,16 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[300px] p-0 rounded-b-lg overflow-hidden">
-            <MapComponent 
-                markers={hqMapMarkers}
-                center={hqMapCenter}
-                zoom={hqMapZoom}
-            />
+             {isLoadingAdminData && isAdminView && (
+                <Skeleton className="h-full w-full" />
+             )}
+             {!isLoadingAdminData && isAdminView && (
+                <MapComponent 
+                    markers={hqMapMarkers}
+                    center={hqMapCenter}
+                    zoom={hqMapZoom}
+                />
+             )}
           </CardContent>
         </Card>
       </div>
