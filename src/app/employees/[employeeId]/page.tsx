@@ -226,15 +226,25 @@ export default function EmployeeProfilePage() {
                     </AvatarFallback>
                 </Avatar>
             </div>
-            <CardTitle className="text-3xl font-bold tracking-tight">{isLoading ? <Skeleton className="h-8 w-3/5 mx-auto" /> : employee?.name || 'N/A'}</CardTitle>
-            <CardDescription className="text-lg text-muted-foreground mt-0.5">
-                {isLoading ? <Skeleton className="h-6 w-2/5 mx-auto" /> : employee?.jobTitle || 'N/A'}
-            </CardDescription>
-            {isLoading ? <Skeleton className="h-5 w-1/4 mx-auto mt-1.5" /> : (
-                <Badge variant={employee?.status === 'Active' ? 'default' : 'secondary'} className="mt-2 text-xs">
-                   {employee?.status === 'Active' ? <CheckCircle className="mr-1.5 h-3 w-3" /> : <XCircle className="mr-1.5 h-3 w-3" />}
-                   {employee?.status}
-                </Badge>
+            <CardTitle className="text-3xl font-bold tracking-tight">
+                {isLoading ? <Skeleton className="h-8 w-3/5 mx-auto" /> : employee?.name || 'N/A'}
+            </CardTitle>
+            {isLoading ? (
+                <Skeleton className="h-6 w-2/5 mx-auto mt-0.5" />
+            ) : (
+                <CardDescription className="text-lg text-muted-foreground mt-0.5">
+                    {employee?.jobTitle || 'N/A'}
+                </CardDescription>
+            )}
+            {isLoading ? (
+                <Skeleton className="h-5 w-1/4 mx-auto mt-1.5" />
+            ) : (
+                employee?.status && (
+                    <Badge variant={employee.status === 'Active' ? 'default' : 'secondary'} className="mt-2 text-xs">
+                       {employee.status === 'Active' ? <CheckCircle className="mr-1.5 h-3 w-3" /> : <XCircle className="mr-1.5 h-3 w-3" />}
+                       {employee.status}
+                    </Badge>
+                )
             )}
         </CardHeader>
         <CardContent className="px-6 py-8 space-y-6">
