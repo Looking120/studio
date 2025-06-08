@@ -67,12 +67,23 @@ axiosInstance.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response) {
       const { status, data } = error.response;
-      let errorMessage = 'An error occurred';
-      if (data && typeof data === 'object') {
+      let errorMessage: string;
+
+      if (status === 500) {
+        // For 500 errors, try to get a specific message, otherwise be generic for the HttpError instance.
+        if (data && typeof data === 'object' && (data.message || data.title || data.detail)) {
+          errorMessage = (data as any).message || (data as any).title || (data as any).detail;
+        } else {
+          errorMessage = "Internal Server Error"; // Generic message for the HttpError instance itself
+        }
+      } else if (data && typeof data === 'object') { // For non-500 errors
+        // Attempt to parse a structured error message
         errorMessage = (data as any).message || (data as any).title || (data as any).detail || JSON.stringify(data);
       } else if (typeof data === 'string' && data.trim() !== '') {
+        // Use the string data if it's not empty
         errorMessage = data;
       } else {
+        // Fallback to Axios error message or a generic status code message
         errorMessage = error.message || `Request failed with status code ${status}`;
       }
       
@@ -81,14 +92,17 @@ axiosInstance.interceptors.response.use(
         throw new UnauthorizedError(`Unauthorized: ${errorMessage}`);
       }
       
-      const logMessage = `API request to ${error.config?.url} failed with status ${status}. Message: ${errorMessage}`;
-      if (status === 415 && error.config?.url?.includes('/auth/signout')) {
-        console.warn(`${logMessage}. This might be related to Content-Type on signout.`, data);
-      } else if (status !== 404 && status !== 500) {
-        console.error(logMessage, data);
-      } else if (status === 500) {
-         console.warn(`API request to ${error.config?.url} resulted in a ${status} Internal Server Error. Message: "${errorMessage}". The page should handle this.`, data);
+      const logMessageBase = `API request to ${error.config?.url} failed with status ${status}.`;
+      
+      if (status === 500) {
+         console.warn(`${logMessageBase} Error: "${errorMessage}". The page should handle this. Full response data:`, data);
+      } else if (status === 415 && error.config?.url?.includes('/auth/signout')) {
+        console.warn(`${logMessageBase} Message: ${errorMessage}. This might be related to Content-Type on signout. Data:`, data);
+      } else if (status !== 404) { // Avoid console.error for 404s as they are common "not found" scenarios
+        console.error(`${logMessageBase} Message: ${errorMessage}. Data:`, data);
       }
+      // For 404, HttpError is thrown, but no specific console.error here, page component can decide how to log/handle.
+      
       throw new HttpError(errorMessage, status, data);
     } else if (error.request) {
       const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
