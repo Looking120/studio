@@ -71,7 +71,7 @@ export default function OfficesPage() {
     setError(null);
     try {
       console.log("[OfficesPage] Attempting to fetch offices from service...");
-      const officeDataArray = await fetchOffices(); // Directly returns Office[]
+      const officeDataArray = await fetchOffices(); 
       console.log("[OfficesPage] Offices fetched:", officeDataArray);
       setOffices(officeDataArray || []); 
     } catch (err) {
@@ -100,7 +100,7 @@ export default function OfficesPage() {
   };
 
   useEffect(() => {
-    if (isClient && !isRoleLoading) { // Only load data if client and role check is done
+    if (isClient && !isRoleLoading) { 
         loadOffices();
     }
   }, [isClient, isRoleLoading]); 
@@ -223,14 +223,34 @@ export default function OfficesPage() {
       toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
     } catch (err) {
       console.error(`[OfficesPage] Delete office ${officeId} failed:`, err);
+
       if (err instanceof UnauthorizedError) {
         toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
         await signOut();
         router.push('/');
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'Could not delete office.';
-      toast({ variant: "destructive", title: "Failed to delete office", description: errorMessage });
+      
+      let toastUserMessage = 'Could not delete the office due to an unexpected issue.';
+      if (err instanceof HttpError) {
+        if (err.status === 500) {
+          toastUserMessage = "The server encountered an internal error and could not complete your request. Please try again later.";
+        } else if (err.status === 404) {
+          toastUserMessage = "The office could not be found. It may have already been deleted.";
+        } else {
+          toastUserMessage = err.message || `An error occurred (Status: ${err.status}).`;
+        }
+      } else if (err instanceof Error) {
+        toastUserMessage = err.message;
+      } else {
+        toastUserMessage = String(err) || 'An unknown error prevented office deletion.';
+      }
+
+      toast({ 
+        variant: "destructive", 
+        title: "Failed to delete office", 
+        description: toastUserMessage 
+      });
     }
   };
 
@@ -393,3 +413,4 @@ export default function OfficesPage() {
     </div>
   );
 }
+
