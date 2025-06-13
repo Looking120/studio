@@ -3,7 +3,7 @@
 import type { Employee as FrontendEmployee } from '@/lib/data';
 import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
-// Interface pour la réponse de l'API GET /employees (liste)
+// Interface for the raw API list item from GET /employees
 interface ApiEmployeeListItem {
   id: string;
   firstName?: string;
@@ -18,7 +18,9 @@ interface ApiEmployeeListItem {
   lastStatusChange?: string;
 }
 
-// Interface pour la réponse de l'API GET /employees/{id} (détail)
+// Interface for the raw API detail from GET /employees/{id}
+// This should reflect what the backend *actually* sends for a single employee.
+// It might include more fields than the list item.
 interface ApiEmployeeDetail {
   id: string;
   firstName?: string;
@@ -29,8 +31,8 @@ interface ApiEmployeeDetail {
   phoneNumber?: string;
   departmentName?: string;
   positionTitle?: string;
-  employmentStatus?: 'Active' | 'Inactive' | string; // Employment status
-  currentStatus?: string; // Activity status
+  employmentStatus?: 'Active' | 'Inactive' | string; // Employment status (e.g., "Active", "Inactive")
+  currentStatus?: string; // Activity status (e.g., "Online", "Offline")
   avatarUrl?: string;
   officeId?: string;
   hireDate?: string;
@@ -45,7 +47,7 @@ export interface EmployeeLocation {
 }
 
 export interface HireEmployeePayload {
-  userId?: string;
+  userId?: string; // Optional: For hiring an existing user
   firstName: string;
   lastName: string;
   middleName?: string | undefined;
@@ -62,8 +64,9 @@ export interface HireEmployeePayload {
   avatarUrl?: string | undefined;
 }
 
+// Assuming the hire endpoint returns something compatible with FrontendEmployee or ApiEmployeeDetail
 interface ApiHiredEmployeeResponse extends FrontendEmployee {
-    firstName: string;
+    firstName: string; // Ensure these are present as per your form and backend
     lastName: string;
 }
 
@@ -90,11 +93,11 @@ export async function fetchEmployees(): Promise<FrontendEmployee[]> {
         email: apiEmp.email,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, // Employment status not provided by this API endpoint
-        currentStatus: apiEmp.currentStatus, // Activity status
-        avatarUrl: undefined,
-        officeId: undefined,
-        hireDate: undefined,
+        status: undefined, // Employment status is NOT in the /employees list API response
+        currentStatus: apiEmp.currentStatus, // This is the Activity Status
+        avatarUrl: undefined, // Not in the list API response
+        officeId: undefined, // Not in the list API response
+        hireDate: undefined, // Not in the list API response
       };
     });
   } catch (error) {
@@ -113,14 +116,24 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
     
     const apiDetail = response.data;
     if (apiDetail) {
+      let name = 'N/A';
+      if (apiDetail.firstName && apiDetail.lastName) {
+        name = `${apiDetail.firstName} ${apiDetail.lastName}`.trim();
+      } else if (apiDetail.firstName) {
+        name = apiDetail.firstName;
+      } else if (apiDetail.lastName) {
+        name = apiDetail.lastName;
+      }
+
       return {
         id: apiDetail.id,
-        name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
+        name: name,
         email: apiDetail.email || 'N/A', 
         department: apiDetail.departmentName || undefined,
         jobTitle: apiDetail.positionTitle || undefined,
+        // Map employmentStatus from API to frontend's status
         status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
-        currentStatus: apiDetail.currentStatus,
+        currentStatus: apiDetail.currentStatus, // Activity status
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
         hireDate: apiDetail.hireDate || undefined,
@@ -141,12 +154,14 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
 export async function updateEmployee(id: string, employeeData: Partial<Omit<FrontendEmployee, 'id'>>): Promise<FrontendEmployee> {
   console.log(`API CALL: PUT /employees/${id} with data:`, employeeData);
   try {
+    // Assuming the backend expects a payload similar to ApiEmployeeDetail for PUT
+    // but the frontend sends FrontendEmployee structure. Adjust as needed.
     const response = await apiClient<ApiEmployeeDetail>(`/employees/${id}`, {
       method: 'PUT',
-      body: employeeData,
+      body: employeeData, // This might need transformation if backend expects different field names
     });
     const apiDetail = response.data;
-     return {
+     return { // Remap response to FrontendEmployee
         id: apiDetail.id,
         name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
         email: apiDetail.email || 'N/A',
@@ -165,20 +180,23 @@ export async function updateEmployee(id: string, employeeData: Partial<Omit<Fron
   }
 }
 
-export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<FrontendEmployee[]> {
-  console.log(`API CALL: GET /employees/status/${status}`); // This likely refers to employment status
+export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive' | string): Promise<FrontendEmployee[]> {
+  // This endpoint GET /employees/status/{status} seems to refer to ACTIVITY status based on cURL (e.g., /status/Online)
+  // The frontend UI uses 'Active'/'Inactive' for EMPLOYMENT status.
+  // There's a mismatch here if this function is intended for employment status.
+  // For now, assuming 'status' passed here is an activity status string.
+  console.log(`API CALL: GET /employees/status/${status} (querying by activity status)`);
   try {
     const response = await apiClient<ApiEmployeeListItem[]>(`/employees/status/${status}`, {
       method: 'GET',
     });
-    // Assuming this endpoint returns employees based on their EMPLOYMENT status
     return response.data.map(apiEmp => ({ 
         id: apiEmp.id,
         name: (apiEmp.firstName && apiEmp.lastName) ? `${apiEmp.firstName} ${apiEmp.lastName}`.trim() : (apiEmp.firstName || apiEmp.lastName || 'Unknown Name'),
         email: apiEmp.email,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: status, // Setting employment status based on the query
+        status: undefined, // Employment status not directly from this API
         currentStatus: apiEmp.currentStatus, // Activity status
         avatarUrl: undefined,
         officeId: undefined,
@@ -187,20 +205,23 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchEmployeesByStatus:", error);
-    throw new HttpError(`Failed to fetch employees with status ${status}.`, 0, null);
+    throw new HttpError(`Failed to fetch employees with activity status ${status}.`, 0, null);
   }
 }
 
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
-  console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`); // This should be employment status
+  // This function is intended to update EMPLOYMENT status ('Active'/'Inactive').
+  console.log(`API CALL: PUT /employees/${employeeId}/status with employment status: ${status}`);
   try {
-    // This API is expected to update the EMPLOYMENT status
+    // Assuming the backend endpoint PUT /employees/{employeeId}/status
+    // expects the status string ("Active" or "Inactive") directly as the JSON body.
     const response = await apiClient<ApiEmployeeDetail>(`/employees/${employeeId}/status`, { 
       method: 'PUT',
-      body: { employmentStatus: status }, // Assuming backend expects employmentStatus
+      body: status, // Send the string "Active" or "Inactive" as the body
+      headers: { 'Content-Type': 'application/json' } // Ensure Axios sends it as a JSON string
     });
-    const apiDetail = response.data;
-    return {
+    const apiDetail = response.data; // Assuming the PUT returns the updated employee details
+    return { // Remap response to FrontendEmployee
       id: apiDetail.id,
       name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
       email: apiDetail.email,
@@ -215,7 +236,7 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in updateEmployeeStatus:", error);
-    throw new HttpError(`Failed to update status for employee ${employeeId}. Error: ${error instanceof Error ? error.message : String(error)}`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
+    throw new HttpError(`Failed to update employment status for employee ${employeeId}. Error: ${error instanceof Error ? error.message : String(error)}`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
   }
 }
 
@@ -234,11 +255,11 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
   }
 }
 
+// This function seems to relate to activity status, not directly to the employee list's 'Active'/'Inactive' employment status.
+// It is correctly fetching location based on an employeeId.
 export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
   console.log(`API CALL: GET /employees/${employeeId}/location/current`);
   try {
-    // This endpoint response structure is different from LocationData in location-service.
-    // It should return something compatible with EmployeeLocation.
     const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`, { 
       method: 'GET',
     });
@@ -262,8 +283,8 @@ export async function getNearbyEmployees(employeeId: string): Promise<FrontendEm
         email: apiEmp.email,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, // Employment status not in this API's list item
-        currentStatus: apiEmp.currentStatus, // Activity status
+        status: undefined, 
+        currentStatus: apiEmp.currentStatus, 
         avatarUrl: undefined,
         officeId: undefined,
         hireDate: undefined,
@@ -274,3 +295,4 @@ export async function getNearbyEmployees(employeeId: string): Promise<FrontendEm
     throw new HttpError(`Failed to get nearby employees for employee ${employeeId}.`, 0, null);
   }
 }
+
