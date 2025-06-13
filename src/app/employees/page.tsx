@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search, AlertTriangle, UserCog, Info, Eye, Briefcase, CheckCircle, XCircle, Coffee, Plane, Laptop, UserRoundCheck, UserRoundX, Clock, CircleOff, Radio } from 'lucide-react';
+import { UserPlus, Search, AlertTriangle, UserCog, Info, Eye, Briefcase, CheckCircle, XCircle, Coffee, Plane, Laptop, UserRoundCheck, UserRoundX, Clock, CircleOff, Radio, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
