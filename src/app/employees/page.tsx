@@ -9,17 +9,46 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Search, AlertTriangle, UserCog, Info, Eye } from 'lucide-react';
+import { UserPlus, Search, AlertTriangle, UserCog, Info, Eye, Briefcase, CheckCircle, XCircle, Coffee, Plane, Laptop, UserRoundCheck, UserRoundX, Clock, CircleOff, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchEmployees, updateEmployeeStatus as apiUpdateEmployeeStatus } from '@/services/employee-service';
+import { fetchEmployees, updateEmployeeActivityStatus as apiUpdateEmployeeActivityStatus } from '@/services/employee-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+// Corresponds to RealTimeEmployee.DataAccess.Enums.ActivityStatus
+const activityStatusOptions = [
+  { value: "Online", label: "Online", icon: <CheckCircle className="h-4 w-4 text-green-500" /> },
+  { value: "Available", label: "Available", icon: <UserRoundCheck className="h-4 w-4 text-green-500" /> },
+  { value: "Offline", label: "Offline", icon: <XCircle className="h-4 w-4 text-red-500" /> },
+  { value: "Busy", label: "Busy", icon: <Briefcase className="h-4 w-4 text-orange-500" /> },
+  { value: "Away", label: "Away", icon: <Plane className="h-4 w-4 text-yellow-500" /> },
+  { value: "OnBreak", label: "On Break", icon: <Coffee className="h-4 w-4 text-purple-500" /> },
+  { value: "OnTask", label: "On Task", icon: <Laptop className="h-4 w-4 text-blue-500" /> },
+  { value: "InMeeting", label: "In Meeting", icon: <Users className="h-4 w-4 text-indigo-500" /> },
+  { value: "DoNotDisturb", label: "Do Not Disturb", icon: <UserRoundX className="h-4 w-4 text-pink-500" /> },
+  { value: "OnLeave", label: "On Leave", icon: <Clock className="h-4 w-4 text-gray-500" /> },
+  // Add other statuses as needed
+];
+
+const getActivityStatusDisplay = (statusValue?: string) => {
+    const option = activityStatusOptions.find(opt => opt.value === statusValue);
+    return option ? (
+        <div className="flex items-center gap-1.5">
+            {React.cloneElement(option.icon, { className: `h-3 w-3 ${option.icon.props.className}` })}
+            <span className="text-xs">{option.label}</span>
+        </div>
+    ) : (
+        <div className="flex items-center gap-1.5">
+            <CircleOff className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{statusValue || 'N/A'}</span>
+        </div>
+    );
+};
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -88,7 +117,7 @@ export default function EmployeesPage() {
   }, [isClient, currentUserRole, toast, router]);
 
 
-  const handleStatusChange = async (employeeId: string, newStatus: 'Active' | 'Inactive') => {
+  const handleActivityStatusChange = async (employeeId: string, newActivityStatus: string) => {
     if (!currentUserRole?.toLowerCase().includes('admin')) {
         toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to change employee status."});
         return;
@@ -97,16 +126,15 @@ export default function EmployeesPage() {
     const originalEmployees = [...employees];
     setEmployees(prevEmployees =>
       prevEmployees.map(emp =>
-        emp.id === employeeId ? { ...emp, status: newStatus } : emp
+        emp.id === employeeId ? { ...emp, currentStatus: newActivityStatus } : emp
       )
     );
 
     try {
-      // The API expects the status string directly in the body
-      await apiUpdateEmployeeStatus(employeeId, newStatus);
+      await apiUpdateEmployeeActivityStatus(employeeId, newActivityStatus);
       toast({
-        title: "Status Updated",
-        description: `Employee status has been changed to ${newStatus}.`,
+        title: "Activity Status Updated",
+        description: `Employee activity status has been changed to ${newActivityStatus}.`,
       });
     } catch (error) {
       if (error instanceof UnauthorizedError) {
@@ -115,14 +143,14 @@ export default function EmployeesPage() {
         router.push('/');
         return;
       }
-      setEmployees(originalEmployees);
-      const errorMessage = error instanceof Error ? error.message : 'Could not update status.';
+      setEmployees(originalEmployees); // Revert optimistic update on error
+      const errorMessage = error instanceof Error ? error.message : 'Could not update activity status.';
       toast({
         variant: "destructive",
         title: "Update Error",
-        description: `Could not update employee status. ${errorMessage}`,
+        description: `Could not update employee activity status. ${errorMessage}`,
       });
-      console.error(`Failed to update employee ${employeeId} status to ${newStatus}:`, error);
+      console.error(`Failed to update employee ${employeeId} activity status to ${newActivityStatus}:`, error);
     }
   };
 
@@ -132,7 +160,8 @@ export default function EmployeesPage() {
         (employee.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
         (employee.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (employee.department?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+        (employee.department?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (employee.currentStatus?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
   }, [employees, searchTerm]);
 
@@ -231,7 +260,7 @@ export default function EmployeesPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Position</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center">Activity Status</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -249,7 +278,7 @@ export default function EmployeesPage() {
                           <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                           <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                           <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                          <TableCell className="text-center"><Skeleton className="h-6 w-16 mx-auto" /></TableCell>
+                          <TableCell className="text-center"><Skeleton className="h-6 w-20 mx-auto" /></TableCell>
                           <TableCell className="text-center"><Skeleton className="h-8 w-[160px] mx-auto" /></TableCell>
                         </TableRow>
                       ))
@@ -282,27 +311,38 @@ export default function EmployeesPage() {
                           <TableCell>{employee.department || 'N/A'}</TableCell>
                           <TableCell>{employee.jobTitle || 'N/A'}</TableCell>
                           <TableCell className="text-center">
-                            <Badge variant={employee.status === 'Active' ? 'default' : 'secondary'}>
-                              {employee.status || 'N/A'}
+                            <Badge variant={employee.currentStatus === "Online" || employee.currentStatus === "Available" ? "default" : employee.currentStatus === "Offline" ? "secondary" : "outline"} className="min-w-[90px] justify-center">
+                                {getActivityStatusDisplay(employee.currentStatus)}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center space-x-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="View Profile">
-                                <Link href={`/employees/${employee.id}`}>
-                                    <Eye className="h-4 w-4" />
-                                </Link>
-                            </Button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                        <Link href={`/employees/${employee.id}`}>
+                                            <Eye className="h-4 w-4" />
+                                        </Link>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>View Profile</p></TooltipContent>
+                            </Tooltip>
                             <Select
-                              value={employee.status}
-                              onValueChange={(value: 'Active' | 'Inactive') => handleStatusChange(employee.id, value)}
+                              value={employee.currentStatus || ""}
+                              onValueChange={(value: string) => handleActivityStatusChange(employee.id, value)}
                               disabled={!employee.id}
                             >
-                              <SelectTrigger className="w-auto max-w-[120px] h-8 text-xs inline-flex">
+                              <SelectTrigger className="w-auto max-w-[130px] h-8 text-xs inline-flex">
                                 <SelectValue placeholder="Change status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Active">Active</SelectItem>
-                                <SelectItem value="Inactive">Inactive</SelectItem>
+                                {activityStatusOptions.map(opt => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        <div className="flex items-center gap-2">
+                                            {React.cloneElement(opt.icon, {className: "h-4 w-4"})}
+                                            {opt.label}
+                                        </div>
+                                    </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </TableCell>
