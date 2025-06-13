@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import MapComponent, { type MapMarkerData } from '@/components/map-component';
-import type { Employee } from '@/lib/data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { Employee } from '@/lib/data'; // Frontend Employee type
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -12,25 +12,18 @@ import { RefreshCw, AlertTriangle, Users, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { fetchEmployees } from '@/services/employee-service';
-import { getEmployeeLocation, type LocationData } from '@/services/location-service';
+import { fetchEmployees } from '@/services/employee-service'; // Fetches FrontendEmployee[]
+import { getEmployeeLocation, type LocationData } from '@/services/location-service'; // Fetches LocationData
 import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import { useRouter } from 'next/navigation';
-
-interface DisplayableLocationInfo extends LocationData {
-  employeeId: string;
-  employeeName: string;
-  employeeJobTitle?: string;
-  employeeAvatarUrl?: string;
-  employeeStatus: 'Active' | 'Inactive';
-}
 
 const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
 const DEFAULT_CITY_ZOOM = 11;
 
 export default function LocationsPage() {
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  // locationsData now stores LocationData keyed by employeeId
   const [locationsData, setLocationsData] = useState<Record<string, LocationData | null>>({});
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   
@@ -49,7 +42,7 @@ export default function LocationsPage() {
     setIsLoadingEmployees(true);
     setErrorEmployees(null);
     try {
-      const fetchedEmployees = await fetchEmployees();
+      const fetchedEmployees = await fetchEmployees(); // Returns FrontendEmployee[]
       setAllEmployees(fetchedEmployees || []);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -74,7 +67,19 @@ export default function LocationsPage() {
   const employeesToFetchLocationsFor = useMemo(() => {
     if (isLoadingEmployees) return [];
     if (filter === 'all') return allEmployees;
-    return allEmployees.filter(emp => emp && emp.status && emp.status.toLowerCase() === filter);
+    // Filter based on currentStatus (activity status)
+    // 'active' filter means employee's currentStatus is not 'Offline' (or equivalent)
+    // 'inactive' filter means employee's currentStatus is 'Offline'
+    return allEmployees.filter(emp => {
+        const currentStatusLower = emp.currentStatus?.toLowerCase();
+        if (filter === 'active') {
+            return currentStatusLower && currentStatusLower !== 'offline';
+        }
+        if (filter === 'inactive') {
+            return currentStatusLower === 'offline';
+        }
+        return false; // Should not happen if filter is 'all', 'active', or 'inactive'
+    });
   }, [allEmployees, filter, isLoadingEmployees]);
 
   const fetchAllLocations = useCallback(async () => {
@@ -93,13 +98,13 @@ export default function LocationsPage() {
     for (const emp of employeesToFetchLocationsFor) {
       if (emp.id) {
         try {
-          const loc = await getEmployeeLocation(emp.id);
+          const loc = await getEmployeeLocation(emp.id); // Fetches LocationData
           newLocations[emp.id] = loc;
         } catch (error) {
           fetchErrors++;
           console.error(`Failed to fetch location for ${emp.name || emp.id}:`, error);
           newLocations[emp.id] = null; 
-          if (error instanceof UnauthorizedError) { // Handle critical error early
+          if (error instanceof UnauthorizedError) {
             toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
             await signOut();
             router.push('/');
@@ -126,21 +131,30 @@ export default function LocationsPage() {
   const displayableEmployeeLocations: MapMarkerData[] = useMemo(() => {
     return employeesToFetchLocationsFor
       .map(emp => {
-        const location = locationsData[emp.id];
-        if (location && location.latitude != null && location.longitude != null) { // Check for null or undefined explicitly
+        const locationInfo = locationsData[emp.id]; // This is LocationData
+        if (locationInfo && locationInfo.latitude != null && locationInfo.longitude != null) {
+          const empName = emp.name || locationInfo.employeeName || 'Unknown Employee';
+          const empJobTitle = emp.jobTitle || 'N/A';
+          const empActivityStatus = emp.currentStatus || 'N/A';
+          const locationType = locationInfo.locationType || 'Unknown location type';
+          const lastSeen = locationInfo.timestamp ? new Date(locationInfo.timestamp).toLocaleString() : 'Timestamp N/A';
+          
           return {
             id: emp.id,
-            latitude: location.latitude,
-            longitude: location.longitude,
-            title: emp.name || 'Unknown Employee',
-            description: `${emp.jobTitle || 'N/A'} - ${emp.status}. Last seen: ${location.timestamp ? new Date(location.timestamp).toLocaleString() : 'N/A'} at ${location.address || 'address unavailable'}`,
+            latitude: locationInfo.latitude,
+            longitude: locationInfo.longitude,
+            title: empName,
+            description: `${empJobTitle} - Status: ${empActivityStatus}. At: ${locationType}. Last seen: ${lastSeen}`,
             icon: (
                 <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
                     <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
-                        <AvatarImage src={emp.avatarUrl} alt={emp.name || ''} data-ai-hint="person map" />
-                        <AvatarFallback>{emp.name ? emp.name.substring(0,1) : 'U'}</AvatarFallback>
+                        <AvatarImage src={emp.avatarUrl} alt={empName} data-ai-hint="person map" />
+                        <AvatarFallback>{empName ? empName.substring(0,1).toUpperCase() : 'U'}</AvatarFallback>
                     </Avatar>
-                    {emp.status === 'Active' && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />}
+                    {/* Green dot based on currentStatus (activity status) */}
+                    {emp.currentStatus && emp.currentStatus.toLowerCase() !== 'offline' && (
+                        <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
+                    )}
                 </div>
             )
           };
@@ -162,6 +176,9 @@ export default function LocationsPage() {
     }
   }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 
+  // Calculate counts for radio group labels based on currentStatus
+  const activeCount = allEmployees.filter(e => e.currentStatus && e.currentStatus.toLowerCase() !== 'offline').length;
+  const inactiveCount = allEmployees.filter(e => e.currentStatus && e.currentStatus.toLowerCase() === 'offline').length;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4"> 
@@ -181,11 +198,11 @@ export default function LocationsPage() {
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="active" id="r-active" />
-                <Label htmlFor="r-active">Active ({allEmployees.filter(e=>e.status === 'Active').length})</Label>
+                <Label htmlFor="r-active">Active ({activeCount})</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="inactive" id="r-inactive" />
-                <Label htmlFor="r-inactive">Inactive ({allEmployees.filter(e=>e.status === 'Inactive').length})</Label>
+                <Label htmlFor="r-inactive">Inactive ({inactiveCount})</Label>
               </div>
             </RadioGroup>
             <Button 
@@ -223,7 +240,7 @@ export default function LocationsPage() {
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                 <Users className="h-12 w-12 mb-2 opacity-50"/>
                 <p className="font-semibold text-lg">No Employees to Display</p>
-                <p className="text-sm">There are no employees matching the filter '{filter}'.</p>
+                <p className="text-sm">There are no employees matching the filter '{filter}'. ({filter === 'active' ? 'Active means current status is not Offline' : 'Inactive means current status is Offline'})</p>
             </div>
         )}
         
@@ -247,4 +264,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-

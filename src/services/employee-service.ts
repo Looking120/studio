@@ -12,15 +12,13 @@ interface ApiEmployeeListItem {
   employeeNumber?: string;
   email: string;
   phoneNumber?: string;
-  departmentName?: string; // Champ de l'API pour le nom du département
-  positionTitle?: string;  // Champ de l'API pour le titre du poste
-  currentStatus?: string; // Statut d'activité en temps réel de l'API, pas le statut d'emploi
-  lastStatusChange?: string; // Date du dernier changement de statut d'activité
-  // avatarUrl et officeId ne semblent pas être dans cette réponse de liste
+  departmentName?: string;
+  positionTitle?: string;
+  currentStatus: string; // Activity status from API like "Available", "Online"
+  lastStatusChange?: string;
 }
 
 // Interface pour la réponse de l'API GET /employees/{id} (détail)
-// Nous supposons qu'elle peut contenir plus de champs que la liste.
 interface ApiEmployeeDetail {
   id: string;
   firstName?: string;
@@ -29,14 +27,14 @@ interface ApiEmployeeDetail {
   employeeNumber?: string;
   email: string;
   phoneNumber?: string;
-  departmentName?: string;   // Pour FrontendEmployee.department
-  positionTitle?: string;    // Pour FrontendEmployee.jobTitle
-  employmentStatus?: 'Active' | 'Inactive' | string; // Pour FrontendEmployee.status ('Active'/'Inactive')
+  departmentName?: string;
+  positionTitle?: string;
+  employmentStatus?: 'Active' | 'Inactive' | string; // Employment status
+  currentStatus?: string; // Activity status
   avatarUrl?: string;
-  officeId?: string;         // Pour FrontendEmployee.officeId -> charger le nom du bureau
-  hireDate?: string;         // Pour FrontendEmployee.hireDate
-  address?: string; 
-  // Ajoutez d'autres champs que l'API /employees/{id} pourrait retourner
+  officeId?: string;
+  hireDate?: string;
+  address?: string;
 }
 
 
@@ -47,7 +45,7 @@ export interface EmployeeLocation {
 }
 
 export interface HireEmployeePayload {
-  userId?: string; // Rendu optionnel pour les nouveaux utilisateurs, requis pour les existants
+  userId?: string;
   firstName: string;
   lastName: string;
   middleName?: string | undefined;
@@ -77,7 +75,7 @@ export async function fetchEmployees(): Promise<FrontendEmployee[]> {
       method: 'GET',
     });
     return response.data.map(apiEmp => {
-      let name = 'N/A'; 
+      let name = 'N/A';
       if (apiEmp.firstName && apiEmp.lastName) {
         name = `${apiEmp.firstName} ${apiEmp.lastName}`.trim();
       } else if (apiEmp.firstName) {
@@ -90,13 +88,13 @@ export async function fetchEmployees(): Promise<FrontendEmployee[]> {
         id: apiEmp.id,
         name: name,
         email: apiEmp.email,
-        department: apiEmp.departmentName || undefined, 
-        jobTitle: apiEmp.positionTitle || undefined,   
-        // Le statut d'emploi 'Active'/'Inactive' n'est pas dans la réponse de liste de l'API.
-        status: undefined, 
-        avatarUrl: undefined, // Non fourni par GET /employees
-        officeId: undefined, // Non fourni par GET /employees
-        hireDate: undefined, // Non fourni par GET /employees
+        department: apiEmp.departmentName || undefined,
+        jobTitle: apiEmp.positionTitle || undefined,
+        status: undefined, // Employment status not provided by this API endpoint
+        currentStatus: apiEmp.currentStatus, // Activity status
+        avatarUrl: undefined,
+        officeId: undefined,
+        hireDate: undefined,
       };
     });
   } catch (error) {
@@ -122,11 +120,10 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
         department: apiDetail.departmentName || undefined,
         jobTitle: apiDetail.positionTitle || undefined,
         status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
+        currentStatus: apiDetail.currentStatus,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
         hireDate: apiDetail.hireDate || undefined,
-        // Les autres champs de FrontendEmployee comme latitude, longitude, lastSeen
-        // seront undefined s'ils ne sont pas dans ApiEmployeeDetail et retournés par l'API.
       };
     }
     return null;
@@ -144,12 +141,10 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
 export async function updateEmployee(id: string, employeeData: Partial<Omit<FrontendEmployee, 'id'>>): Promise<FrontendEmployee> {
   console.log(`API CALL: PUT /employees/${id} with data:`, employeeData);
   try {
-    // L'API pourrait retourner ApiEmployeeDetail, donc un mappage serait nécessaire si la structure de retour est différente de FrontendEmployee.
     const response = await apiClient<ApiEmployeeDetail>(`/employees/${id}`, {
       method: 'PUT',
       body: employeeData,
     });
-    // Mappage ici si ApiEmployeeDetail diffère significativement de FrontendEmployee pour les champs retournés par PUT
     const apiDetail = response.data;
      return {
         id: apiDetail.id,
@@ -158,6 +153,7 @@ export async function updateEmployee(id: string, employeeData: Partial<Omit<Fron
         department: apiDetail.departmentName || undefined,
         jobTitle: apiDetail.positionTitle || undefined,
         status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
+        currentStatus: apiDetail.currentStatus,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
         hireDate: apiDetail.hireDate || undefined,
@@ -170,18 +166,20 @@ export async function updateEmployee(id: string, employeeData: Partial<Omit<Fron
 }
 
 export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Promise<FrontendEmployee[]> {
-  console.log(`API CALL: GET /employees/status/${status}`);
+  console.log(`API CALL: GET /employees/status/${status}`); // This likely refers to employment status
   try {
     const response = await apiClient<ApiEmployeeListItem[]>(`/employees/status/${status}`, {
       method: 'GET',
     });
+    // Assuming this endpoint returns employees based on their EMPLOYMENT status
     return response.data.map(apiEmp => ({ 
         id: apiEmp.id,
         name: (apiEmp.firstName && apiEmp.lastName) ? `${apiEmp.firstName} ${apiEmp.lastName}`.trim() : (apiEmp.firstName || apiEmp.lastName || 'Unknown Name'),
         email: apiEmp.email,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: status, 
+        status: status, // Setting employment status based on the query
+        currentStatus: apiEmp.currentStatus, // Activity status
         avatarUrl: undefined,
         officeId: undefined,
         hireDate: undefined,
@@ -194,11 +192,12 @@ export async function fetchEmployeesByStatus(status: 'Active' | 'Inactive'): Pro
 }
 
 export async function updateEmployeeStatus(employeeId: string, status: 'Active' | 'Inactive'): Promise<FrontendEmployee> {
-  console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`);
+  console.log(`API CALL: PUT /employees/${employeeId}/status with status: ${status}`); // This should be employment status
   try {
+    // This API is expected to update the EMPLOYMENT status
     const response = await apiClient<ApiEmployeeDetail>(`/employees/${employeeId}/status`, { 
       method: 'PUT',
-      body: { status }, // L'API peut s'attendre à un objet { "status": "Active" }
+      body: { employmentStatus: status }, // Assuming backend expects employmentStatus
     });
     const apiDetail = response.data;
     return {
@@ -208,6 +207,7 @@ export async function updateEmployeeStatus(employeeId: string, status: 'Active' 
       department: apiDetail.departmentName || undefined,
       jobTitle: apiDetail.positionTitle || undefined,
       status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
+      currentStatus: apiDetail.currentStatus,
       avatarUrl: apiDetail.avatarUrl || undefined,
       officeId: apiDetail.officeId || undefined,
       hireDate: apiDetail.hireDate || undefined,
@@ -237,6 +237,8 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
 export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
   console.log(`API CALL: GET /employees/${employeeId}/location/current`);
   try {
+    // This endpoint response structure is different from LocationData in location-service.
+    // It should return something compatible with EmployeeLocation.
     const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`, { 
       method: 'GET',
     });
@@ -260,7 +262,8 @@ export async function getNearbyEmployees(employeeId: string): Promise<FrontendEm
         email: apiEmp.email,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, 
+        status: undefined, // Employment status not in this API's list item
+        currentStatus: apiEmp.currentStatus, // Activity status
         avatarUrl: undefined,
         officeId: undefined,
         hireDate: undefined,
@@ -271,4 +274,3 @@ export async function getNearbyEmployees(employeeId: string): Promise<FrontendEm
     throw new HttpError(`Failed to get nearby employees for employee ${employeeId}.`, 0, null);
   }
 }
-
