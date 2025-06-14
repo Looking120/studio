@@ -4,11 +4,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import MapComponent, { type MapMarkerData } from '@/components/map-component';
 import type { Employee } from '@/lib/data'; // Frontend Employee type
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'; // Added CardContent
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, AlertTriangle, Users, MapPinned } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Users, MapPinned, Info as InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +23,6 @@ const DEFAULT_CITY_ZOOM = 11;
 
 export default function LocationsPage() {
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
-  // locationsData now stores LocationData keyed by employeeId
   const [locationsData, setLocationsData] = useState<Record<string, LocationData | null>>({});
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   
@@ -34,6 +33,8 @@ export default function LocationsPage() {
 
   const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
   const [mapZoom, setMapZoom] = useState(DEFAULT_CITY_ZOOM);
+  const [fetchSummaryMessage, setFetchSummaryMessage] = useState<string | null>(null);
+
 
   const { toast } = useToast();
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function LocationsPage() {
     setIsLoadingEmployees(true);
     setErrorEmployees(null);
     try {
-      const fetchedEmployees = await fetchEmployees(); // Returns FrontendEmployee[]
+      const fetchedEmployees = await fetchEmployees(); 
       setAllEmployees(fetchedEmployees || []);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -67,9 +68,6 @@ export default function LocationsPage() {
   const employeesToFetchLocationsFor = useMemo(() => {
     if (isLoadingEmployees) return [];
     if (filter === 'all') return allEmployees;
-    // Filter based on currentStatus (activity status)
-    // 'active' filter means employee's currentStatus is not 'Offline' (or equivalent)
-    // 'inactive' filter means employee's currentStatus is 'Offline'
     return allEmployees.filter(emp => {
         const currentStatusLower = emp.currentStatus?.toLowerCase();
         if (filter === 'active') {
@@ -78,7 +76,7 @@ export default function LocationsPage() {
         if (filter === 'inactive') {
             return currentStatusLower === 'offline';
         }
-        return false; // Should not happen if filter is 'all', 'active', or 'inactive'
+        return false; 
     });
   }, [allEmployees, filter, isLoadingEmployees]);
 
@@ -86,39 +84,49 @@ export default function LocationsPage() {
     if (employeesToFetchLocationsFor.length === 0 && !isLoadingEmployees) {
         setLocationsData({});
         setErrorLocations(null);
+        setFetchSummaryMessage(null);
         return;
     }
     if (employeesToFetchLocationsFor.length === 0) return;
 
     setIsLoadingLocations(true);
     setErrorLocations(null);
+    setFetchSummaryMessage(null);
     const newLocations: Record<string, LocationData | null> = {};
     let fetchErrors = 0;
+    let unauthorizedEncountered = false;
 
     for (const emp of employeesToFetchLocationsFor) {
       if (emp.id) {
         try {
-          const loc = await getEmployeeLocation(emp.id); // Fetches LocationData
+          const loc = await getEmployeeLocation(emp.id); 
           newLocations[emp.id] = loc;
         } catch (error) {
           fetchErrors++;
           console.error(`Failed to fetch location for ${emp.name || emp.id}:`, error);
           newLocations[emp.id] = null; 
           if (error instanceof UnauthorizedError) {
-            toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
-            await signOut();
-            router.push('/');
-            setIsLoadingLocations(false);
-            return;
+            unauthorizedEncountered = true; // Mark that an unauthorized error occurred
+            // Don't redirect immediately, continue fetching other locations if possible
           }
         }
       }
     }
+
+    if (unauthorizedEncountered) {
+        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
+        await signOut();
+        router.push('/');
+        setIsLoadingLocations(false);
+        return; // Exit after handling unauthorized
+    }
+    
     setLocationsData(newLocations);
     setIsLoadingLocations(false);
+
     if (fetchErrors > 0) {
         const errorMsg = `Could not fetch locations for ${fetchErrors} employee(s). Some map markers may be missing or outdated.`;
-        setErrorLocations(errorMsg);
+        setErrorLocations(errorMsg); // This sets an error state, which can be displayed if needed
         toast({ variant: "destructive", title: "Location Fetch Issues", description: errorMsg, duration: 5000 });
     }
   }, [employeesToFetchLocationsFor, toast, router, isLoadingEmployees]);
@@ -131,7 +139,7 @@ export default function LocationsPage() {
   const displayableEmployeeLocations: MapMarkerData[] = useMemo(() => {
     return employeesToFetchLocationsFor
       .map(emp => {
-        const locationInfo = locationsData[emp.id]; // This is LocationData
+        const locationInfo = locationsData[emp.id]; 
         if (locationInfo && locationInfo.latitude != null && locationInfo.longitude != null) {
           const empName = emp.name || locationInfo.employeeName || 'Unknown Employee';
           const empJobTitle = emp.jobTitle || 'N/A';
@@ -151,7 +159,6 @@ export default function LocationsPage() {
                         <AvatarImage src={emp.avatarUrl} alt={empName} data-ai-hint="person map" />
                         <AvatarFallback>{empName ? empName.substring(0,1).toUpperCase() : 'U'}</AvatarFallback>
                     </Avatar>
-                    {/* Green dot based on currentStatus (activity status) */}
                     {emp.currentStatus && emp.currentStatus.toLowerCase() !== 'offline' && (
                         <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
                     )}
@@ -176,7 +183,27 @@ export default function LocationsPage() {
     }
   }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 
-  // Calculate counts for radio group labels based on currentStatus
+  // Update fetch summary message
+  useEffect(() => {
+    if (!isLoadingLocations && !isLoadingEmployees && employeesToFetchLocationsFor.length > 0) {
+        const displayedIds = new Set(displayableEmployeeLocations.map(m => m.id));
+        const missingCount = employeesToFetchLocationsFor.filter(emp => emp.id && !displayedIds.has(emp.id)).length;
+
+        if (missingCount > 0) {
+            setFetchSummaryMessage(`${missingCount} employee(s) in the current filter could not be displayed on the map due to missing or invalid location data.`);
+        } else if (employeesToFetchLocationsFor.length > 0 && displayableEmployeeLocations.length === 0 && !errorLocations) {
+            setFetchSummaryMessage(`No employees in the current filter have valid location data to display.`);
+        } else {
+            setFetchSummaryMessage(null); // Clear message if all displayed or errors handle it
+        }
+    } else if (!isLoadingEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all') {
+        setFetchSummaryMessage(null); // No message if filter results in no one to fetch for
+    } else {
+        setFetchSummaryMessage(null); // Clear message during loading or initial state
+    }
+  }, [displayableEmployeeLocations, employeesToFetchLocationsFor, isLoadingLocations, isLoadingEmployees, errorLocations, filter]);
+
+
   const activeCount = allEmployees.filter(e => e.currentStatus && e.currentStatus.toLowerCase() !== 'offline').length;
   const inactiveCount = allEmployees.filter(e => e.currentStatus && e.currentStatus.toLowerCase() === 'offline').length;
 
@@ -218,6 +245,16 @@ export default function LocationsPage() {
           </div>
         </CardHeader>
       </Card>
+
+      {fetchSummaryMessage && !isLoadingEmployees && !isLoadingLocations && (
+        <Card className="mb-0">
+            <CardContent className="p-3 text-sm text-muted-foreground flex items-center">
+                <InfoIcon className="h-5 w-5 mr-2 flex-shrink-0 text-primary" />
+                {fetchSummaryMessage}
+            </CardContent>
+        </Card>
+      )}
+
       <div className="flex-grow rounded-lg overflow-hidden shadow-xl border relative">
         { (isLoadingEmployees || (employeesToFetchLocationsFor.length > 0 && isLoadingLocations && displayableEmployeeLocations.length === 0)) && (
              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
@@ -236,7 +273,7 @@ export default function LocationsPage() {
             </div>
         )}
 
-        { !isLoadingEmployees && !errorEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all' && (
+        { !isLoadingEmployees && !errorEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all' && !fetchSummaryMessage && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                 <Users className="h-12 w-12 mb-2 opacity-50"/>
                 <p className="font-semibold text-lg">No Employees to Display</p>
@@ -244,7 +281,7 @@ export default function LocationsPage() {
             </div>
         )}
         
-        { !isLoadingEmployees && !errorEmployees && allEmployees.length === 0 && (
+        { !isLoadingEmployees && !errorEmployees && allEmployees.length === 0 && !fetchSummaryMessage && (
              <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                 <Users className="h-12 w-12 mb-2 opacity-50"/>
                 <p className="font-semibold text-lg">No Employees Found</p>
@@ -254,7 +291,7 @@ export default function LocationsPage() {
 
         <MapComponent markers={displayableEmployeeLocations} center={mapCenter} zoom={mapZoom} />
 
-        { errorLocations && (
+        { errorLocations && !fetchSummaryMessage && ( // Only show this specific errorLocations message if fetchSummary isn't already covering it
              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg text-xs max-w-md text-center">
                 <AlertTriangle className="inline h-4 w-4 mr-1" />
                 {errorLocations}
@@ -264,3 +301,5 @@ export default function LocationsPage() {
     </div>
   );
 }
+
+    
