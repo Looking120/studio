@@ -204,50 +204,49 @@ export async function updateEmployeeActivityStatus(employeeId: string, activityS
   try {
     const response = await apiClient<ApiEmployeeDetail | null>(`/employees/${employeeId}/status`, {
       method: 'PUT',
-      body: activityStatus,
+      body: activityStatus, // This sends the string as JSON, e.g., "Online"
       headers: { 'Content-Type': 'application/json' }
     });
 
     // Handle 204 No Content (successful update, no body)
-    if (response.status === 204) {
-      console.log(`[updateEmployeeActivityStatus] Received 204 No Content for ${employeeId}. Update successful. Re-fetching employee for fresh data.`);
+    if (response.status === 204 || !response.data) { // Also check for !response.data for safety
+      console.log(`[updateEmployeeActivityStatus] Received ${response.status} for ${employeeId} with status "${activityStatus}". Update successful. Re-fetching employee for fresh data.`);
       const updatedEmployee = await fetchEmployeeById(employeeId);
       if (updatedEmployee) {
         return updatedEmployee;
       } else {
-        console.error(`[updateEmployeeActivityStatus] Successfully updated status for ${employeeId} (204), but FAILED to re-fetch full employee details.`);
-        throw new HttpError(`Activity status was updated on the server, but there was an issue refreshing the employee data. Please refresh the page.`, 500, { employeeId, issue: "Re-fetch failed after 204" });
+        console.error(`[updateEmployeeActivityStatus] Successfully updated status for ${employeeId} to "${activityStatus}" (status ${response.status}), but FAILED to re-fetch full employee details.`);
+        // This specific error indicates a problem after a successful PUT, not the original 500.
+        throw new HttpError(`Activity status was updated on the server, but there was an issue refreshing the employee data. Please refresh the page.`, 500, { employeeId, requestedStatus: activityStatus, issue: "Re-fetch failed after successful PUT" });
       }
     }
 
-    // Handle 200 OK with body
+    // Handle 200 OK with body (if API ever changes to return body)
     const apiDetail = response.data;
-    if (apiDetail) { // Should be true if status is 200
-      return {
+     return { // This mapping is for consistency, even if 204 is the primary success path.
         id: apiDetail.id,
         name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
         email: apiDetail.email || undefined,
         department: apiDetail.departmentName || undefined,
         jobTitle: apiDetail.positionTitle || undefined,
         status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
-        currentStatus: apiDetail.currentStatus || activityStatus, 
+        currentStatus: apiDetail.currentStatus || activityStatus,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
         hireDate: apiDetail.hireDate || undefined,
-      };
-    }
-    
-    // Fallback for unexpected successful response without data (e.g. 200 OK but empty body)
-    console.error(`[updateEmployeeActivityStatus] Update for ${employeeId} was successful (status ${response.status}) but no data was returned in the body.`);
-    throw new HttpError(`Activity status update for ${employeeId} seemed successful, but no employee data was returned.`, response.status, null);
+    };
 
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) {
-      console.error(`[updateEmployeeActivityStatus] HttpError for ${employeeId}: ${error.message} (Status: ${(error as HttpError).status})`, (error as HttpError).responseData);
-      throw error;
+      console.error(
+        `[updateEmployeeActivityStatus] API call to PUT /employees/${employeeId}/status with body "${activityStatus}" failed. Error: ${error.message} (Status: ${(error as HttpError).status}). Response Data:`,
+        (error as HttpError).responseData
+      );
+      throw error; // Re-throw to be caught by the page component
     }
-    console.error("[updateEmployeeActivityStatus] Unexpected error:", error);
-    throw new HttpError(`Failed to update activity status for employee ${employeeId}. Error: ${error instanceof Error ? error.message : String(error)}`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
+    // This path is for unexpected errors not already HttpError or UnauthorizedError
+    console.error(`[updateEmployeeActivityStatus] Unexpected non-HTTP error for ${employeeId} while trying to set status to "${activityStatus}":`, error);
+    throw new HttpError(`Failed to update activity status for employee ${employeeId}. Error: ${error instanceof Error ? error.message : String(error)}`, 0, null);
   }
 }
 
