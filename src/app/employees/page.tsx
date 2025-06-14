@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchEmployees, updateEmployeeActivityStatus as apiUpdateEmployeeActivityStatus } from '@/services/employee-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UnauthorizedError } from '@/services/api-client';
+import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -32,7 +32,6 @@ const activityStatusOptions = [
   { value: "InMeeting", label: "In Meeting", icon: <Users className="h-4 w-4 text-indigo-500" /> },
   { value: "DoNotDisturb", label: "Do Not Disturb", icon: <UserRoundX className="h-4 w-4 text-pink-500" /> },
   { value: "OnLeave", label: "On Leave", icon: <Clock className="h-4 w-4 text-gray-500" /> },
-  // Add other statuses as needed
 ];
 
 const getActivityStatusDisplay = (statusValue?: string) => {
@@ -122,8 +121,13 @@ export default function EmployeesPage() {
         toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to change employee status."});
         return;
     }
+     if (!employeeId) {
+        toast({ variant: "destructive", title: "Error", description: "Employee ID is missing."});
+        return;
+    }
 
     const originalEmployees = [...employees];
+    // Optimistic update
     setEmployees(prevEmployees =>
       prevEmployees.map(emp =>
         emp.id === employeeId ? { ...emp, currentStatus: newActivityStatus } : emp
@@ -131,19 +135,27 @@ export default function EmployeesPage() {
     );
 
     try {
-      await apiUpdateEmployeeActivityStatus(employeeId, newActivityStatus);
+      const updatedEmployeeFromServer = await apiUpdateEmployeeActivityStatus(employeeId, newActivityStatus);
+      
+      // Replace optimistic update with server-confirmed data
+      setEmployees(prevEmployees =>
+        prevEmployees.map(emp =>
+          emp.id === employeeId ? updatedEmployeeFromServer : emp
+        )
+      );
+
       toast({
         title: "Activity Status Updated",
         description: `Employee activity status has been changed to ${newActivityStatus}.`,
       });
     } catch (error) {
+      setEmployees(originalEmployees); // Revert optimistic update on error
       if (error instanceof UnauthorizedError) {
         toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
         await signOut();
         router.push('/');
         return;
       }
-      setEmployees(originalEmployees); // Revert optimistic update on error
       const errorMessage = error instanceof Error ? error.message : 'Could not update activity status.';
       toast({
         variant: "destructive",
