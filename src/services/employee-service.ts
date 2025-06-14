@@ -46,7 +46,7 @@ export interface EmployeeLocation {
 }
 
 export interface HireEmployeePayload {
-  userId?: string; 
+  userId?: string;
   firstName: string;
   lastName: string;
   middleName?: string | undefined;
@@ -64,7 +64,7 @@ export interface HireEmployeePayload {
 }
 
 interface ApiHiredEmployeeResponse extends FrontendEmployee {
-    firstName: string; 
+    firstName: string;
     lastName: string;
 }
 
@@ -87,15 +87,15 @@ export async function fetchEmployees(): Promise<FrontendEmployee[]> {
 
       return {
         id: apiEmp.id,
-        name: name || undefined, // Ensure 'N/A' isn't stored if both are missing
+        name: name === 'N/A' ? undefined : name,
         email: apiEmp.email || undefined,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, // Employment status is not in GET /employees
+        status: undefined, // Employment status is not in GET /employees list
         currentStatus: apiEmp.currentStatus || undefined, // Activity Status
-        avatarUrl: undefined, 
-        officeId: undefined, 
-        hireDate: undefined, 
+        avatarUrl: undefined,
+        officeId: undefined,
+        hireDate: undefined,
       };
     });
   } catch (error) {
@@ -111,7 +111,7 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
     const response = await apiClient<ApiEmployeeDetail | null>(`/employees/${id}`, {
       method: 'GET',
     });
-    
+
     const apiDetail = response.data;
     if (apiDetail) {
       let name = 'N/A';
@@ -125,8 +125,8 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
 
       return {
         id: apiDetail.id,
-        name: name || undefined,
-        email: apiDetail.email || undefined, 
+        name: name === 'N/A' ? undefined : name,
+        email: apiDetail.email || undefined,
         department: apiDetail.departmentName || undefined,
         jobTitle: apiDetail.positionTitle || undefined,
         status: apiDetail.employmentStatus === 'Active' ? 'Active' : (apiDetail.employmentStatus === 'Inactive' ? 'Inactive' : undefined),
@@ -153,10 +153,10 @@ export async function updateEmployee(id: string, employeeData: Partial<Omit<Fron
   try {
     const response = await apiClient<ApiEmployeeDetail>(`/employees/${id}`, {
       method: 'PUT',
-      body: employeeData, 
+      body: employeeData,
     });
     const apiDetail = response.data;
-     return { 
+     return {
         id: apiDetail.id,
         name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
         email: apiDetail.email || undefined,
@@ -181,14 +181,14 @@ export async function fetchEmployeesByStatus(status: string): Promise<FrontendEm
     const response = await apiClient<ApiEmployeeListItem[]>(`/employees/status/${status}`, {
       method: 'GET',
     });
-    return response.data.map(apiEmp => ({ 
+    return response.data.map(apiEmp => ({
         id: apiEmp.id,
         name: (apiEmp.firstName && apiEmp.lastName) ? `${apiEmp.firstName} ${apiEmp.lastName}`.trim() : (apiEmp.firstName || apiEmp.lastName || undefined),
         email: apiEmp.email || undefined,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, 
-        currentStatus: apiEmp.currentStatus || undefined, 
+        status: undefined,
+        currentStatus: apiEmp.currentStatus || undefined,
         avatarUrl: undefined,
         officeId: undefined,
         hireDate: undefined,
@@ -200,33 +200,37 @@ export async function fetchEmployeesByStatus(status: string): Promise<FrontendEm
   }
 }
 
-// Renamed from updateEmployeeStatus to updateEmployeeActivityStatus
 export async function updateEmployeeActivityStatus(employeeId: string, activityStatus: string): Promise<FrontendEmployee> {
-  console.log(`API CALL: PUT /employees/${employeeId}/status with activity status: ${activityStatus}`);
+  console.log(`[updateEmployeeActivityStatus] Preparing API CALL: PUT /employees/${employeeId}/status with activity status: "${activityStatus}" (Type: ${typeof activityStatus})`);
   try {
-    const response = await apiClient<ApiEmployeeDetail>(`/employees/${employeeId}/status`, { 
+    const response = await apiClient<ApiEmployeeDetail>(`/employees/${employeeId}/status`, {
       method: 'PUT',
       body: activityStatus, // Send the string like "Online", "Offline"
-      headers: { 'Content-Type': 'application/json' } 
+      headers: { 'Content-Type': 'application/json' }
     });
     const apiDetail = response.data;
-    // If the PUT /status endpoint returns 204, response.data might be empty.
-    // In a real scenario, if it's 204, you might need to re-fetch the employee or trust optimistic update.
-    // For now, assuming it might return the updated employee detail:
-    if (!apiDetail) { // Handle cases where API might return 204 or empty body on success
-        console.warn(`updateEmployeeActivityStatus for ${employeeId} returned no content. Re-fetching might be needed or rely on optimistic UI.`);
-        // Attempt to return a partially updated optimistic response or re-fetch.
-        // For simplicity here, we'll assume optimistic update is primary and return a modified object.
-        // This part might need adjustment based on actual API behavior for 204.
-        // A robust solution would involve re-fetching if the API is 204.
-        // For now, if apiDetail is null/undefined from a 204, this will fail.
-        // We should make it return void or the optimistic update be sufficient.
-        // Let's fetch the employee to get the full updated details if response is empty
-        // This is less efficient but ensures data consistency if API doesn't return full object on PUT status
-        return await fetchEmployeeById(employeeId) || { id: employeeId, currentStatus: activityStatus } as FrontendEmployee;
+
+    if (!apiDetail && response.status === 204) {
+        console.warn(`updateEmployeeActivityStatus for ${employeeId} returned 204 No Content. Re-fetching employee details.`);
+        const updatedEmployee = await fetchEmployeeById(employeeId);
+        if (updatedEmployee) {
+            return updatedEmployee;
+        } else {
+            // This case should ideally not happen if the update was successful
+            // and the employee still exists.
+            console.error(`Failed to re-fetch employee ${employeeId} after 204 status update.`);
+            // Return a minimal object or throw an error, depending on desired behavior
+            return { id: employeeId, currentStatus: activityStatus } as FrontendEmployee;
+        }
+    }
+     if (!apiDetail) {
+        console.error(`updateEmployeeActivityStatus for ${employeeId} returned an empty response body but status was not 204 (was ${response.status}). This is unexpected.`);
+        // Fallback or error, as no data was returned to construct the FrontendEmployee
+        throw new HttpError(`Update status for employee ${employeeId} succeeded but returned no data.`, response.status, null);
     }
 
-    return { 
+
+    return {
       id: apiDetail.id,
       name: `${apiDetail.firstName || ''} ${apiDetail.lastName || ''}`.trim() || undefined,
       email: apiDetail.email || undefined,
@@ -263,7 +267,7 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
 export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
   console.log(`API CALL: GET /employees/${employeeId}/location/current`);
   try {
-    const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`, { 
+    const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`, {
       method: 'GET',
     });
     return response.data;
@@ -280,14 +284,14 @@ export async function getNearbyEmployees(employeeId: string): Promise<FrontendEm
     const response = await apiClient<ApiEmployeeListItem[]>(`/employees/${employeeId}/location/nearby`, {
       method: 'GET',
     });
-    return response.data.map(apiEmp => ({ 
+    return response.data.map(apiEmp => ({
         id: apiEmp.id,
         name: (apiEmp.firstName && apiEmp.lastName) ? `${apiEmp.firstName} ${apiEmp.lastName}`.trim() : (apiEmp.firstName || apiEmp.lastName || undefined),
         email: apiEmp.email || undefined,
         department: apiEmp.departmentName || undefined,
         jobTitle: apiEmp.positionTitle || undefined,
-        status: undefined, 
-        currentStatus: apiEmp.currentStatus || undefined, 
+        status: undefined,
+        currentStatus: apiEmp.currentStatus || undefined,
         avatarUrl: undefined,
         officeId: undefined,
         hireDate: undefined,
