@@ -36,14 +36,12 @@ const InfoItem: React.FC<InfoItemProps> = ({ icon, label, value, isLoading }) =>
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return 'N/A';
   try {
-    // Attempt to parse as ISO and then format
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) { // Check if date is invalid
-        // Fallback for "YYYY-MM-DD" if ISO parsing fails or if it's just a date string
+    if (isNaN(date.getTime())) { 
         const parts = dateString.split('T')[0].split('-');
         if (parts.length === 3) {
             const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) -1; // JS months are 0-indexed
+            const month = parseInt(parts[1], 10) -1; 
             const day = parseInt(parts[2], 10);
             const potentiallyValidDate = new Date(year, month, day);
             if (!isNaN(potentiallyValidDate.getTime())) {
@@ -78,7 +76,7 @@ export default function EmployeeProfilePage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [office, setOffice] = useState<Office | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOfficeLoading, setIsOfficeLoading] = useState(false); // Separate loading state for office
+  const [isOfficeLoading, setIsOfficeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -109,7 +107,7 @@ export default function EmployeeProfilePage() {
 
     const loadEmployeeData = async () => {
       setIsLoading(true);
-      setIsOfficeLoading(false); // Reset office loading
+      setIsOfficeLoading(false); 
       setError(null);
       try {
         const fetchedEmployee = await fetchEmployeeById(employeeId);
@@ -122,13 +120,13 @@ export default function EmployeeProfilePage() {
             setOffice(fetchedOffice);
           } catch (officeErr) {
             console.warn(`Failed to fetch office details for ID ${fetchedEmployee.officeId}:`, officeErr);
-            setOffice(null); // Ensure office is null if fetch fails
+            setOffice(null); 
             toast({ variant: "destructive", title: "Office Data Error", description: "Could not load assigned office details."});
           } finally {
             setIsOfficeLoading(false);
           }
         } else {
-          setOffice(null); // No officeId, so no office to fetch
+          setOffice(null); 
         }
 
       } catch (err) {
@@ -148,6 +146,20 @@ export default function EmployeeProfilePage() {
 
     loadEmployeeData();
   }, [employeeId, isAdmin, isClient, isRoleLoading, toast, router]);
+
+  const getInitials = (name: string | undefined | null) => {
+    if (!name) return 'N/A';
+    const nameParts = name.split(' ').filter(part => part.length > 0);
+    if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
+    return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const officeDisplayValue = useMemo(() => {
+    if (isOfficeLoading && employee?.officeId) return 'Loading office...';
+    if (office?.name) return office.name;
+    if (employee?.officeId && !office?.name && !isOfficeLoading) return `Office ID: ${employee.officeId.substring(0,8)}... (Details N/A)`;
+    return 'N/A';
+  }, [employee, office, isOfficeLoading]);
 
 
   if (isRoleLoading || (!isClient && isLoading)) {
@@ -235,20 +247,6 @@ export default function EmployeeProfilePage() {
     );
   }
 
-  const getInitials = (name: string | undefined | null) => {
-    if (!name) return 'N/A';
-    const nameParts = name.split(' ').filter(part => part.length > 0);
-    if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
-    return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
-  };
-
-  const officeDisplayValue = useMemo(() => {
-    if (isOfficeLoading && employee?.officeId) return 'Loading office...';
-    if (office?.name) return office.name;
-    if (employee?.officeId && !office?.name && !isOfficeLoading) return `Office ID: ${employee.officeId.substring(0,8)}... (Details N/A)`;
-    return 'N/A';
-  }, [employee, office, isOfficeLoading]);
-
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
       <Button variant="outline" size="sm" onClick={() => router.push('/employees')} className="mb-6">
@@ -299,12 +297,7 @@ export default function EmployeeProfilePage() {
                     isLoading={isLoading || (isOfficeLoading && !!employee?.officeId)} 
                 />
                 <InfoItem icon={<CalendarDays />} label="Hire Date" value={formatDate(employee?.hireDate)} isLoading={isLoading} />
-                 {/* Add more fields here as they become available in Employee type or fetched data */}
             </div>
-            {/* Placeholder for potential future actions like "Edit Employee" */}
-            {/* <div className="pt-4 flex justify-end">
-                <Button variant="outline">Edit Profile</Button>
-            </div> */}
         </CardContent>
       </Card>
     </div>
