@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import MapComponent, { MapMarkerData } from '@/components/map-component';
-import type { Office, AddOfficePayload } from '@/services/organization-service'; 
+import type { Office as FrontendOfficeType } from '@/lib/data'; // Renamed for clarity
+import { type AddOfficePayload } from '@/services/organization-service'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,13 +28,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from "@/lib/utils";
 
 const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
 const DEFAULT_CITY_ZOOM_OFFICES = 6;
+const FOCUSED_OFFICE_ZOOM = 14;
 
 
 export default function OfficesPage() {
-  const [offices, setOffices] = useState<Office[]>([]);
+  const [offices, setOffices] = useState<FrontendOfficeType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
@@ -54,6 +57,7 @@ export default function OfficesPage() {
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
+  const [selectedOfficeIdForHighlight, setSelectedOfficeIdForHighlight] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -135,6 +139,12 @@ export default function OfficesPage() {
         setMapZoom(DEFAULT_CITY_ZOOM_OFFICES);
     }
   }, [markers, isLoading, offices]);
+
+  const handleOfficeCardClick = (office: FrontendOfficeType) => {
+    setMapCenter({ lat: office.latitude, lng: office.longitude });
+    setMapZoom(FOCUSED_OFFICE_ZOOM);
+    setSelectedOfficeIdForHighlight(office.id);
+  };
 
   const handleNewOfficeDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -366,7 +376,14 @@ export default function OfficesPage() {
         )}
 
         {isAdmin && !isLoading && !error && offices.map(office => (
-          <Card key={office.id} className="shadow-md hover:shadow-lg transition-shadow">
+          <Card 
+            key={office.id} 
+            className={cn(
+                "shadow-md hover:shadow-lg transition-all duration-200 ease-in-out cursor-pointer",
+                selectedOfficeIdForHighlight === office.id && "ring-2 ring-primary shadow-primary/30 scale-[1.01]"
+            )}
+            onClick={() => handleOfficeCardClick(office)}
+            >
             <CardHeader className="pb-2">
               <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -375,13 +392,13 @@ export default function OfficesPage() {
                 </CardTitle>
                 {isAdmin && (
                   <div className="flex gap-1 self-end xs:self-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditOffice(office.id)} title="Edit Office">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => {e.stopPropagation(); handleEditOffice(office.id);}} title="Edit Office">
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Delete Office">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()} title="Delete Office">
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Delete</span>
                           </Button>
@@ -428,3 +445,6 @@ export default function OfficesPage() {
     </div>
   );
 }
+
+
+    
