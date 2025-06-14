@@ -119,12 +119,16 @@ export default function OfficesPage() {
         longitude: office.longitude,
         title: office.name,
         description: `${office.address}${office.radius ? ` (Radius: ${office.radius}m)` : ''}${office.description ? ` - ${office.description}` : ''}`,
-        icon: <Building2 className="text-primary h-8 w-8 cursor-pointer transform hover:scale-110 transition-transform" />
+        icon: (
+          <div className="p-2 bg-primary rounded-full shadow-md cursor-pointer transform hover:scale-110 transition-transform">
+            <Building2 className="text-primary-foreground h-4 w-4" />
+          </div>
+        )
     }));
   }, [offices]);
 
   useEffect(() => {
-    if (markers.length > 0) {
+    if (markers.length > 0 && !selectedOfficeIdForHighlight) { // Only adjust global view if no specific office is selected
       if (markers.length === 1) {
         setMapCenter({ lat: markers[0].latitude, lng: markers[0].longitude });
         setMapZoom(10);
@@ -138,7 +142,7 @@ export default function OfficesPage() {
         setMapCenter(GOMEL_COORDS);
         setMapZoom(DEFAULT_CITY_ZOOM_OFFICES);
     }
-  }, [markers, isLoading, offices]);
+  }, [markers, isLoading, offices, selectedOfficeIdForHighlight]);
 
   const handleOfficeCardClick = (office: FrontendOfficeType) => {
     setMapCenter({ lat: office.latitude, lng: office.longitude });
@@ -445,6 +449,5 @@ export default function OfficesPage() {
     </div>
   );
 }
-
 
     

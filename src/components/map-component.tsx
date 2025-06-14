@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Map, { Marker, Popup, NavigationControl, FullscreenControl, ScaleControl } from 'react-map-gl';
+import { Building2 } from 'lucide-react'; // Import Building2 icon
 
 export interface MapMarkerData {
   id: string;
@@ -38,14 +39,13 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
   useEffect(() => {
     const envAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-    // Token provided by the user
     const userProvidedToken = 'pk.eyJ1Ijoiam4wMDciLCJhIjoiY21haW9yeXFxMGNuODJrcjQzamlyenF6aCJ9.nfHTNAMGgwwbawLTNJrLLg';
 
-    if (mapboxAccessToken) { // Prop takes precedence
+    if (mapboxAccessToken) {
       setCurrentAccessToken(mapboxAccessToken);
-    } else if (envAccessToken) { // Then env var
+    } else if (envAccessToken) {
       setCurrentAccessToken(envAccessToken);
-    } else { // Fallback to the user-provided token
+    } else {
       setCurrentAccessToken(userProvidedToken);
     }
   }, [mapboxAccessToken]);
@@ -61,7 +61,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
 
   if (!currentAccessToken) {
-    // This block should ideally not be reached if userProvidedToken is valid
     return (
       <div className="flex items-center justify-center h-full w-full bg-muted rounded-lg shadow-md">
         <div className="text-center p-8">
@@ -100,8 +99,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
               e.originalEvent.stopPropagation();
               setSelectedMarker(marker);
             }}
+            // The default anchor is 'center'. If your custom icon's visual center is not its actual center, 
+            // you might need to adjust anchor or use offset prop on Marker.
+            // For a typical bottom-pointed pin, anchor="bottom" is common.
+            // For a circular icon like we're making, "center" should be fine.
           >
-            {marker.icon ? marker.icon : <div className="w-6 h-6 bg-primary rounded-full border-2 border-white shadow-md" />}
+            {marker.icon ? marker.icon : (
+              // Default fallback icon (simple circle)
+              <div className="w-3 h-3 bg-primary rounded-full border-2 border-white shadow" />
+            )}
           </Marker>
         ))}
 
@@ -110,14 +116,23 @@ const MapComponent: React.FC<MapComponentProps> = ({
             longitude={selectedMarker.longitude}
             latitude={selectedMarker.latitude}
             onClose={() => setSelectedMarker(null)}
-            closeOnClick={false}
-            anchor="bottom"
-            offset={selectedMarker.icon ? 30 : 15} 
+            closeOnClick={false} // Keep popup open until explicitly closed
+            anchor="bottom" // Anchor point of the popup relative to marker coordinates
+            // Adjust offset based on your marker icon's size and shape.
+            // If icon is a circle centered on coords, offset might be [0, -markerHeight/2]
+            // Current circular icon with padding will be ~32px (h-4 icon + p-2). So offset of ~ -16px upwards
+            offset={[0, -20]} 
+            className="z-10" // Ensure popup is above markers if needed
           >
-            <div className="p-1 max-w-xs">
-              <h4 className="font-semibold text-sm text-popover-foreground">{selectedMarker.title}</h4>
+            <div className="p-2.5 rounded-md shadow-xl bg-popover text-popover-foreground max-w-xs w-auto min-w-[200px]">
+              <div className="flex items-center mb-1.5">
+                <Building2 className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                <h4 className="font-semibold text-sm leading-tight">{selectedMarker.title}</h4>
+              </div>
               {selectedMarker.description && (
-                <p className="text-xs text-muted-foreground">{selectedMarker.description}</p>
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                  {selectedMarker.description}
+                </p>
               )}
             </div>
           </Popup>
@@ -128,3 +143,4 @@ const MapComponent: React.FC<MapComponentProps> = ({
 };
 
 export default MapComponent;
+
