@@ -32,7 +32,8 @@ export interface Office {
   address: string;
   latitude: number;
   longitude: number;
-  headcount: number;
+  radius?: number;
+  description?: string;
 }
 
 export interface Task {
@@ -61,9 +62,9 @@ export const mockActivityLogs: ActivityLog[] = [
 ];
 
 export const mockOffices: Office[] = [
-  { id: 'off001', name: 'Headquarters', address: '123 Main St, Los Angeles, CA', latitude: 34.052235, longitude: -118.243683, headcount: 150 },
-  { id: 'off002', name: 'Innovation Center', address: '456 Tech Park, San Francisco, CA', latitude: 37.774929, longitude: -122.419418, headcount: 75 },
-  { id: 'off003', name: 'East Coast Hub', address: '789 Broadway, New York, NY', latitude: 40.712776, longitude: -74.005974, headcount: 100 },
+  { id: 'off001', name: 'Headquarters', address: '123 Main St, Los Angeles, CA', latitude: 34.052235, longitude: -118.243683, radius: 100, description: 'Main HQ' },
+  { id: 'off002', name: 'Innovation Center', address: '456 Tech Park, San Francisco, CA', latitude: 37.774929, longitude: -122.419418, radius: 150, description: 'R&D Center' },
+  { id: 'off003', name: 'East Coast Hub', address: '789 Broadway, New York, NY', latitude: 40.712776, longitude: -74.005974, radius: 120, description: 'Sales and Marketing Hub' },
 ];
 
 export const mockAttendanceSummary = {

@@ -19,18 +19,19 @@ export interface AddOfficePayload {
   address: string;
   latitude: number;
   longitude: number;
-  headcount: number;
+  radius?: number;
+  description?: string;
 }
 export interface UpdateOfficePayload {
   name?: string;
   address?: string;
   latitude?: number;
   longitude?: number;
-  headcount?: number;
   radius?: number;
   description?: string;
 }
-interface ApiOffice extends FrontendOffice {} // Supposons une compatibilité directe pour l'instant
+// ApiOffice will now implicitly match the updated FrontendOffice from lib/data.ts
+interface ApiOffice extends FrontendOffice {}
 
 // Department types
 export interface Department {
@@ -59,11 +60,11 @@ export interface AddPositionPayload {
   departmentId?: string;
 }
 export interface AssignPositionPayload {
-  employeeId?: string; // L'API s'attend probablement à employeeId, pas departmentId ici
-  departmentId?: string; // Redondant si positionId est fourni
+  employeeId?: string;
+  departmentId?: string;
 }
 interface ApiPosition extends Position {}
-interface ApiAssignPositionResponse { // Exemple de réponse, ajustez si nécessaire
+interface ApiAssignPositionResponse {
     success: boolean;
     message?: string;
 }
@@ -81,6 +82,7 @@ export async function addOffice(officeData: AddOfficePayload): Promise<FrontendO
       method: 'POST',
       body: officeData,
     });
+    // Assuming the API response for addOffice directly matches the FrontendOffice structure (including id, radius, description)
     return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
@@ -92,12 +94,12 @@ export async function addOffice(officeData: AddOfficePayload): Promise<FrontendO
 export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<FrontendOffice[]> {
   console.log(`API CALL: GET /organization/offices with params: pageNumber=${pageNumber}, pageSize=${pageSize}`);
   try {
-    // Expecting API to return a direct array of offices for the given page
     const response = await apiClient<ApiOffice[]>('/organization/offices', {
       method: 'GET',
       params: { pageNumber, pageSize },
     });
-    return response.data; // response.data is ApiOffice[]
+    // Assuming the API response items directly match the FrontendOffice structure
+    return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in fetchOffices:", error);
@@ -144,11 +146,11 @@ export async function deleteOffice(officeId: string): Promise<ApiDeleteResponse>
     const response = await apiClient<ApiDeleteResponse>(`/organization/offices/${officeId}`, {
       method: 'DELETE',
     });
-    return response.data; // API devrait retourner { success: true } ou similaire
+    return response.data;
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
     console.error("Unexpected error in deleteOffice:", error);
-    throw new HttpError(`Failed to delete office ${officeId}.`, 0, null);
+    throw new HttpError(`Failed to delete office ${officeId}.`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
   }
 }
 
@@ -184,8 +186,6 @@ export async function fetchDepartments(): Promise<Department[]> {
 
 export async function updateDepartment(departmentId: string, departmentData: UpdateDepartmentPayload): Promise<Department> {
   console.log(`API CALL: PUT /organization/departments/${departmentId} with data:`, departmentData);
-   // L'endpoint n'est pas dans la liste fournie, mais le UI le suggère.
-   // Supposons que PUT /organization/departments/{id} existe.
   try {
     const response = await apiClient<ApiDepartment>(`/organization/departments/${departmentId}`, {
       method: 'PUT',
@@ -201,8 +201,6 @@ export async function updateDepartment(departmentId: string, departmentData: Upd
 
 export async function deleteDepartment(departmentId: string): Promise<ApiDeleteResponse> {
   console.log(`API CALL: DELETE /organization/departments/${departmentId}`);
-  // L'endpoint n'est pas dans la liste fournie, mais le UI le suggère.
-  // Supposons que DELETE /organization/departments/{id} existe.
   try {
     const response = await apiClient<ApiDeleteResponse>(`/organization/departments/${departmentId}`, {
       method: 'DELETE',
@@ -250,7 +248,7 @@ export async function assignPositionToEmployee(positionId: string, assignmentDat
   try {
     const response = await apiClient<ApiAssignPositionResponse>(`/organization/positions/${positionId}/assign`, {
       method: 'PUT',
-      body: assignmentData, // L'API attendra probablement l'employeeId ici
+      body: assignmentData,
     });
     return response.data;
   } catch (error) {

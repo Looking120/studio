@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, PlusCircle, Edit, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Building2, PlusCircle, Edit, Trash2, AlertTriangle, ShieldAlert, Info, Map } from 'lucide-react';
 import { fetchOffices, addOffice, updateOffice, deleteOffice } from '@/services/organization-service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from '@/components/ui/textarea';
 
 const GOMEL_COORDS = { lat: 52.4345, lng: 30.9754 };
 const DEFAULT_CITY_ZOOM_OFFICES = 6;
@@ -46,7 +47,8 @@ export default function OfficesPage() {
     address: "",
     latitude: undefined,
     longitude: undefined,
-    headcount: undefined,
+    radius: undefined,
+    description: "",
   });
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export default function OfficesPage() {
         latitude: office.latitude,
         longitude: office.longitude,
         title: office.name,
-        description: `${office.address} (Headcount: ${office.headcount})`,
+        description: `${office.address}${office.radius ? ` (Radius: ${office.radius}m)` : ''}${office.description ? ` - ${office.description}` : ''}`,
         icon: <Building2 className="text-primary h-8 w-8 cursor-pointer transform hover:scale-110 transition-transform" />
     }));
   }, [offices]);
@@ -134,11 +136,11 @@ export default function OfficesPage() {
     }
   }, [markers, isLoading, offices]);
 
-  const handleNewOfficeDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewOfficeDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewOfficeData(prev => ({
         ...prev,
-        [name]: name === 'latitude' || name === 'longitude' || name === 'headcount' ? parseFloat(value) || undefined : value,
+        [name]: name === 'latitude' || name === 'longitude' || name === 'radius' ? parseFloat(value) || undefined : value,
     }));
   };
 
@@ -151,8 +153,8 @@ export default function OfficesPage() {
     if (!newOfficeData.name?.trim() || !newOfficeData.address?.trim() ||
         newOfficeData.latitude === undefined || isNaN(newOfficeData.latitude) ||
         newOfficeData.longitude === undefined || isNaN(newOfficeData.longitude) ||
-        newOfficeData.headcount === undefined || isNaN(newOfficeData.headcount) || newOfficeData.headcount <= 0) {
-      toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields correctly. Latitude, Longitude, and Headcount must be valid numbers (Headcount > 0)." });
+        newOfficeData.radius === undefined || isNaN(newOfficeData.radius) || newOfficeData.radius <= 0) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please fill all required fields correctly. Name, Address, Latitude, Longitude, and Radius (must be > 0) are required." });
       return;
     }
 
@@ -161,7 +163,8 @@ export default function OfficesPage() {
         address: newOfficeData.address,
         latitude: newOfficeData.latitude,
         longitude: newOfficeData.longitude,
-        headcount: newOfficeData.headcount,
+        radius: newOfficeData.radius,
+        description: newOfficeData.description?.trim() || undefined,
     };
 
     console.log("[OfficesPage] Attempting to add office with data:", JSON.stringify(payload, null, 2));
@@ -171,7 +174,7 @@ export default function OfficesPage() {
       setOffices(prev => [...prev, addedOffice]); 
       toast({ title: "Office Added", description: `${addedOffice.name} was successfully added.` });
       setShowAddOfficeDialog(false);
-      setNewOfficeData({ name: "", address: "", latitude: undefined, longitude: undefined, headcount: undefined });
+      setNewOfficeData({ name: "", address: "", latitude: undefined, longitude: undefined, radius: undefined, description: "" });
     } catch (err) {
       console.error("[OfficesPage] Add office failed:", err);
       if (err instanceof UnauthorizedError) {
@@ -280,35 +283,39 @@ export default function OfficesPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Add New Office</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Fill in the details for the new office. All fields are required.
+                          Fill in the details for the new office. Fields marked * are required.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="space-y-1">
-                          <Label htmlFor="name">Office Name</Label>
+                          <Label htmlFor="name">Office Name *</Label>
                           <Input id="name" name="name" value={newOfficeData.name || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., Downtown Branch" />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="address">Address</Label>
+                          <Label htmlFor="address">Address *</Label>
                           <Input id="address" name="address" value={newOfficeData.address || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 123 Main St, Anytown" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <Label htmlFor="latitude">Latitude</Label>
+                            <Label htmlFor="latitude">Latitude *</Label>
                             <Input id="latitude" name="latitude" type="number" value={newOfficeData.latitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 34.0522" />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor="longitude">Longitude</Label>
+                            <Label htmlFor="longitude">Longitude *</Label>
                             <Input id="longitude" name="longitude" type="number" value={newOfficeData.longitude || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., -118.2437" />
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="headcount">Headcount</Label>
-                          <Input id="headcount" name="headcount" type="number" value={newOfficeData.headcount || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 50" min="1"/>
+                          <Label htmlFor="radius">Radius (meters) *</Label>
+                          <Input id="radius" name="radius" type="number" value={newOfficeData.radius || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., 100" min="1"/>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea id="description" name="description" value={newOfficeData.description || ""} onChange={handleNewOfficeDataChange} placeholder="E.g., Regional headquarters..." />
                         </div>
                       </div>
                       <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setNewOfficeData({})}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => setNewOfficeData({name: "", address: "", latitude: undefined, longitude: undefined, radius: undefined, description: ""})}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleSaveNewOffice}>Save Office</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -332,9 +339,10 @@ export default function OfficesPage() {
                 <CardHeader className="pb-2">
                     <Skeleton className="h-5 w-3/4" />
                 </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-4 w-full mb-2" />
+                <CardContent className="space-y-2 py-3">
+                    <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-2/3" />
                 </CardContent>
             </Card>
         ))}
@@ -397,12 +405,19 @@ export default function OfficesPage() {
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{office.address}</p>
-              <div className="flex items-center gap-2 mt-2 text-sm">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span>{office.headcount} Employees</span>
-              </div>
+            <CardContent className="text-sm space-y-1">
+              <p className="text-muted-foreground">{office.address}</p>
+              {office.radius !== undefined && (
+                <div className="flex items-center gap-1 text-muted-foreground">
+                    <Map className="h-3.5 w-3.5" /> Radius: {office.radius}m
+                </div>
+              )}
+              {office.description && (
+                <div className="flex items-start gap-1 text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs">{office.description}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -413,4 +428,3 @@ export default function OfficesPage() {
     </div>
   );
 }
-
