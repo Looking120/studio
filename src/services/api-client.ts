@@ -74,7 +74,8 @@ axiosInstance.interceptors.response.use(
         if (data && typeof data === 'object' && (data.message || data.title || data.detail)) {
           errorMessage = (data as any).message || (data as any).title || (data as any).detail;
         } else {
-          errorMessage = "Internal Server Error"; // Generic message for the HttpError instance itself
+          // If no specific JSON error message, or data is not an object, use a generic message for the HttpError instance
+          errorMessage = "Internal Server Error";
         }
       } else if (data && typeof data === 'object') { // For non-500 errors
         // Attempt to parse a structured error message
@@ -107,7 +108,7 @@ axiosInstance.interceptors.response.use(
     } else if (error.request) {
       const targetUrl = error.config?.baseURL && error.config?.url ? `${error.config.baseURL}${error.config.url}` : error.config?.url || 'unknown URL';
       let detailedErrorMessage = `Network error: No response from server at ${targetUrl}.`;
-      const logMessageBase = `[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}.`;
+      const localLogMessage = `[apiClient] Network request to ${targetUrl} failed. No response received from server. Original Axios error: ${error.message}.`;
 
       if (isHostnameIpAddress(error.config?.baseURL || API_BASE_URL) && targetUrl.startsWith('https://')) {
         detailedErrorMessage += ' When accessing a local IP via HTTPS, ensure you have accepted/bypassed any SSL certificate warnings in your browser for this IP address.';
@@ -116,7 +117,7 @@ axiosInstance.interceptors.response.use(
       } else {
         detailedErrorMessage += ' Check backend server, firewall, and (if HTTPS) SSL certificate validity.';
       }
-      console.warn(`${logMessageBase} ${detailedErrorMessage}`, error.request);
+      console.warn(`${localLogMessage} ${detailedErrorMessage}`, error.request);
       throw new HttpError(detailedErrorMessage, 0, null);
     } else {
       console.error('Axios setup error for request to ' + error.config?.url + ':', error.message);
@@ -148,3 +149,4 @@ export async function apiClient<T = any>(endpoint: string, options: ApiClientOpt
     throw error;
   }
 }
+
