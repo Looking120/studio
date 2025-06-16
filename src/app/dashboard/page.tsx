@@ -1,17 +1,18 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { mockActivityLogs, mockEmployees, mockAttendanceSummary, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data";
-import { Users, MapPin, ListChecks, Building2, CheckCircle, Clock, Briefcase, Home, UserPlus } from "lucide-react";
+import { mockActivityLogs, type Employee, type Office, type Task, type ActivityLog } from "@/lib/data"; // mockEmployees removed from here
+import { Users, MapPin, ListChecks, Building2, CheckCircle, Briefcase, Home, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { fetchTasksForEmployee, updateTaskStatus } from '@/services/task-service';
 import { fetchUnhiredUsers } from '@/services/user-service';
-import { fetchOffices } from '@/services/organization-service'; // Import fetchOffices
+import { fetchOffices } from '@/services/organization-service';
+import { fetchEmployees } from '@/services/employee-service'; // Import fetchEmployees
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import MapComponent, { type MapMarkerData } from '@/components/map-component';
@@ -50,19 +51,28 @@ export default function DashboardPage() {
 
   const [unhiredUserCount, setUnhiredUserCount] = useState<number | null>(null);
   const [isUnhiredCountLoading, setIsUnhiredCountLoading] = useState(true);
+  
   const [totalOfficesCount, setTotalOfficesCount] = useState<number | null>(null);
   const [isLoadingOfficesCount, setIsLoadingOfficesCount] = useState(true);
+
+  const [totalEmployeesCount, setTotalEmployeesCount] = useState<number | null>(null);
+  const [isLoadingEmployeesCount, setIsLoadingEmployeesCount] = useState(true);
+
 
   useEffect(() => {
     setIsClient(true); 
     const roleFromStorage = localStorage.getItem('userRole');
     const emailFromStorage = localStorage.getItem('userEmail');
+    const employeeIdFromStorage = localStorage.getItem('userId'); // Assuming employee data is fetched based on userId
     
     setUserRole(roleFromStorage);
 
-    if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin')) {
-      const employeeDetails = mockEmployees.find(emp => emp.email === emailFromStorage);
-      setCurrentEmployee(employeeDetails || null);
+    if (roleFromStorage && !roleFromStorage.toLowerCase().includes('admin') && employeeIdFromStorage) {
+      // For non-admin, we might fetch their specific employee details if needed beyond mock.
+      // For now, dashboard relies on mock data for employee details or fetches tasks.
+      // This part might need adjustment if currentEmployee details are to be fetched for non-admins.
+      // Example: fetchEmployeeById(employeeIdFromStorage).then(setCurrentEmployee);
+      // For now, sticking to existing logic of tasks and potentially assignedOffice.
     }
     setIsRoleLoading(false);
   }, []);
@@ -72,14 +82,13 @@ export default function DashboardPage() {
       const isAdmin = userRole && userRole.toLowerCase().includes('admin');
 
       if (isAdmin) {
-        setIsLoadingAdminData(true);
-        setIsLoadingOfficesCount(true); // Start loading offices count
-
-        // Fetch actual offices for map and count
-        fetchOffices(1, 100) // Fetch up to 100 offices for map and count
+        setIsLoadingAdminData(true); // Set global admin loading to true
+        
+        setIsLoadingOfficesCount(true);
+        fetchOffices(1, 200) // Fetch a large number to get accurate count
           .then(fetchedOffices => {
             setTotalOfficesCount(fetchedOffices.length);
-            const headquarters = fetchedOffices.find(office => office.name.toLowerCase().includes('headquarters')); // More flexible HQ finding
+            const headquarters = fetchedOffices.find(office => office.name.toLowerCase().includes('headquarters'));
             if (headquarters) {
               setHqMapMarkers([{
                 id: headquarters.id,
@@ -91,7 +100,7 @@ export default function DashboardPage() {
               }]);
               setHqMapCenter({ lat: headquarters.latitude, lng: headquarters.longitude });
               setHqMapZoom(12);
-            } else if (fetchedOffices.length > 0) { // Fallback to first office if HQ not found but offices exist
+            } else if (fetchedOffices.length > 0) {
               const firstOffice = fetchedOffices[0];
                setHqMapMarkers([{
                 id: firstOffice.id,
@@ -103,7 +112,7 @@ export default function DashboardPage() {
               }]);
               setHqMapCenter({ lat: firstOffice.latitude, lng: firstOffice.longitude });
               setHqMapZoom(12);
-            } else { // No offices found
+            } else {
               setHqMapMarkers([]);
               setHqMapCenter(GOMEL_COORDS); 
               setHqMapZoom(DEFAULT_CITY_ZOOM_DASHBOARD); 
@@ -114,14 +123,10 @@ export default function DashboardPage() {
             toast({ variant: "destructive", title: "Error Loading Offices", description: "Could not load office data."});
             setTotalOfficesCount(null);
             setHqMapMarkers([]);
-            setHqMapCenter(GOMEL_COORDS);
-            setHqMapZoom(DEFAULT_CITY_ZOOM_DASHBOARD);
           })
           .finally(() => {
             setIsLoadingOfficesCount(false);
-            // isLoadingAdminData will be set to false after all admin data (offices, applicants) are fetched
           });
-
 
         setIsUnhiredCountLoading(true);
         fetchUnhiredUsers()
@@ -135,12 +140,23 @@ export default function DashboardPage() {
           })
           .finally(() => {
             setIsUnhiredCountLoading(false);
-            // Check if all admin data is loaded
-            if (!isLoadingOfficesCount && !isUnhiredCountLoading) {
-              setIsLoadingAdminData(false);
-            }
           });
         
+        setIsLoadingEmployeesCount(true);
+        fetchEmployees()
+            .then(employees => {
+                setTotalEmployeesCount(employees.length);
+            })
+            .catch(err => {
+                console.error("Failed to fetch employees for dashboard:", err);
+                toast({ variant: "destructive", title: "Error Loading Employees", description: "Could not load employees count."});
+                setTotalEmployeesCount(null);
+            })
+            .finally(() => {
+                setIsLoadingEmployeesCount(false);
+            });
+        
+        // Process mock activity logs (keep as is for now unless real data is needed)
         const processedLogs = mockActivityLogs.slice(0, 5).map(log => ({
           ...log,
           displayTime: log.startTime ? new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
@@ -149,15 +165,18 @@ export default function DashboardPage() {
 
       } else { // Employee view
         setIsLoadingEmployeeData(true);
-        if (currentEmployee) {
-          if (currentEmployee.officeId) {
-            // For employee view, office details are typically part of employee object or fetched separately
-            // If using mockOffices:
-            // setAssignedOffice(mockOffices.find(office => office.id === currentEmployee.officeId) || null);
-            // For real data, employee detail should contain office name or you fetch it
-            // For now, let's assume office details might come from employee data or a specific fetch.
-          }
-          fetchTasksForEmployee(currentEmployee.id)
+        const employeeId = localStorage.getItem('userId');
+        if (employeeId) {
+          // Fetch employee details to get officeId, then fetch office
+          // This replaces currentEmployee derived from mock data
+          // fetchEmployeeById(employeeId).then(empDetails => {
+          //   setCurrentEmployee(empDetails);
+          //   if (empDetails?.officeId) {
+          //     fetchOfficeById(empDetails.officeId).then(setAssignedOffice).catch(() => setAssignedOffice(null));
+          //   }
+          // });
+
+          fetchTasksForEmployee(employeeId)
             .then(tasks => {
               setEmployeeTasks(tasks); 
               const processed = tasks.map(task => ({
@@ -177,7 +196,22 @@ export default function DashboardPage() {
         }
       }
     }
-  }, [isClient, isRoleLoading, userRole, currentEmployee, toast, isLoadingOfficesCount]); // Added isLoadingOfficesCount
+  }, [isClient, isRoleLoading, userRole, toast]);
+
+  // Effect to manage overall isLoadingAdminData based on individual loading states
+  useEffect(() => {
+    const isAdmin = userRole && userRole.toLowerCase().includes('admin');
+    if (isAdmin) {
+      if (!isLoadingOfficesCount && !isUnhiredCountLoading && !isLoadingEmployeesCount) {
+        setIsLoadingAdminData(false);
+      }
+    } else {
+      // For non-admin, admin data isn't relevant for loading status, base it on employee specific data
+      if (!isLoadingEmployeeData) {
+        setIsLoadingAdminData(false); // Effectively means employee view specific data is loaded or not applicable
+      }
+    }
+  }, [userRole, isLoadingOfficesCount, isUnhiredCountLoading, isLoadingEmployeesCount, isLoadingEmployeeData]);
 
 
   const formatDate = (dateString?: string) => {
@@ -229,7 +263,7 @@ export default function DashboardPage() {
   const isAdminView = userRole && userRole.toLowerCase().includes('admin');
 
   if (!isAdminView) { // Employee Dashboard View
-    if (isLoadingEmployeeData) {
+    if (isLoadingEmployeeData) { // Use employee specific loading for employee view
       return (
         <div className="space-y-6 p-2 sm:p-4 animate-pulse">
           <h1 className="text-2xl font-semibold text-foreground mb-4"><Skeleton className="h-8 w-3/5" /></h1>
@@ -305,7 +339,7 @@ export default function DashboardPage() {
                 <p className="text-md font-semibold">{assignedOffice.name}</p>
                 <p className="text-sm text-muted-foreground">{assignedOffice.address}</p>
               </>
-            ) : currentEmployee ? (
+            ) : currentEmployee ? ( // This check might need adjustment if currentEmployee not from mock
               <p className="text-sm text-muted-foreground">No primary office assigned. Contact your administrator.</p>
             ) : (
                <p className="text-sm text-muted-foreground">Employee information not available.</p>
@@ -318,8 +352,13 @@ export default function DashboardPage() {
 
   // Admin dashboard view
   const adminSummaryData = [
-    { title: "Total Employees", value: mockEmployees.length, icon: Users, href: "/employees" },
-    { title: "Active Today", value: mockAttendanceSummary.activeToday, icon: CheckCircle, href: "/activity" },
+    { 
+      title: "Total Employees", 
+      value: isLoadingEmployeesCount ? <Skeleton className="h-6 w-10 inline-block" /> : (totalEmployeesCount !== null ? totalEmployeesCount : "N/A"),
+      icon: Users, 
+      href: "/employees" 
+    },
+    { title: "Active Today", value: mockActivityLogs.filter(log => log.startTime && !log.endTime && new Date(log.startTime).toDateString() === new Date().toDateString()).length, icon: CheckCircle, href: "/activity" }, // Kept mock for now
     { 
       title: "Total Offices", 
       value: isLoadingOfficesCount ? <Skeleton className="h-6 w-10 inline-block" /> : (totalOfficesCount !== null ? totalOfficesCount : "N/A"), 
@@ -337,12 +376,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {(isLoadingAdminData || isLoadingOfficesCount) && isAdminView && ( 
+      {isLoadingAdminData && isAdminView && ( 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({length: adminSummaryData.length}).map((_, i) => <Skeleton key={`admin-summary-skel-${i}`} className="h-28 w-full" />)}
         </div>
       )}
-      {(!isLoadingAdminData && !isLoadingOfficesCount) && isAdminView && (
+      {!isLoadingAdminData && isAdminView && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {adminSummaryData.map((item) => (
             <Link href={item.href} key={item.title} legacyBehavior>
@@ -368,11 +407,11 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ListChecks className="h-5 w-5 text-primary" />
-              Recent Activity
+              Recent Activity (Mock Data)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(isLoadingAdminData || isLoadingOfficesCount) && isAdminView && processedActivityLogs.length === 0 && (
+            {isLoadingAdminData && isAdminView && processedActivityLogs.length === 0 && ( // Use isLoadingAdminData for consistency
                  Array.from({ length: 3 }).map((_, index) => (
                     <div key={`skeleton-log-${index}`} className="flex items-center justify-between py-2 border-b border-border last:border-b-0 animate-pulse">
                         <div>
@@ -383,10 +422,11 @@ export default function DashboardPage() {
                     </div>
                 ))
             )}
-            {(!isLoadingAdminData && !isLoadingOfficesCount) && isAdminView && processedActivityLogs.length === 0 && (
+            {!isLoadingAdminData && isAdminView && processedActivityLogs.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No recent activity to display.</p>
             )}
-            {processedActivityLogs.map(log => (
+            {/* Display mock logs only if not loading and admin view */}
+            {!isLoadingAdminData && isAdminView && processedActivityLogs.map(log => (
               <div key={log.id} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
                 <div>
                   <p className="font-medium text-sm">{log.employeeName}</p>
@@ -395,7 +435,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{log.displayTime}</p>
               </div>
             ))}
-            {(!isLoadingAdminData && !isLoadingOfficesCount) && processedActivityLogs.length > 0 && (
+            {!isLoadingAdminData && isAdminView && processedActivityLogs.length > 0 && (
               <Link href="/activity" className="text-sm text-primary hover:underline mt-4 block text-center">
                 View All Activity Logs
               </Link>
@@ -411,10 +451,10 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-[300px] p-0 rounded-b-lg overflow-hidden">
-             {(isLoadingAdminData || isLoadingOfficesCount) && isAdminView && (
+             {isLoadingAdminData && isAdminView && ( // Use isLoadingAdminData
                 <Skeleton className="h-full w-full" />
              )}
-             {(!isLoadingAdminData && !isLoadingOfficesCount) && isAdminView && (
+             {!isLoadingAdminData && isAdminView && ( // Use isLoadingAdminData
                 <MapComponent 
                     markers={hqMapMarkers}
                     center={hqMapCenter}
@@ -427,5 +467,4 @@ export default function DashboardPage() {
     </div>
   );
 }
-
     
