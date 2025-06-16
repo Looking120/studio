@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import MapComponent, { MapMarkerData } from '@/components/map-component';
-import type { Office as FrontendOfficeType } from '@/lib/data'; // Renamed for clarity
+import type { Office as FrontendOfficeType } from '@/lib/data';
 import { type AddOfficePayload } from '@/services/organization-service'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,12 +72,12 @@ export default function OfficesPage() {
   }, [isClient, isRoleLoading, currentUserRole]);
 
 
-  const loadOffices = async () => {
+  const loadOffices = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("[OfficesPage] Attempting to fetch offices from service...");
-      const officeDataArray = await fetchOffices(); 
+      console.log("[OfficesPage] Attempting to fetch offices from service (requesting page 1, size 50)...");
+      const officeDataArray = await fetchOffices(1, 50); // Request up to 50 offices
       console.log("[OfficesPage] Offices fetched:", officeDataArray);
       setOffices(officeDataArray || []); 
     } catch (err) {
@@ -103,13 +103,13 @@ export default function OfficesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, router]);
 
   useEffect(() => {
     if (isClient && !isRoleLoading) { 
         loadOffices();
     }
-  }, [isClient, isRoleLoading]); 
+  }, [isClient, isRoleLoading, loadOffices]); 
 
   const markers: MapMarkerData[] = useMemo(() => {
     if (!Array.isArray(offices)) return [];
@@ -128,7 +128,7 @@ export default function OfficesPage() {
   }, [offices]);
 
   useEffect(() => {
-    if (markers.length > 0 && !selectedOfficeIdForHighlight) { // Only adjust global view if no specific office is selected
+    if (markers.length > 0 && !selectedOfficeIdForHighlight) {
       if (markers.length === 1) {
         setMapCenter({ lat: markers[0].latitude, lng: markers[0].longitude });
         setMapZoom(10);
@@ -138,7 +138,7 @@ export default function OfficesPage() {
         setMapCenter({ lat: avgLat, lng: avgLng });
         setMapZoom(3); 
       }
-    } else if (!isLoading && offices.length === 0) {
+    } else if (!isLoading && offices.length === 0 && !selectedOfficeIdForHighlight) {
         setMapCenter(GOMEL_COORDS);
         setMapZoom(DEFAULT_CITY_ZOOM_OFFICES);
     }
@@ -238,6 +238,9 @@ export default function OfficesPage() {
       console.log(`[OfficesPage] Office ${officeId} deleted successfully via service.`);
       setOffices(prev => prev.filter(off => off.id !== officeId)); 
       toast({ title: "Office Deleted", description: `Office was successfully deleted.` });
+      if (selectedOfficeIdForHighlight === officeId) {
+        setSelectedOfficeIdForHighlight(null); // Clear highlight if deleted office was selected
+      }
     } catch (err) {
       console.error(`[OfficesPage] Delete office ${officeId} failed:`, err);
 
