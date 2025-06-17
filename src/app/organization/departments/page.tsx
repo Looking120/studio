@@ -310,7 +310,7 @@ export default function DepartmentsPage() {
                 {departments.map((dept) => (
                     <TableRow key={dept.id}>
                     <TableCell className="font-medium">{dept.name}</TableCell>
-                    <TableCell>{dept.employeeCount !== undefined ? dept.employeeCount : 'N/A'}</TableCell>
+                    <TableCell>{dept.employeeCount ?? 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1 sm:space-x-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(dept)} title="Edit Department">
                             <Edit className="h-4 w-4" />
