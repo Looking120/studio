@@ -2,21 +2,20 @@
 // src/services/location-service.ts
 import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
-// Updated to match GET /employees/{employeeId}/location/current response
+// Doit correspondre aux champs de EmployeeLocationDto du backend (basé sur LocationHistory)
 export interface LocationData {
-  employeeId: string;
-  employeeName: string; // Provided by the new endpoint
+  employeeId: string; // L'API backend retournera l'ID de l'employé
   latitude: number;
   longitude: number;
-  locationType?: string; // Make optional as it might not always be present
-  timestamp: string; // API returns string
+  locationType?: string;
+  timestamp: string; // L'API retourne une chaîne de caractères ISO
 }
 
 export interface UpdateLocationPayload {
   latitude: number;
   longitude: number;
-  timestamp?: string; 
-  locationType?: string; // Add if your PUT /location/{employeeId} expects it
+  timestamp?: string;
+  locationType?: string;
 }
 
 interface ApiUpdateLocationResponse {
@@ -24,11 +23,20 @@ interface ApiUpdateLocationResponse {
     message?: string;
 }
 
+// Cette interface est pour ce que le backend /api/location/{id} retourne dans sa liste
+// Basé sur EmployeeLocationDto qui vient de LocationHistory
+interface ApiLocationHistoryItem {
+    id?: string; // L'historique de localisation a son propre ID
+    employeeId: string;
+    latitude: number;
+    longitude: number;
+    locationType?: string;
+    timestamp: string;
+}
+
 export async function updateEmployeeLocation(employeeId: string, locationData: UpdateLocationPayload): Promise<ApiUpdateLocationResponse> {
   console.log(`API CALL: PUT /location/${employeeId} with data:`, locationData);
   try {
-    // This endpoint might be different from what you're using in your Swagger test (PUT /api/employees/{id}/location)
-    // Ensure this is the correct endpoint for updating location in your backend.
     const response = await apiClient<ApiUpdateLocationResponse>(`/location/${employeeId}`, {
       method: 'PUT',
       body: locationData,
@@ -42,20 +50,36 @@ export async function updateEmployeeLocation(employeeId: string, locationData: U
 }
 
 export async function getEmployeeLocation(employeeId: string): Promise<LocationData | null> {
-  // Using the endpoint you confirmed works: GET /api/employees/{employeeId}/location/current
-  console.log(`API CALL: GET /employees/${employeeId}/location/current`);
+  console.log(`API CALL: GET /location/${employeeId} with params: PageNumber=1, PageSize=1`);
   try {
-    const response = await apiClient<LocationData | null>(`/employees/${employeeId}/location/current`, {
+    // L'endpoint backend /api/location/{employeeId} retourne une liste paginée d'EmployeeLocationDto.
+    // Nous demandons la première page avec un seul item pour obtenir le plus récent (en supposant un tri par défaut côté backend).
+    const response = await apiClient<ApiLocationHistoryItem[]>(`/location/${employeeId}`, {
       method: 'GET',
+      params: { PageNumber: 1, PageSize: 1 },
     });
-    return response.data;
+
+    if (response.data && response.data.length > 0) {
+      const latestLocationFromHistory = response.data[0];
+      // Mapper les champs de ApiLocationHistoryItem vers LocationData
+      return {
+        employeeId: latestLocationFromHistory.employeeId, // ou employeeId de l'argument de la fonction
+        latitude: latestLocationFromHistory.latitude,
+        longitude: latestLocationFromHistory.longitude,
+        locationType: latestLocationFromHistory.locationType,
+        timestamp: latestLocationFromHistory.timestamp,
+      };
+    }
+    // Si aucune donnée d'historique n'est retournée
+    console.warn(`No location history found for employee ${employeeId} via /location/${employeeId}.`);
+    return null;
   } catch (error) {
     if (error instanceof HttpError && error.status === 404) {
-        console.warn(`Location data for employee ${employeeId} not found via /employees/{id}/location/current.`);
+        console.warn(`Location data for employee ${employeeId} not found (404) via /location/${employeeId}.`);
         return null;
     }
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    console.error("Unexpected error in getEmployeeLocation:", error);
-    throw new HttpError(`Failed to get location for employee ${employeeId} via /employees/{id}/location/current.`, 0, null);
+    console.error(`Unexpected error in getEmployeeLocation for ${employeeId}:`, error);
+    throw new HttpError(`Failed to get location for employee ${employeeId}.`, 0, null);
   }
 }
