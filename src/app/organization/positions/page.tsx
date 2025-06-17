@@ -124,10 +124,10 @@ export default function PositionsPage() {
   useEffect(() => {
     if (isClient && !isRoleLoading) {
       loadPositions();
-      if (isAdmin) { // Only load users if admin, as non-admins likely can't assign
+      if (isAdmin) { 
         loadUsers();
       } else {
-        setIsLoadingUsers(false); // No need to load users for non-admins
+        setIsLoadingUsers(false); 
       }
     }
   }, [isClient, isRoleLoading, isAdmin]);
@@ -183,48 +183,56 @@ export default function PositionsPage() {
 
   const openAssignDialog = (position: Position) => {
     if (!isAdmin) {
-      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to assign positions." });
+      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to modify position assignments." });
+      return;
+    }
+    // Check if the position has a valid departmentId, as it's required for the API call
+    if (isZeroGuid(position.departmentId)) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Assign",
+        description: `The position "${position.title}" must be associated with a valid department before this action can be performed.`,
+        duration: 7000,
+      });
       return;
     }
     setSelectedPositionForAssign(position);
-    setSelectedEmployeeIdToAssign("");
+    setSelectedEmployeeIdToAssign(""); // Reset employee selection
     setIsAssignDialogOpen(true);
   };
 
   const handleAssignPositionSubmit = async () => {
-    if (!isAdmin) {
-       // Redundant check if openAssignDialog already checks, but good for safety
-      toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to assign positions." });
-      return;
-    }
-    if (!selectedPositionForAssign || !selectedEmployeeIdToAssign) {
-      toast({ variant: "destructive", title: "Validation Error", description: "Please select a position and an employee." });
+    if (!isAdmin || !selectedPositionForAssign) {
+      toast({ variant: "destructive", title: "Error", description: "Operation cannot be performed." });
       return;
     }
 
-    console.log(
-      `[Assign Position] Attempting to assign employee ${selectedEmployeeIdToAssign} to position: `,
-      JSON.stringify(selectedPositionForAssign, null, 2) 
-    );
-    console.log(`[Assign Position] Checking departmentId: "${selectedPositionForAssign.departmentId}" with isZeroGuid: ${isZeroGuid(selectedPositionForAssign.departmentId)}`);
+    // The departmentId for the API call will come from the selected position.
+    // The employeeId is selected in the UI but not directly used by this specific API call (PUT /.../assign?departmentId=...).
+    // This API call, as per Swagger, updates the department assignment of the position.
+    const departmentIdForApi = selectedPositionForAssign.departmentId;
 
-    if (isZeroGuid(selectedPositionForAssign.departmentId)) {
+    if (isZeroGuid(departmentIdForApi)) {
       toast({
         variant: "destructive",
         title: "Assignment Error",
-        description: `The selected position "${selectedPositionForAssign.title}" is not associated with a valid department or its department ID is invalid (e.g., '0000-...', null, or empty). Please ensure the position is correctly configured with a department before assigning.`,
-        duration: 9000, 
+        description: `The selected position "${selectedPositionForAssign.title}" does not have a valid department ID associated with it, which is required for this operation.`,
+        duration: 9000,
       });
-      setIsAssignDialogOpen(false); 
+      setIsAssignDialogOpen(false);
       return;
     }
 
     setIsSubmittingAssignment(true);
     try {
-      const payload: AssignPositionPayload = { employeeId: selectedEmployeeIdToAssign };
+      const payload: AssignPositionPayload = {
+        // employeeId is still captured here if other logic might use it, but not for this specific API call
+        employeeId: selectedEmployeeIdToAssign, 
+        departmentId: departmentIdForApi 
+      };
       
-      await assignPositionToEmployee(selectedPositionForAssign.id, payload);
-      toast({ title: "Position Assigned", description: `Successfully assigned position to employee.` });
+      await assignPositionToEmployee(selectedPositionForAssign.id, payload); // API call sends positionId and departmentId in query
+      toast({ title: "Position Update Successful", description: `The department assignment for position "${selectedPositionForAssign?.title}" was updated.` });
       setIsAssignDialogOpen(false);
       setSelectedPositionForAssign(null);
       setSelectedEmployeeIdToAssign("");
@@ -237,9 +245,9 @@ export default function PositionsPage() {
             setIsSubmittingAssignment(false); 
             return;
         }
-        const errorMessage = err instanceof Error ? err.message : 'Could not assign position.';
-        toast({ variant: "destructive", title: "Failed to assign position", description: errorMessage });
-        console.error("Assign position failed:", err);
+        const errorMessage = err instanceof Error ? err.message : 'Could not update position assignment.';
+        toast({ variant: "destructive", title: "Failed to Update Position", description: errorMessage });
+        console.error("Update position assignment failed:", err);
     } finally {
       setIsSubmittingAssignment(false);
     }
@@ -265,7 +273,7 @@ export default function PositionsPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <CardTitle className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/>Manage Positions</CardTitle>
-            <CardDescription>Define and assign job positions within the organization.</CardDescription>
+            <CardDescription>Define job positions and their departmental assignments.</CardDescription>
           </div>
           {isAdmin && (
             <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -363,8 +371,8 @@ export default function PositionsPage() {
                       <TableCell>{pos.departmentName || 'N/A'}</TableCell>
                       <TableCell>{pos.assignedEmployees !== undefined ? pos.assignedEmployees : 'N/A'}</TableCell>
                       <TableCell className="text-right space-x-1">
-                          <Button variant="outline" size="xs" onClick={() => openAssignDialog(pos)} title="Assign Employee">
-                            <UserCheck className="mr-1 h-3 w-3" /> Assign
+                          <Button variant="outline" size="xs" onClick={() => openAssignDialog(pos)} title="Assign Position to Department">
+                            <UserCheck className="mr-1 h-3 w-3" /> Assign/Update Dept.
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditPosition(pos)} title="Edit Position">
                             <Edit className="h-4 w-4" />
@@ -400,19 +408,35 @@ export default function PositionsPage() {
         </CardContent>
       </Card>
 
+      {/* Dialog for "Assigning" a Position to a Department (and selecting an employee, though employeeId is not used by this API) */}
       {isAdmin && (
         <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHead>
-              <DialogTitl>Assign Employee to Position</DialogTitl>
+              <DialogTitl>Update Position's Department</DialogTitl>
               <DialogDesc>
-                Select an employee to assign to the position: "{selectedPositionForAssign?.title}".
+                Updating department assignment for position: "{selectedPositionForAssign?.title}".
+                The position's current department ID ({selectedPositionForAssign?.departmentId || 'N/A'}) will be used for the API call.
+                <br/>
+                <span className="text-xs text-muted-foreground">(Note: Selecting an employee below is for context or future use; this specific API call does not use the employee ID.)</span>
               </DialogDesc>
             </DialogHead>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="positionInfo" className="text-right col-span-1">
+                  Position
+                </Label>
+                 <Input id="positionInfo" value={selectedPositionForAssign?.title || ''} readOnly className="col-span-3 bg-muted/50"/>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="departmentInfo" className="text-right col-span-1">
+                  Dept. ID
+                </Label>
+                 <Input id="departmentInfo" value={selectedPositionForAssign?.departmentId || 'N/A (Cannot Assign)'} readOnly className="col-span-3 bg-muted/50"/>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="employee" className="text-right">
-                  Employee
+                  Employee (Context)
                 </Label>
                 <div className="col-span-3">
                   <Select
@@ -421,7 +445,7 @@ export default function PositionsPage() {
                     disabled={isLoadingUsers}
                   >
                     <SelectTrigger id="employee">
-                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select an employee"} />
+                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select an employee (for context)"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -447,9 +471,9 @@ export default function PositionsPage() {
               <Button 
                 type="submit" 
                 onClick={handleAssignPositionSubmit}
-                disabled={!selectedEmployeeIdToAssign || isSubmittingAssignment || isLoadingUsers}
+                disabled={isSubmittingAssignment || isLoadingUsers || isZeroGuid(selectedPositionForAssign?.departmentId)}
               >
-                {isSubmittingAssignment ? "Assigning..." : "Assign Position"}
+                {isSubmittingAssignment ? "Updating..." : "Update Position Dept."}
               </Button>
             </DialogFoot>
           </DialogContent>
@@ -458,5 +482,3 @@ export default function PositionsPage() {
     </>
   );
 }
-
-    

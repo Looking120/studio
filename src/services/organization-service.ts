@@ -60,18 +60,19 @@ export interface AddPositionPayload {
   departmentId?: string;
 }
 export interface AssignPositionPayload {
-  employeeId?: string;
-  departmentId?: string;
+  employeeId?: string; // Still captured by UI, but not directly used by this specific API call
+  departmentId?: string; // This will be used as a query parameter
 }
-interface ApiPosition extends Position {}
-interface ApiAssignPositionResponse {
-    success: boolean;
-    message?: string;
-}
+// ApiAssignPositionResponse is no longer needed as API returns 204
 interface ApiDeleteResponse {
     success: boolean;
     message?: string;
 }
+
+const isZeroGuid = (guid: string | undefined | null): boolean => {
+  if (!guid || guid.trim() === "" || guid === "00000000-0000-0000-0000-000000000000") return true;
+  return false;
+};
 
 
 // --- Office Functions ---
@@ -243,17 +244,25 @@ export async function fetchPositions(): Promise<Position[]> {
   }
 }
 
-export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<ApiAssignPositionResponse> {
-  console.log(`API CALL: PUT /organization/positions/${positionId}/assign with data:`, assignmentData);
+export async function assignPositionToEmployee(positionId: string, assignmentData: AssignPositionPayload): Promise<void> {
+  console.log(`API CALL: PUT /organization/positions/${positionId}/assign with query params:`, { departmentId: assignmentData.departmentId });
+  
+  if (!assignmentData.departmentId || isZeroGuid(assignmentData.departmentId)) {
+    console.error("assignPositionToEmployee: departmentId is missing or invalid in assignmentData, which is required for the API query parameter.");
+    throw new HttpError("A valid Department ID is required for this operation on the position.", 400, { errorField: "departmentId" });
+  }
+
   try {
-    const response = await apiClient<ApiAssignPositionResponse>(`/organization/positions/${positionId}/assign`, {
+    // API returns 204 No Content, so we expect no data in response.data
+    await apiClient<void>(`/organization/positions/${positionId}/assign`, {
       method: 'PUT',
-      body: assignmentData,
+      params: { departmentId: assignmentData.departmentId }, // departmentId as query parameter
+      // No body is sent
     });
-    return response.data;
+    // No return value needed for 204
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    console.error("Unexpected error in assignPositionToEmployee:", error);
-    throw new HttpError(`Failed to assign position ${positionId}.`, 0, null);
+    console.error("Unexpected error in assignPositionToEmployee (or assignPositionToDepartment):", error);
+    throw new HttpError(`Failed to update position ${positionId} assignment.`, (error as HttpError)?.status || 0, (error as HttpError)?.responseData);
   }
 }
