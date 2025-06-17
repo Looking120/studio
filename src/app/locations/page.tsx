@@ -12,8 +12,7 @@ import { RefreshCw, AlertTriangle, Users, MapPinned, Info as InfoIcon } from 'lu
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { fetchEmployees } from '@/services/employee-service'; // Fetches FrontendEmployee[]
-import { getEmployeeLocation, type LocationData } from '@/services/location-service'; // Fetches LocationData
+import { fetchEmployees, getCurrentEmployeeLocation, type EmployeeLocation } from '@/services/employee-service'; // Changed import
 import { UnauthorizedError, HttpError } from '@/services/api-client';
 import { signOut } from '@/services/auth-service';
 import { useRouter } from 'next/navigation';
@@ -23,13 +22,13 @@ const DEFAULT_CITY_ZOOM = 11;
 
 export default function LocationsPage() {
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
-  const [locationsData, setLocationsData] = useState<Record<string, LocationData | null>>({});
+  const [locationsData, setLocationsData] = useState<Record<string, EmployeeLocation | null>>({}); // Changed type to EmployeeLocation
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active');
   
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [errorEmployees, setErrorEmployees] = useState<string | null>(null);
-  const [errorLocations, setErrorLocations] = useState<string | null>(null);
+  const [errorLocations, setErrorLocations] = useState<string | null>(null); // To store general location fetching errors
 
   const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
   const [mapZoom, setMapZoom] = useState(DEFAULT_CITY_ZOOM);
@@ -71,8 +70,6 @@ export default function LocationsPage() {
     return allEmployees.filter(emp => {
         const currentStatusLower = emp.currentStatus?.toLowerCase();
         if (filter === 'active') {
-            // Consider any status not explicitly 'offline' as active for location tracking purposes.
-            // This includes "Online", "Available", "Busy", "OnBreak", etc.
             return currentStatusLower !== 'offline';
         }
         if (filter === 'inactive') {
@@ -85,37 +82,39 @@ export default function LocationsPage() {
   const fetchAllLocations = useCallback(async () => {
     if (employeesToFetchLocationsFor.length === 0 && !isLoadingEmployees) {
         setLocationsData({});
-        setErrorLocations(null);
+        setErrorLocations(null); // Clear general location errors
         setFetchSummaryMessage(null);
         return;
     }
     if (employeesToFetchLocationsFor.length === 0) return;
 
     setIsLoadingLocations(true);
-    setErrorLocations(null);
+    setErrorLocations(null); // Clear general location errors at start of fetch
     setFetchSummaryMessage(null);
-    const newLocations: Record<string, LocationData | null> = {};
-    let fetchErrors = 0;
+    const newLocations: Record<string, EmployeeLocation | null> = {};
+    let individualFetchErrors = 0;
     let unauthorizedEncountered = false;
 
     for (const emp of employeesToFetchLocationsFor) {
       if (emp.id) {
         try {
-          const loc = await getEmployeeLocation(emp.id);
+          // Use getCurrentEmployeeLocation from employee-service
+          const loc = await getCurrentEmployeeLocation(emp.id); 
           if (loc && loc.latitude != null && loc.longitude != null) {
             newLocations[emp.id] = loc;
           } else {
-            // Log specifically which employee's location data is missing or invalid
-            console.warn(`[LocationsPage] No valid location data (lat/lng) returned for employee ${emp.name || 'Unknown'} (ID: ${emp.id}). API response for location:`, loc);
+            console.warn(`[LocationsPage] No valid location data (lat/lng) returned for employee ${emp.name || 'Unknown'} (ID: ${emp.id}) from getCurrentEmployeeLocation. API response for location:`, loc);
             newLocations[emp.id] = null; 
           }
         } catch (error) {
-          fetchErrors++;
-          // Log error for specific employee
-          console.error(`[LocationsPage] Failed to fetch location for employee ${emp.name || 'Unknown'} (ID: ${emp.id}):`, error);
+          individualFetchErrors++;
+          console.error(`[LocationsPage] Failed to fetch location for employee ${emp.name || 'Unknown'} (ID: ${emp.id}) using getCurrentEmployeeLocation:`, error);
           newLocations[emp.id] = null; 
           if (error instanceof UnauthorizedError) {
             unauthorizedEncountered = true; 
+          } else if (error instanceof HttpError && error.status !== 404) {
+            // Collect general errors if not 404 (which is handled by null location)
+            setErrorLocations(prev => prev ? `${prev}; ${error.message}` : error.message);
           }
         }
       }
@@ -132,10 +131,12 @@ export default function LocationsPage() {
     setLocationsData(newLocations);
     setIsLoadingLocations(false);
 
-    if (fetchErrors > 0) {
-        const errorMsg = `Could not fetch locations for ${fetchErrors} employee(s). Some map markers may be missing or outdated. Check console for details.`;
-        setErrorLocations(errorMsg); 
-        toast({ variant: "destructive", title: "Location Fetch Issues", description: errorMsg, duration: 7000 });
+    // setErrorLocations is now set for general non-404 errors during loop
+    // fetchSummaryMessage will handle the count of missing ones
+    if (individualFetchErrors > 0 && !errorLocations) { // If individual errors happened but no general error was set
+        const errorMsg = `Could not fetch locations for ${individualFetchErrors} employee(s). Some map markers may be missing or outdated. Check console for details.`;
+        // setErrorLocations(errorMsg); // This might be too noisy if some are expected to be 404. Let fetchSummaryMessage handle counts.
+        // toast({ variant: "warning", title: "Location Fetch Issues", description: errorMsg, duration: 7000 });
     }
   }, [employeesToFetchLocationsFor, toast, router, isLoadingEmployees]);
 
@@ -148,10 +149,11 @@ export default function LocationsPage() {
     return employeesToFetchLocationsFor
       .map(emp => {
         const locationInfo = locationsData[emp.id]; 
-        if (locationInfo && locationInfo.latitude != null && locationInfo.longitude != null) {
-          const empName = emp.name || locationInfo.employeeName || 'Unknown Employee';
+        // Ensure locationInfo is not null and has valid coordinates
+        if (locationInfo && typeof locationInfo.latitude === 'number' && typeof locationInfo.longitude === 'number') {
+          const empName = emp.name || 'Unknown Employee'; // Removed locationInfo.employeeName
           const empJobTitle = emp.jobTitle || 'N/A';
-          const empActivityStatus = emp.currentStatus || 'N/A'; // Use currentStatus from Employee object
+          const empActivityStatus = emp.currentStatus || 'N/A';
           const locationType = locationInfo.locationType || 'Unknown location type';
           const lastSeen = locationInfo.timestamp ? new Date(locationInfo.timestamp).toLocaleString() : 'Timestamp N/A';
           
@@ -167,7 +169,6 @@ export default function LocationsPage() {
                         <AvatarImage src={emp.avatarUrl} alt={empName} data-ai-hint="person map" />
                         <AvatarFallback>{empName ? empName.substring(0,1).toUpperCase() : 'U'}</AvatarFallback>
                     </Avatar>
-                     {/* Green dot if status is not 'offline' */}
                     {emp.currentStatus && emp.currentStatus.toLowerCase() !== 'offline' && (
                         <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
                     )}
@@ -192,7 +193,6 @@ export default function LocationsPage() {
     }
   }, [displayableEmployeeLocations, isLoadingEmployees, isLoadingLocations]);
 
-  // Update fetch summary message
   useEffect(() => {
     if (!isLoadingLocations && !isLoadingEmployees && employeesToFetchLocationsFor.length > 0) {
         const displayedIds = new Set(displayableEmployeeLocations.map(m => m.id));
@@ -201,7 +201,7 @@ export default function LocationsPage() {
         if (missingCount > 0) {
             setFetchSummaryMessage(`${missingCount} employee(s) in the current filter could not be displayed on the map due to missing or invalid location data.`);
         } else if (employeesToFetchLocationsFor.length > 0 && displayableEmployeeLocations.length === 0 && !errorLocations) {
-            setFetchSummaryMessage(`No employees in the current filter have valid location data to display.`);
+             setFetchSummaryMessage(`No employees in the current filter have valid location data to display. Ensure their locations are being reported to the '/employees/{id}/location/current' endpoint.`);
         } else {
             setFetchSummaryMessage(null); 
         }
@@ -315,5 +315,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-
-    

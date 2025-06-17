@@ -38,10 +38,14 @@ interface ApiEmployeeDetail {
 }
 
 
+// Updated to match the Swagger response for GET /employees/{id}/location/current
 export interface EmployeeLocation {
+  employeeId: string;
   latitude: number;
   longitude: number;
-  lastSeen: string;
+  locationType?: string;
+  timestamp: string; // Was lastSeen, changed to timestamp to match API
+  // employeeName is also in API response but we get it from the main Employee object
 }
 
 export interface HireEmployeePayload {
@@ -265,16 +269,25 @@ export async function hireEmployee(employeeData: HireEmployeePayload): Promise<A
   }
 }
 
-export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation> {
+export async function getCurrentEmployeeLocation(employeeId: string): Promise<EmployeeLocation | null> {
   console.log(`API CALL: GET /employees/${employeeId}/location/current`);
   try {
-    const response = await apiClient<EmployeeLocation>(`/employees/${employeeId}/location/current`, {
+    const response = await apiClient<EmployeeLocation | null>(`/employees/${employeeId}/location/current`, {
       method: 'GET',
     });
-    return response.data;
+    // Check if data exists and has valid coordinates before returning
+    if (response.data && typeof response.data.latitude === 'number' && typeof response.data.longitude === 'number') {
+      return response.data;
+    }
+    console.warn(`[getCurrentEmployeeLocation] No valid location data returned for employee ${employeeId} from /employees/${employeeId}/location/current. Response:`, response.data);
+    return null;
   } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+      console.warn(`[getCurrentEmployeeLocation] Location for employee ${employeeId} not found (404) via /employees/${employeeId}/location/current.`);
+      return null;
+    }
     if (error instanceof UnauthorizedError || error instanceof HttpError) throw error;
-    console.error("Unexpected error in getCurrentEmployeeLocation:", error);
+    console.error(`Unexpected error in getCurrentEmployeeLocation for employee ${employeeId}:`, error);
     throw new HttpError(`Failed to get current location for employee ${employeeId}.`, 0, null);
   }
 }
