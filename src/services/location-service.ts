@@ -4,11 +4,11 @@ import { apiClient, UnauthorizedError, HttpError } from './api-client';
 
 // Doit correspondre aux champs de EmployeeLocationDto du backend (basé sur LocationHistory)
 export interface LocationData {
-  employeeId: string; // L'API backend retournera l'ID de l'employé
+  employeeId: string; 
   latitude: number;
   longitude: number;
   locationType?: string;
-  timestamp: string; // L'API retourne une chaîne de caractères ISO
+  timestamp: string; 
 }
 
 export interface UpdateLocationPayload {
@@ -23,10 +23,8 @@ interface ApiUpdateLocationResponse {
     message?: string;
 }
 
-// Cette interface est pour ce que le backend /api/location/{id} retourne dans sa liste
-// Basé sur EmployeeLocationDto qui vient de LocationHistory
 interface ApiLocationHistoryItem {
-    id?: string; // L'historique de localisation a son propre ID
+    id?: string; 
     employeeId: string;
     latitude: number;
     longitude: number;
@@ -52,26 +50,29 @@ export async function updateEmployeeLocation(employeeId: string, locationData: U
 export async function getEmployeeLocation(employeeId: string): Promise<LocationData | null> {
   console.log(`API CALL: GET /location/${employeeId} with params: PageNumber=1, PageSize=1`);
   try {
-    // L'endpoint backend /api/location/{employeeId} retourne une liste paginée d'EmployeeLocationDto.
-    // Nous demandons la première page avec un seul item pour obtenir le plus récent (en supposant un tri par défaut côté backend).
     const response = await apiClient<ApiLocationHistoryItem[]>(`/location/${employeeId}`, {
       method: 'GET',
-      params: { PageNumber: 1, PageSize: 1 },
+      params: { PageNumber: 1, PageSize: 1 }, 
     });
 
     if (response.data && response.data.length > 0) {
       const latestLocationFromHistory = response.data[0];
-      // Mapper les champs de ApiLocationHistoryItem vers LocationData
-      return {
-        employeeId: latestLocationFromHistory.employeeId, // ou employeeId de l'argument de la fonction
-        latitude: latestLocationFromHistory.latitude,
-        longitude: latestLocationFromHistory.longitude,
-        locationType: latestLocationFromHistory.locationType,
-        timestamp: latestLocationFromHistory.timestamp,
-      };
+      // Explicitly check if latitude and longitude are valid numbers
+      if (latestLocationFromHistory.latitude != null && typeof latestLocationFromHistory.latitude === 'number' &&
+          latestLocationFromHistory.longitude != null && typeof latestLocationFromHistory.longitude === 'number') {
+        return {
+          employeeId: latestLocationFromHistory.employeeId,
+          latitude: latestLocationFromHistory.latitude,
+          longitude: latestLocationFromHistory.longitude,
+          locationType: latestLocationFromHistory.locationType,
+          timestamp: latestLocationFromHistory.timestamp,
+        };
+      } else {
+        console.warn(`[LocationService] Received location history for employee ${employeeId}, but latitude/longitude are invalid or missing in the record:`, latestLocationFromHistory);
+        return null;
+      }
     }
-    // Si aucune donnée d'historique n'est retournée
-    console.warn(`No location history found for employee ${employeeId} via /location/${employeeId}.`);
+    console.warn(`No location history found for employee ${employeeId} via /location/${employeeId}. API returned:`, response.data);
     return null;
   } catch (error) {
     if (error instanceof HttpError && error.status === 404) {
@@ -83,3 +84,4 @@ export async function getEmployeeLocation(employeeId: string): Promise<LocationD
     throw new HttpError(`Failed to get location for employee ${employeeId}.`, 0, null);
   }
 }
+
