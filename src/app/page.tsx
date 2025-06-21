@@ -108,6 +108,12 @@ export default function LoginPage() {
           console.log(`Login page - Determined finalUserId (due to missing API user object): ${finalUserId} (Source: Empty Fallback)`);
         }
         
+        // HACK: Force admin role for specific email to override incorrect role from token/API.
+        if (finalUserEmail === 'joshuandayiadm@gmail.com') {
+          console.warn(`Login Page HACK: Overriding role to 'Admin' for ${finalUserEmail} because the one from API was '${finalUserRole}'.`);
+          finalUserRole = 'Admin';
+        }
+
         console.log(`Login page - About to store in localStorage: userName='${finalUserName}', userRole='${finalUserRole}', userEmail='${finalUserEmail}', userId='${finalUserId || 'Not Stored'}'`);
         localStorage.setItem('userName', finalUserName);
         localStorage.setItem('userRole', finalUserRole);
@@ -232,3 +238,4 @@ export default function LoginPage() {
   );
 }
 
+    
