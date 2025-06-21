@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from 'next-themes';
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { signOut as signOutService } from "@/services/auth-service";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -118,6 +118,17 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     router.push('/');
   }, [toast, router]);
 
+  const navItems = useMemo(() => {
+    // HACK: Temporarily treat a specific email as admin for nav items.
+    // TODO: Remove this hack when backend sends the correct "Admin" role for admin users.
+    const isSuperAdmin = loggedInUserEmail === 'joshuandayiadm@gmail.com';
+
+    if (isSuperAdmin || (loggedInUserRole && typeof loggedInUserRole === 'string' && loggedInUserRole.toLowerCase().includes('admin'))) {
+        return adminNavItems;
+    }
+    return employeeNavItems;
+  }, [loggedInUserRole, loggedInUserEmail]);
+
   useEffect(() => {
     if (!mounted) {
       return;
@@ -126,9 +137,7 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('authToken');
 
     if (pathname === "/" || pathname === "/signup") {
-      if (currentNavItems.length > 0) {
-        setCurrentNavItems([]);
-      }
+      setCurrentNavItems([]);
       return;
     }
 
@@ -136,28 +145,13 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
       if (pathname !== "/" && pathname !== "/signup") {
           handleSignOut("Session expired or not found. Please log in again.");
       }
-      if (currentNavItems.length > 0) { 
-          setCurrentNavItems([]);
-      }
+      setCurrentNavItems([]);
       return;
     }
     
-    let navItemsToSet: NavItem[] = [];
-    console.log('[AppClientLayout NavEffect] Role from state for nav determination:', loggedInUserRole);
-    if (loggedInUserRole && typeof loggedInUserRole === 'string' && loggedInUserRole.toLowerCase().includes('admin')) {
-      console.log('[AppClientLayout NavEffect] User is Admin. Setting adminNavItems.');
-      navItemsToSet = adminNavItems;
-    } else { 
-      console.log('[AppClientLayout NavEffect] User is Employee or role unknown/null. Setting employeeNavItems. Role was:', loggedInUserRole);
-      navItemsToSet = employeeNavItems;
-    }
+    setCurrentNavItems(navItems);
     
-    // Only update if the nav items have actually changed to prevent potential loops
-    if (JSON.stringify(currentNavItems) !== JSON.stringify(navItemsToSet)) {
-        console.log('[AppClientLayout NavEffect] Nav items changed. Setting new nav items.');
-        setCurrentNavItems(navItemsToSet);
-    }
-  }, [mounted, pathname, loggedInUserRole, handleSignOut, router]); 
+  }, [mounted, pathname, navItems, handleSignOut]);
 
 
   const getPageTitle = () => {

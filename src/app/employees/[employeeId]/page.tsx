@@ -80,20 +80,26 @@ export default function EmployeeProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
 
   useEffect(() => {
     setIsClient(true);
     const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
     setCurrentUserRole(role);
+    setCurrentUserEmail(email);
     setIsRoleLoading(false);
   }, []);
 
   const isAdmin = useMemo(() => {
     if (!isClient || isRoleLoading) return false;
-    return currentUserRole?.toLowerCase().includes('admin') ?? false;
-  }, [isClient, isRoleLoading, currentUserRole]);
+    // HACK: Temporarily treat a specific email as admin.
+    // TODO: Remove this hack when backend sends the correct "Admin" role.
+    const isSuperAdmin = currentUserEmail === 'joshuandayiadm@gmail.com';
+    return isSuperAdmin || (currentUserRole?.toLowerCase().includes('admin') ?? false);
+  }, [isClient, isRoleLoading, currentUserRole, currentUserEmail]);
 
 
   useEffect(() => {
@@ -303,4 +309,3 @@ export default function EmployeeProfilePage() {
     </div>
   );
 }
-

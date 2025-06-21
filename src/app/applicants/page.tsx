@@ -21,9 +21,13 @@ export default function ApplicantsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // This effect runs only on the client-side
     const role = localStorage.getItem('userRole');
-    const isAdmin = role?.toLowerCase().includes('admin') ?? false;
+    const email = localStorage.getItem('userEmail');
+    
+    // HACK: Temporarily treat a specific email as admin.
+    // TODO: Remove this hack when backend sends the correct "Admin" role.
+    const isSuperAdmin = email === 'joshuandayiadm@gmail.com';
+    const isAdmin = isSuperAdmin || (role?.toLowerCase().includes('admin') ?? false);
 
     if (!isAdmin) {
       setError("Access Denied: You do not have permission to view this page.");

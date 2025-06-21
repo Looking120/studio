@@ -66,20 +66,26 @@ export default function PositionsPage() {
   const [isSubmittingAssignment, setIsSubmittingAssignment] = useState(false);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
 
   useEffect(() => {
     setIsClient(true);
     const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
     setCurrentUserRole(role);
+    setCurrentUserEmail(email);
     setIsRoleLoading(false);
   }, []);
 
   const isAdmin = useMemo(() => {
     if (!isClient || isRoleLoading) return false;
-    return currentUserRole?.toLowerCase().includes('admin') ?? false;
-  }, [isClient, isRoleLoading, currentUserRole]);
+    // HACK: Temporarily treat a specific email as admin.
+    // TODO: Remove this hack when backend sends the correct "Admin" role.
+    const isSuperAdmin = currentUserEmail === 'joshuandayiadm@gmail.com';
+    return isSuperAdmin || (currentUserRole?.toLowerCase().includes('admin') ?? false);
+  }, [isClient, isRoleLoading, currentUserRole, currentUserEmail]);
 
   const loadPositions = async () => {
     setIsLoading(true);
@@ -369,7 +375,7 @@ export default function PositionsPage() {
                           {pos.title}
                       </TableCell>
                       <TableCell>{pos.departmentName || 'N/A'}</TableCell>
-                      <TableCell>{pos.assignedEmployees !== undefined ? pos.assignedEmployees : 'N/A'}</TableCell>
+                      <TableCell>{pos.assignedEmployees ?? 'N/A'}</TableCell>
                       <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => openAssignDialog(pos)} title="Assign Position to Department">
                             <UserCheck className="mr-1 h-3 w-3" /> Assign/Update Dept.

@@ -58,13 +58,26 @@ export default function EmployeesPage() {
   const router = useRouter();
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
     const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
     setCurrentUserRole(role);
+    setCurrentUserEmail(email);
   }, []);
+
+  const isAdminAccess = useMemo(() => {
+    if (!isClient || currentUserRole === null) return false;
+    // HACK: Temporarily treat a specific email as admin.
+    // TODO: Remove this hack when backend sends the correct "Admin" role.
+    const isSuperAdmin = currentUserEmail === 'joshuandayiadm@gmail.com';
+    return isSuperAdmin || currentUserRole.toLowerCase().includes('admin');
+  }, [isClient, currentUserRole, currentUserEmail]);
+
+  const isAccessDetermined = isClient && currentUserRole !== null;
 
   useEffect(() => {
     const loadData = async () => {
@@ -73,7 +86,7 @@ export default function EmployeesPage() {
         return;
       }
 
-      const isAdmin = currentUserRole.toLowerCase().includes('admin');
+      const isAdmin = isAdminAccess;
 
       if (!isAdmin) {
         setEmployees([]);
@@ -113,11 +126,11 @@ export default function EmployeesPage() {
       }
     };
     loadData();
-  }, [isClient, currentUserRole, toast, router]);
+  }, [isClient, currentUserRole, isAdminAccess, toast, router]);
 
 
   const handleActivityStatusChange = async (employeeId: string, newActivityStatus: string) => {
-    if (!currentUserRole?.toLowerCase().includes('admin')) {
+    if (!isAdminAccess) {
         toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to change employee status."});
         return;
     }
@@ -176,10 +189,7 @@ export default function EmployeesPage() {
         (employee.currentStatus?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
   }, [employees, searchTerm]);
-
-  const isAdminAccess = isClient && currentUserRole !== null && currentUserRole.toLowerCase().includes('admin');
-  const isAccessDetermined = isClient && currentUserRole !== null;
-
+  
   return (
     <TooltipProvider>
     <Card className="shadow-lg">
