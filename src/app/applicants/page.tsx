@@ -50,8 +50,8 @@ export default function ApplicantsPage() {
         
         let errorMessage = "An unknown error occurred while fetching applicants.";
         if (err instanceof HttpError && err.status === 403) {
-             errorMessage = "Access Denied: You do not have permission to view unhired users.";
-             toast({ variant: "destructive", title: "Access Denied", description: errorMessage});
+             errorMessage = "Access Denied by Server. Your account's security token does not have the required 'Admin' role to view this information.";
+             toast({ variant: "destructive", title: "Permission Denied by Server", description: errorMessage, duration: 8000});
         } else if (err instanceof Error) {
             errorMessage = err.message;
             toast({ variant: "destructive", title: "Failed to load applicants", description: errorMessage });
@@ -112,7 +112,7 @@ export default function ApplicantsPage() {
                 <p className="text-2xl font-semibold text-foreground mb-2">
                     {isAccessDenied ? "Access Denied" : "Failed to load applicants"}
                 </p>
-                <p className="text-md">{error}</p>
+                <p className="text-md text-center">{error}</p>
             </div>
         );
     }
