@@ -3,15 +3,17 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { ActivityLog } from '@/lib/data';
+import type { Employee } from '@/services/employee-service';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from 'date-fns';
-import { ListFilter, Search, AlertTriangle, UserX } from 'lucide-react';
+import { ListFilter, Search, AlertTriangle, UserX, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchActivityLogsByEmployee } from '@/services/activity-service';
+import { fetchEmployees } from '@/services/employee-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UnauthorizedError, HttpError } from '@/services/api-client';
@@ -45,84 +47,100 @@ const formatDate = (dateString?: string | null) => {
 
 export default function ActivityLogsPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Combined loading state
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activityFilter, setActivityFilter] = useState('all');
   const { toast } = useToast();
   const router = useRouter();
-  const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
-
+  
+  // Determine user role and load initial data
   useEffect(() => {
-    const userIdFromStorage = localStorage.getItem('userId');
-    if (userIdFromStorage) {
-      setCurrentEmployeeId(userIdFromStorage);
-    } else {
-      console.warn("ActivityLogsPage: No userId found in localStorage. User might not be logged in or ID not stored.");
-      // Potentially set an error or a message to the user.
-      // For now, it will prevent fetching data if no ID.
-      setIsLoading(false);
-      setFetchError("Could not determine the user to fetch logs for. Please ensure you are logged in.");
-    }
-  }, []);
+    const role = localStorage.getItem('userRole');
+    const email = localStorage.getItem('userEmail');
+    const isAdmin = email === 'joshuandayiadm@gmail.com' || (role?.toLowerCase().includes('admin') ?? false);
+    setIsUserAdmin(isAdmin);
 
-  useEffect(() => {
-    if (!currentEmployeeId) {
-      setIsLoading(false); // Stop loading if no employee ID
-      if (!fetchError) { // Avoid overwriting specific "no userId" error
-          setFetchError("No employee selected to fetch logs for.");
+    const loadInitialData = async () => {
+      if (isAdmin) {
+        setIsLoadingEmployees(true);
+        try {
+          const employees = await fetchEmployees();
+          setAllEmployees(employees);
+          if (employees.length > 0) {
+            setSelectedEmployeeId(employees[0].id); // Pre-select the first employee
+          }
+        } catch (err) {
+           const errorMessage = err instanceof Error ? err.message : "Could not load employee list.";
+           setFetchError(errorMessage);
+           toast({ variant: "destructive", title: "Error", description: errorMessage });
+        } finally {
+          setIsLoadingEmployees(false);
+        }
+      } else {
+        const userIdFromStorage = localStorage.getItem('userId');
+        if (userIdFromStorage) {
+          setSelectedEmployeeId(userIdFromStorage);
+        } else {
+          setFetchError("Could not determine your user ID. Please log in again.");
+        }
+        setIsLoadingEmployees(false);
       }
+    };
+    
+    loadInitialData();
+  }, [toast]);
+
+
+  // Fetch activity logs when an employee is selected
+  useEffect(() => {
+    if (!selectedEmployeeId) {
+      setActivityLogs([]);
+      setIsLoading(false);
       return;
     }
 
-    const loadData = async () => {
+    const loadLogData = async () => {
       setIsLoading(true);
       setFetchError(null);
       try {
-        console.log(`ActivityLogsPage: Fetching logs for employeeId: ${currentEmployeeId}`);
-        // The service function now handles default pagination
-        const data = await fetchActivityLogsByEmployee(currentEmployeeId);
+        console.log(`ActivityLogsPage: Fetching logs for employeeId: ${selectedEmployeeId}`);
+        const data = await fetchActivityLogsByEmployee(selectedEmployeeId);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         let errorMessage = 'An unknown error occurred while fetching activity logs.';
         if (err instanceof UnauthorizedError) {
-          toast({
-            variant: "destructive",
-            title: "Session Expired",
-            description: "Your session has expired. Please log in again.",
-          });
-          await signOut();
-          router.push('/');
+          toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
+          signOut().finally(() => router.push('/'));
           return;
         } else if (err instanceof HttpError) {
-          errorMessage = err.message;
-          if (err.status === 400) {
-            errorMessage = "Failed to load activity logs. There was an issue with the request (e.g., invalid employee ID format or no logs for this ID). Details: " + err.message;
-          }
+          errorMessage = `Failed to load logs for the selected employee. ${err.message}`;
         } else if (err instanceof Error) {
           errorMessage = err.message;
         }
         
         console.error("Failed to fetch activity logs:", err);
         setFetchError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Failed to load activity logs",
-          description: errorMessage,
-        });
+        toast({ variant: "destructive", title: "Failed to load activity logs", description: errorMessage });
         setActivityLogs([]);
       } finally {
         setIsLoading(false);
       }
     };
-    loadData();
-  }, [currentEmployeeId, toast, router]);
+    loadLogData();
+  }, [selectedEmployeeId, toast, router]);
 
   const uniqueActivities = useMemo(() => {
-    if (isLoading || fetchError || !activityLogs || activityLogs.length === 0) return ['all'];
+    if (!activityLogs || activityLogs.length === 0) return ['all'];
     const activities = new Set(activityLogs.map(log => log.activityType).filter(Boolean));
     return ['all', ...Array.from(activities)];
-  }, [activityLogs, isLoading, fetchError]);
+  }, [activityLogs]);
 
   const filteredLogs = useMemo(() => {
     if (!activityLogs) return [];
@@ -146,6 +164,29 @@ export default function ActivityLogsPage() {
       <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <CardTitle>Employee Activity Logs</CardTitle>
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          {isUserAdmin && (
+             <Select value={selectedEmployeeId || ''} onValueChange={setSelectedEmployeeId} disabled={isLoadingEmployees}>
+              <SelectTrigger className="w-full sm:w-[250px]">
+                <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Select an employee to view logs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {isLoadingEmployees ? (
+                    <SelectItem value="loading" disabled>Loading employees...</SelectItem>
+                  ) : allEmployees.length > 0 ? (
+                     allEmployees.map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.name || emp.email}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <SelectItem value="none" disabled>No employees found</SelectItem>
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
           <div className="relative w-full sm:w-auto">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -154,13 +195,13 @@ export default function ActivityLogsPage() {
               className="pl-8 w-full md:w-[200px] lg:w-[250px] bg-background"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading || !!fetchError || !currentEmployeeId}
+              disabled={isLoading || !!fetchError || !selectedEmployeeId}
             />
           </div>
           <Select
             value={activityFilter}
             onValueChange={setActivityFilter}
-            disabled={isLoading || !!fetchError || uniqueActivities.length <= 1 || !currentEmployeeId}
+            disabled={isLoading || !!fetchError || uniqueActivities.length <= 1 || !selectedEmployeeId}
           >
             <SelectTrigger className="w-full sm:w-[180px]">
               <ListFilter className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -181,14 +222,20 @@ export default function ActivityLogsPage() {
       <CardContent>
         {fetchError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
-            {currentEmployeeId ? <AlertTriangle className="h-12 w-12 mb-4" /> : <UserX className="h-12 w-12 mb-4" />}
+            {selectedEmployeeId ? <AlertTriangle className="h-12 w-12 mb-4" /> : <UserX className="h-12 w-12 mb-4" />}
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            {currentEmployeeId && <p className="text-xs mt-2">Ensure the API server at the configured base URL (e.g., https://localhost:7294) is running and accessible, and that the selected employee has logs.</p>}
-            {!currentEmployeeId && <p className="text-xs mt-2">Could not determine user. Please log in again. If the issue persists, contact support.</p>}
+            {selectedEmployeeId && <p className="text-xs mt-2">Ensure the API server at the configured base URL is running and accessible, and that the selected employee has logs.</p>}
           </div>
         )}
-        {!fetchError && currentEmployeeId && (
+        {!selectedEmployeeId && !isLoading && !fetchError && (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <UserX className="h-12 w-12 mb-4" />
+                <p className="text-xl font-semibold">{isUserAdmin ? "No Employee Selected" : "No User Context"}</p>
+                <p className="text-sm">{isUserAdmin ? "Please select an employee from the dropdown to view their logs." : "Cannot fetch activity logs without a user context."}</p>
+            </div>
+        )}
+        {selectedEmployeeId && !fetchError && (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -213,28 +260,23 @@ export default function ActivityLogsPage() {
                       <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                     </TableRow>
                   ))
-                ) : (
+                ) : filteredLogs.length > 0 ? (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell><TableCell><Badge variant={ log.activityType?.toLowerCase().includes('checked in') ? 'default' : log.activityType?.toLowerCase().includes('checked out') ? 'secondary' : log.activityType?.toLowerCase().includes('break') ? 'outline' : 'outline' }>{log.activityType || 'N/A'}</Badge></TableCell><TableCell>{log.description || 'N/A'}</TableCell><TableCell>{log.location || 'N/A'}</TableCell><TableCell>{formatDate(log.startTime)}</TableCell><TableCell>{formatDate(log.endTime)}</TableCell></TableRow>
+                      <TableCell className="font-medium">{log.employeeName || 'N/A'}</TableCell><TableCell><Badge variant={ log.activityType?.toLowerCase().includes('checkin') ? 'default' : log.activityType?.toLowerCase().includes('checkout') ? 'secondary' : log.activityType?.toLowerCase().includes('break') ? 'outline' : 'outline' }>{log.activityType || 'N/A'}</Badge></TableCell><TableCell>{log.description || 'N/A'}</TableCell><TableCell>{log.location || 'N/A'}</TableCell><TableCell>{formatDate(log.startTime)}</TableCell><TableCell>{formatDate(log.endTime)}</TableCell></TableRow>
                   ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No activity logs found for the selected employee and filters.
+                        </TableCell>
+                    </TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
-        )}
-        {!isLoading && !fetchError && currentEmployeeId && filteredLogs.length === 0 && (
-          <p className="text-center text-muted-foreground py-8">No activity logs found for the current employee and filters.</p>
-        )}
-         {!isLoading && !currentEmployeeId && !fetchError && (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <UserX className="h-12 w-12 mb-4" />
-            <p className="text-xl font-semibold">No User Selected</p>
-            <p className="text-sm">Cannot fetch activity logs without a user context.</p>
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
-
