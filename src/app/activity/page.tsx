@@ -60,6 +60,7 @@ export default function ActivityLogsPage() {
   const { toast } = useToast();
   const router = useRouter();
   
+  // This effect runs ONCE on mount to determine user type and set the initial employee ID to view.
   useEffect(() => {
     const role = localStorage.getItem('userRole');
     const email = localStorage.getItem('userEmail');
@@ -72,9 +73,8 @@ export default function ActivityLogsPage() {
       fetchEmployees()
         .then(employees => {
           setAllEmployees(employees);
-          // Pre-selecting an employee triggers the other useEffect to load their logs
           if (employees.length > 0) {
-            setSelectedEmployeeId(employees[0].id);
+            setSelectedEmployeeId(employees[0].id); // Select first employee for admin by default
           } else {
             setIsLoading(false); // No one to load, stop loading indicator
           }
@@ -89,10 +89,9 @@ export default function ActivityLogsPage() {
           setIsLoadingEmployees(false);
         });
     } else {
-      // This is the direct logic path for a regular user
+      // This is the logic path for a regular user
       const userId = localStorage.getItem('userId');
       if (userId) {
-        // We have the user's ID, so we can directly set it for the log-fetching useEffect
         setSelectedEmployeeId(userId);
       } else {
         setFetchError("Could not determine your user ID. Please log in again.");
@@ -100,14 +99,18 @@ export default function ActivityLogsPage() {
       }
       setIsLoadingEmployees(false); // Not applicable for regular users
     }
-  }, [toast]); // This effect runs once on mount to set up the page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
-  // This effect is responsible ONLY for fetching logs when an employee ID is selected.
-  // It works for both admins (when they select from dropdown) and users (set automatically).
+  // This effect reacts to changes in selectedEmployeeId and fetches the logs.
+  // It works for the initial load for a user, and when an admin changes their selection.
   useEffect(() => {
     if (!selectedEmployeeId) {
       setActivityLogs([]);
-      setIsLoading(false);
+      // Only set loading to false if we are not expecting an ID to be set soon.
+      if (!isLoadingEmployees) { // Avoid flicker if employees are still loading
+          setIsLoading(false);
+      }
       return;
     }
 
@@ -138,7 +141,8 @@ export default function ActivityLogsPage() {
       }
     };
     loadLogData();
-  }, [selectedEmployeeId, toast, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployeeId]); // This effect ONLY depends on the ID to fetch.
 
   const uniqueActivities = useMemo(() => {
     if (!activityLogs || activityLogs.length === 0) return ['all'];
