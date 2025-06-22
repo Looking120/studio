@@ -224,10 +224,10 @@ export default function LocationsPage() {
         const displayedCount = displayableEmployeeLocations.length;
         const totalInFilter = employeesToFetchLocationsFor.length;
         
-        if (totalInFilter > 0 && displayedCount === totalInFilter) {
-             setFetchSummaryMessage(`${displayedCount} of ${totalInFilter} employees in filter displayed.`);
-        } else if (totalInFilter > 0) {
-             setFetchSummaryMessage(`${displayedCount} of ${totalInFilter} employees in filter could not be displayed due to missing or invalid location data.`);
+        if (totalInFilter > 0 && displayedCount < totalInFilter) {
+             setFetchSummaryMessage(`${totalInFilter - displayedCount} of ${totalInFilter} employees in the current filter could not be displayed on the map due to missing or invalid location data.`);
+        } else if (totalInFilter > 0 && displayedCount === totalInFilter) {
+            setFetchSummaryMessage(`${displayedCount} of ${totalInFilter} employees in filter displayed.`);
         } else {
              setFetchSummaryMessage(null); 
         }
@@ -275,12 +275,12 @@ export default function LocationsPage() {
             <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={fetchAllLocations} 
-                disabled={isLoadingEmployees || isLoadingLocations || employeesToFetchLocationsFor.length === 0}
+                onClick={loadAllEmployees} 
+                disabled={isLoadingEmployees || isLoadingLocations}
                 className="w-full sm:w-auto"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingLocations ? 'animate-spin' : ''}`} />
-              {isLoadingLocations ? 'Refreshing...' : 'Refresh Locations'}
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingEmployees || isLoadingLocations ? 'animate-spin' : ''}`} />
+              {isLoadingEmployees || isLoadingLocations ? 'Refreshing...' : 'Refresh Locations'}
             </Button>
           </div>
         </CardHeader>
