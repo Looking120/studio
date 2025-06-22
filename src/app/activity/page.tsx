@@ -52,7 +52,6 @@ export default function ActivityLogsPage() {
   
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +59,7 @@ export default function ActivityLogsPage() {
   const { toast } = useToast();
   const router = useRouter();
   
-  // This effect runs ONCE on mount to determine user type and set the initial employee ID to view.
+  // This effect runs ONCE on mount to determine user type and set up the page.
   useEffect(() => {
     const role = localStorage.getItem('userRole');
     const email = localStorage.getItem('userEmail');
@@ -69,14 +68,16 @@ export default function ActivityLogsPage() {
     setIsUserAdmin(isAdmin);
 
     if (isAdmin) {
-      setIsLoadingEmployees(true);
+      setIsLoading(true); // Start loading state for fetching employees
       fetchEmployees()
         .then(employees => {
           setAllEmployees(employees);
           if (employees.length > 0) {
-            setSelectedEmployeeId(employees[0].id); // Select first employee for admin by default
+            // This will trigger the second useEffect to fetch logs
+            setSelectedEmployeeId(employees[0].id);
           } else {
-            setIsLoading(false); // No one to load, stop loading indicator
+            // No employees, so nothing to load
+            setIsLoading(false);
           }
         })
         .catch(err => {
@@ -84,39 +85,36 @@ export default function ActivityLogsPage() {
            setFetchError(errorMessage);
            toast({ variant: "destructive", title: "Error", description: errorMessage });
            setIsLoading(false);
-        })
-        .finally(() => {
-          setIsLoadingEmployees(false);
         });
     } else {
       // This is the logic path for a regular user
       const userId = localStorage.getItem('userId');
       if (userId) {
+        // This will trigger the second useEffect to fetch logs
         setSelectedEmployeeId(userId);
       } else {
         setFetchError("Could not determine your user ID. Please log in again.");
         setIsLoading(false);
       }
-      setIsLoadingEmployees(false); // Not applicable for regular users
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once on mount.
+  }, []); // Run only once
 
   // This effect reacts to changes in selectedEmployeeId and fetches the logs.
-  // It works for the initial load for a user, and when an admin changes their selection.
   useEffect(() => {
     if (!selectedEmployeeId) {
-      setActivityLogs([]);
-      // Only set loading to false if we are not expecting an ID to be set soon.
-      if (!isLoadingEmployees) { // Avoid flicker if employees are still loading
-          setIsLoading(false);
+      // If we are not an admin, and have no ID yet, we are not done loading.
+      // If we are an admin and have no employees, then we are done.
+      if (isUserAdmin && allEmployees.length === 0) {
+         setIsLoading(false);
       }
       return;
     }
 
     const loadLogData = async () => {
-      setIsLoading(true);
+      setIsLoading(true); // Start loading logs
       setFetchError(null);
+      setActivityLogs([]); // Clear old logs
       try {
         const data = await fetchActivityLogsByEmployee(selectedEmployeeId);
         setActivityLogs(Array.isArray(data) ? data : []);
@@ -137,7 +135,7 @@ export default function ActivityLogsPage() {
         toast({ variant: "destructive", title: "Failed to load activity logs", description: errorMessage });
         setActivityLogs([]);
       } finally {
-        setIsLoading(false);
+        setIsLoading(false); // Finish loading logs
       }
     };
     loadLogData();
@@ -173,14 +171,14 @@ export default function ActivityLogsPage() {
         <CardTitle>Employee Activity Logs</CardTitle>
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
           {isUserAdmin && (
-             <Select value={selectedEmployeeId || ''} onValueChange={setSelectedEmployeeId} disabled={isLoadingEmployees}>
+             <Select value={selectedEmployeeId || ''} onValueChange={setSelectedEmployeeId} disabled={isLoading && allEmployees.length === 0}>
               <SelectTrigger className="w-full sm:w-[250px]">
                 <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Select an employee to view logs" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {isLoadingEmployees ? (
+                  {(isLoading && allEmployees.length === 0) ? (
                     <SelectItem value="loading" disabled>Loading employees...</SelectItem>
                   ) : allEmployees.length > 0 ? (
                      allEmployees.map(emp => (
