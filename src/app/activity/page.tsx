@@ -51,7 +51,7 @@ export default function ActivityLogsPage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   
   const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Combined loading state
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -60,45 +60,50 @@ export default function ActivityLogsPage() {
   const { toast } = useToast();
   const router = useRouter();
   
-  // Determine user role and load initial data
   useEffect(() => {
     const role = localStorage.getItem('userRole');
     const email = localStorage.getItem('userEmail');
     const isAdmin = email === 'joshuandayiadm@gmail.com' || (role?.toLowerCase().includes('admin') ?? false);
+    
     setIsUserAdmin(isAdmin);
 
-    const loadInitialData = async () => {
-      if (isAdmin) {
-        setIsLoadingEmployees(true);
-        try {
-          const employees = await fetchEmployees();
+    if (isAdmin) {
+      setIsLoadingEmployees(true);
+      fetchEmployees()
+        .then(employees => {
           setAllEmployees(employees);
+          // Pre-selecting an employee triggers the other useEffect to load their logs
           if (employees.length > 0) {
-            setSelectedEmployeeId(employees[0].id); // Pre-select the first employee
+            setSelectedEmployeeId(employees[0].id);
+          } else {
+            setIsLoading(false); // No one to load, stop loading indicator
           }
-        } catch (err) {
+        })
+        .catch(err => {
            const errorMessage = err instanceof Error ? err.message : "Could not load employee list.";
            setFetchError(errorMessage);
            toast({ variant: "destructive", title: "Error", description: errorMessage });
-        } finally {
+           setIsLoading(false);
+        })
+        .finally(() => {
           setIsLoadingEmployees(false);
-        }
+        });
+    } else {
+      // This is the direct logic path for a regular user
+      const userId = localStorage.getItem('userId');
+      if (userId) {
+        // We have the user's ID, so we can directly set it for the log-fetching useEffect
+        setSelectedEmployeeId(userId);
       } else {
-        const userIdFromStorage = localStorage.getItem('userId');
-        if (userIdFromStorage) {
-          setSelectedEmployeeId(userIdFromStorage);
-        } else {
-          setFetchError("Could not determine your user ID. Please log in again.");
-        }
-        setIsLoadingEmployees(false);
+        setFetchError("Could not determine your user ID. Please log in again.");
+        setIsLoading(false);
       }
-    };
-    
-    loadInitialData();
-  }, [toast]);
+      setIsLoadingEmployees(false); // Not applicable for regular users
+    }
+  }, [toast]); // This effect runs once on mount to set up the page.
 
-
-  // Fetch activity logs when an employee is selected
+  // This effect is responsible ONLY for fetching logs when an employee ID is selected.
+  // It works for both admins (when they select from dropdown) and users (set automatically).
   useEffect(() => {
     if (!selectedEmployeeId) {
       setActivityLogs([]);
@@ -110,7 +115,6 @@ export default function ActivityLogsPage() {
       setIsLoading(true);
       setFetchError(null);
       try {
-        console.log(`ActivityLogsPage: Fetching logs for employeeId: ${selectedEmployeeId}`);
         const data = await fetchActivityLogsByEmployee(selectedEmployeeId);
         setActivityLogs(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -195,13 +199,13 @@ export default function ActivityLogsPage() {
               className="pl-8 w-full md:w-[200px] lg:w-[250px] bg-background"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading || !!fetchError || !selectedEmployeeId}
+              disabled={isLoading || !!fetchError || (!isUserAdmin && !activityLogs.length) || (isUserAdmin && !selectedEmployeeId) }
             />
           </div>
           <Select
             value={activityFilter}
             onValueChange={setActivityFilter}
-            disabled={isLoading || !!fetchError || uniqueActivities.length <= 1 || !selectedEmployeeId}
+            disabled={isLoading || !!fetchError || uniqueActivities.length <= 1 || (!isUserAdmin && !activityLogs.length) || (isUserAdmin && !selectedEmployeeId)}
           >
             <SelectTrigger className="w-full sm:w-[180px]">
               <ListFilter className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -222,20 +226,22 @@ export default function ActivityLogsPage() {
       <CardContent>
         {fetchError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
-            {selectedEmployeeId ? <AlertTriangle className="h-12 w-12 mb-4" /> : <UserX className="h-12 w-12 mb-4" />}
+            {isUserAdmin && selectedEmployeeId ? <AlertTriangle className="h-12 w-12 mb-4" /> : <UserX className="h-12 w-12 mb-4" />}
             <p className="text-xl font-semibold">Failed to load activity logs</p>
             <p className="text-sm">{fetchError}</p>
-            {selectedEmployeeId && <p className="text-xs mt-2">Ensure the API server at the configured base URL is running and accessible, and that the selected employee has logs.</p>}
+            {isUserAdmin && selectedEmployeeId && <p className="text-xs mt-2">Ensure the API server at the configured base URL is running and accessible, and that the selected employee has logs.</p>}
           </div>
         )}
-        {!selectedEmployeeId && !isLoading && !fetchError && (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+        
+        {isUserAdmin && !selectedEmployeeId && !isLoading && !fetchError && (
+             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <UserX className="h-12 w-12 mb-4" />
-                <p className="text-xl font-semibold">{isUserAdmin ? "No Employee Selected" : "No User Context"}</p>
-                <p className="text-sm">{isUserAdmin ? "Please select an employee from the dropdown to view their logs." : "Cannot fetch activity logs without a user context."}</p>
+                <p className="text-xl font-semibold">No Employee Selected</p>
+                <p className="text-sm">Please select an employee from the dropdown to view their logs.</p>
             </div>
         )}
-        {selectedEmployeeId && !fetchError && (
+
+        {(isUserAdmin ? !!selectedEmployeeId : true) && !fetchError && (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
