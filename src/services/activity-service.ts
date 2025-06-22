@@ -28,9 +28,9 @@ export async function fetchActivityLogsByEmployee(
   // we explicitly provide a valid date range.
   const finalEndDate = endDate || new Date().toISOString();
   
-  // Set a default start date (e.g., 90 days ago) if not provided.
+  // Set a default start date to respect the backend's 31-day limit.
   const defaultStartDate = new Date();
-  defaultStartDate.setDate(defaultStartDate.getDate() - 90);
+  defaultStartDate.setDate(defaultStartDate.getDate() - 30);
   const finalStartDate = startDate || defaultStartDate.toISOString();
 
   const params = {
