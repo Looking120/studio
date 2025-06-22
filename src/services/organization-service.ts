@@ -14,6 +14,7 @@ export interface PaginatedResult<T> {
 }
 
 // Office types
+export interface Office extends FrontendOffice {}
 export interface AddOfficePayload {
   name: string;
   address: string;
@@ -31,19 +32,23 @@ export interface UpdateOfficePayload {
   description?: string;
 }
 // ApiOffice will now implicitly match the updated FrontendOffice from lib/data.ts
-interface ApiOffice extends FrontendOffice {}
+interface ApiOffice extends Office {}
 
 // Department types
 export interface Department {
   id: string;
   name: string;
   employeeCount?: number;
+  officeId?: string;
+  officeName?: string;
 }
 export interface AddDepartmentPayload {
   name: string;
+  officeId: string;
 }
 export interface UpdateDepartmentPayload {
   name: string;
+  officeId?: string;
 }
 interface ApiDepartment extends Department {}
 
@@ -76,7 +81,7 @@ const isZeroGuid = (guid: string | undefined | null): boolean => {
 
 
 // --- Office Functions ---
-export async function addOffice(officeData: AddOfficePayload): Promise<FrontendOffice> {
+export async function addOffice(officeData: AddOfficePayload): Promise<Office> {
   console.log('API CALL: POST /organization/offices with data:', officeData);
   try {
     const response = await apiClient<ApiOffice>('/organization/offices', {
@@ -92,7 +97,7 @@ export async function addOffice(officeData: AddOfficePayload): Promise<FrontendO
   }
 }
 
-export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<FrontendOffice[]> {
+export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10): Promise<Office[]> {
   console.log(`API CALL: GET /organization/offices with params: pageNumber=${pageNumber}, pageSize=${pageSize}`);
   try {
     const response = await apiClient<ApiOffice[]>('/organization/offices', {
@@ -108,7 +113,7 @@ export async function fetchOffices(pageNumber: number = 1, pageSize: number = 10
   }
 }
 
-export async function fetchOfficeById(officeId: string): Promise<FrontendOffice | null> {
+export async function fetchOfficeById(officeId: string): Promise<Office | null> {
   console.log(`API CALL: GET /organization/offices/${officeId}`);
   try {
     const response = await apiClient<ApiOffice | null>(`/organization/offices/${officeId}`, {
@@ -126,7 +131,7 @@ export async function fetchOfficeById(officeId: string): Promise<FrontendOffice 
   }
 }
 
-export async function updateOffice(officeId: string, officeData: UpdateOfficePayload): Promise<FrontendOffice> {
+export async function updateOffice(officeId: string, officeData: UpdateOfficePayload): Promise<Office> {
   console.log(`API CALL: PUT /organization/offices/${officeId} with data:`, officeData);
   try {
     const response = await apiClient<ApiOffice>(`/organization/offices/${officeId}`, {
@@ -218,7 +223,7 @@ export async function deleteDepartment(departmentId: string): Promise<ApiDeleteR
 export async function addPosition(positionData: AddPositionPayload): Promise<Position> {
   console.log('API CALL: POST /organization/positions with data:', positionData);
   try {
-    const response = await apiClient<ApiPosition>('/organization/positions', {
+    const response = await apiClient<Position>('/organization/positions', {
       method: 'POST',
       body: positionData,
     });
@@ -233,7 +238,7 @@ export async function addPosition(positionData: AddPositionPayload): Promise<Pos
 export async function fetchPositions(): Promise<Position[]> {
   console.log('API CALL: GET /organization/positions');
   try {
-    const response = await apiClient<ApiPosition[]>('/organization/positions', {
+    const response = await apiClient<Position[]>('/organization/positions', {
       method: 'GET',
     });
     return response.data;

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase, ShieldAlert } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Users, AlertTriangle, Briefcase, ShieldAlert, Building } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     fetchDepartments,
@@ -15,7 +15,9 @@ import {
     deleteDepartment,
     type Department,
     type AddDepartmentPayload,
-    type UpdateDepartmentPayload
+    type UpdateDepartmentPayload,
+    fetchOffices,
+    type Office,
 } from '@/services/organization-service';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -33,10 +35,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [offices, setOffices] = useState<Office[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -44,10 +48,12 @@ export default function DepartmentsPage() {
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [newDepartmentOfficeId, setNewDepartmentOfficeId] = useState("");
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [editDepartmentName, setEditDepartmentName] = useState("");
+  const [editDepartmentOfficeId, setEditDepartmentOfficeId] = useState("");
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
@@ -65,21 +71,24 @@ export default function DepartmentsPage() {
 
   const isAdmin = useMemo(() => {
     if (!isClient || isRoleLoading) return false;
-    // HACK: Temporarily treat a specific email as admin.
-    // TODO: Remove this hack when backend sends the correct "Admin" role.
     const isSuperAdmin = currentUserEmail === 'joshuandayiadm@gmail.com';
     return isSuperAdmin || (currentUserRole?.toLowerCase().includes('admin') ?? false);
   }, [isClient, isRoleLoading, currentUserRole, currentUserEmail]);
 
 
-  const loadDepartments = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting to fetch departments from service...");
-      const data = await fetchDepartments();
-      console.log("Departments fetched:", data);
-      setDepartments(data || []); 
+      console.log("Attempting to fetch departments and offices from service...");
+      const [deptData, officeData] = await Promise.all([
+          fetchDepartments(),
+          fetchOffices(1, 100) // Fetch up to 100 offices
+      ]);
+      console.log("Departments fetched:", deptData);
+      console.log("Offices fetched:", officeData);
+      setDepartments(deptData || []);
+      setOffices(officeData || []);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         toast({
@@ -91,36 +100,44 @@ export default function DepartmentsPage() {
         router.push('/');
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching departments.';
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching departments or offices.';
       setError(errorMessage);
-      toast({ variant: "destructive", title: "Failed to load departments", description: errorMessage });
+      toast({ variant: "destructive", title: "Failed to load data", description: errorMessage });
       setDepartments([]);
+      setOffices([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isClient && !isRoleLoading) { // Only load data if client and role check is done
-        loadDepartments();
+    if (isClient && !isRoleLoading && isAdmin) {
+        loadData();
+    } else if (!isAdmin) {
+        setIsLoading(false);
     }
-  }, [isClient, isRoleLoading]);
+  }, [isClient, isRoleLoading, isAdmin]);
 
   const handleAddDepartmentSubmit = async () => {
     if (!isAdmin) {
       toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to add departments." });
       return;
     }
-    if (!newDepartmentName.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
+    if (!newDepartmentName.trim() || !newDepartmentOfficeId) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Department name and office are required." });
         return;
     }
-    const payload: AddDepartmentPayload = { name: newDepartmentName.trim() };
+    const payload: AddDepartmentPayload = { 
+        name: newDepartmentName.trim(),
+        officeId: newDepartmentOfficeId,
+    };
     try {
       const newDepartment = await addDepartment(payload);
-      setDepartments(prev => [...prev, newDepartment]);
+      // Re-fetch all data to get updated list with officeName
+      await loadData();
       toast({ title: "Department Added", description: `${newDepartment.name} was successfully added.` });
       setNewDepartmentName("");
+      setNewDepartmentOfficeId("");
       setShowAddDialog(false);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -142,23 +159,27 @@ export default function DepartmentsPage() {
     }
     setEditingDepartment(dept);
     setEditDepartmentName(dept.name);
+    setEditDepartmentOfficeId(dept.officeId || "");
     setShowEditDialog(true);
   };
 
   const handleEditDepartmentSubmit = async () => {
     if (!isAdmin) {
-      // This check is redundant if openEditDialog already checks, but good for safety.
       toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to edit departments." });
       return;
     }
-    if (!editingDepartment || !editDepartmentName.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Department name cannot be empty." });
+    if (!editingDepartment || !editDepartmentName.trim() || !editDepartmentOfficeId) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Department name and office are required." });
         return;
     }
-    const payload: UpdateDepartmentPayload = { name: editDepartmentName.trim() };
+    const payload: UpdateDepartmentPayload = { 
+        name: editDepartmentName.trim(),
+        officeId: editDepartmentOfficeId
+    };
     try {
       const updatedDept = await updateDepartment(editingDepartment.id, payload);
-      setDepartments(prev => prev.map(d => d.id === updatedDept.id ? updatedDept : d));
+      // Re-fetch all data to get updated list with officeName
+      await loadData();
       toast({ title: "Department Updated", description: `Department "${updatedDept.name}" was successfully updated.` });
       setShowEditDialog(false);
       setEditingDepartment(null);
@@ -208,7 +229,7 @@ export default function DepartmentsPage() {
     }
   };
 
-  if (isRoleLoading || !isClient) {
+  if (isRoleLoading || (!isClient && isLoading)) {
     return (
       <Card className="shadow-lg p-6">
         <Skeleton className="h-8 w-1/2 mb-4" />
@@ -240,12 +261,12 @@ export default function DepartmentsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Add New Department</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Enter the name for the new department.
+                            Provide a name and assign an office for the new department.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="newDepartmentName">Department Name</Label>
+                            <Label htmlFor="newDepartmentName">Department Name *</Label>
                             <Input
                                 id="newDepartmentName"
                                 placeholder="E.g., Engineering, Marketing"
@@ -253,9 +274,28 @@ export default function DepartmentsPage() {
                                 onChange={(e) => setNewDepartmentName(e.target.value)}
                             />
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="newDepartmentOffice">Office *</Label>
+                            <Select onValueChange={setNewDepartmentOfficeId} value={newDepartmentOfficeId}>
+                                <SelectTrigger id="newDepartmentOffice">
+                                    <SelectValue placeholder="Select an office" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectLabel>Offices</SelectLabel>
+                                        {offices.map(office => (
+                                            <SelectItem key={office.id} value={office.id}>
+                                                {office.name}
+                                            </SelectItem>
+                                        ))}
+                                        {offices.length === 0 && <SelectItem value="no-offices" disabled>No offices available</SelectItem>}
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setNewDepartmentName("")}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => { setNewDepartmentName(""); setNewDepartmentOfficeId(""); }}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleAddDepartmentSubmit}>Add Department</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -275,6 +315,7 @@ export default function DepartmentsPage() {
                 <TableHeader>
                     <TableRow>
                     <TableHead>Department Name</TableHead>
+                    <TableHead>Office</TableHead>
                     <TableHead>Employee Count</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -283,6 +324,7 @@ export default function DepartmentsPage() {
                     {Array.from({ length: 3 }).map((_, index) => (
                         <TableRow key={`skeleton-dept-${index}`}>
                         <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                         </TableRow>
@@ -293,7 +335,7 @@ export default function DepartmentsPage() {
         {isAdmin && !isLoading && error && (
           <div className="flex flex-col items-center justify-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mb-4" />
-            <p className="text-xl font-semibold">Failed to load departments</p>
+            <p className="text-xl font-semibold">Failed to load data</p>
             <p className="text-sm">{error}</p>
           </div>
         )}
@@ -308,6 +350,7 @@ export default function DepartmentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Department Name</TableHead>
+                  <TableHead>Office</TableHead>
                   <TableHead>Employee Count</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -316,6 +359,7 @@ export default function DepartmentsPage() {
                 {departments.map((dept) => (
                     <TableRow key={dept.id}>
                     <TableCell className="font-medium">{dept.name}</TableCell>
+                    <TableCell>{dept.officeName ?? 'N/A'}</TableCell>
                     <TableCell>{dept.employeeCount ?? 'N/A'}</TableCell>
                     <TableCell className="text-right space-x-1 sm:space-x-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(dept)} title="Edit Department">
@@ -357,18 +401,36 @@ export default function DepartmentsPage() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Edit Department</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Update the name for the department: {editingDepartment?.name}.
+                        Update the name and office for the department: {editingDepartment?.name}.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="grid gap-4 py-4">
                      <div className="space-y-2">
-                        <Label htmlFor="editDepartmentName">New Department Name</Label>
+                        <Label htmlFor="editDepartmentName">Department Name *</Label>
                         <Input
                             id="editDepartmentName"
                             placeholder="E.g., Advanced Engineering"
                             value={editDepartmentName}
                             onChange={(e) => setEditDepartmentName(e.target.value)}
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="editDepartmentOffice">Office *</Label>
+                        <Select onValueChange={setEditDepartmentOfficeId} value={editDepartmentOfficeId}>
+                            <SelectTrigger id="editDepartmentOffice">
+                                <SelectValue placeholder="Select an office" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectLabel>Offices</SelectLabel>
+                                    {offices.map(office => (
+                                        <SelectItem key={office.id} value={office.id}>
+                                            {office.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
                 <AlertDialogFooter>
