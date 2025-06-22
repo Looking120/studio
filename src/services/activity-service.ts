@@ -20,13 +20,32 @@ interface ApiActivityLog extends FrontendActivityLog {} // Placeholder
 export async function fetchActivityLogsByEmployee(
   employeeId: string,
   pageNumber: number = 1,
-  pageSize: number = 25 // Default PageSize, adjust as needed
+  pageSize: number = 25, // Default PageSize, adjust as needed
+  startDate?: string,
+  endDate?: string
 ): Promise<FrontendActivityLog[]> {
-  console.log(`API CALL: GET /activity-logs/${employeeId} with params: PageNumber=${pageNumber}, PageSize=${pageSize}`);
+  // To prevent "Cannot query future dates" error from the backend,
+  // we explicitly provide a valid date range.
+  const finalEndDate = endDate || new Date().toISOString();
+  
+  // Set a default start date (e.g., 90 days ago) if not provided.
+  const defaultStartDate = new Date();
+  defaultStartDate.setDate(defaultStartDate.getDate() - 90);
+  const finalStartDate = startDate || defaultStartDate.toISOString();
+
+  const params = {
+    PageNumber: pageNumber,
+    PageSize: pageSize,
+    StartDate: finalStartDate,
+    EndDate: finalEndDate,
+  };
+
+  console.log(`API CALL: GET /activity-logs/${employeeId} with params:`, params);
+
   try {
     const response = await apiClient<ApiActivityLog[]>(`/activity-logs/${employeeId}`, {
       method: 'GET',
-      params: { PageNumber: pageNumber, PageSize: pageSize },
+      params: params,
     });
     return response.data;
   } catch (error) {
@@ -65,4 +84,3 @@ export async function endCurrentEmployeeActivity(employeeId: string, endActivity
     throw new HttpError('Failed to end current employee activity.', 0, null);
   }
 }
-
