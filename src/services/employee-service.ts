@@ -33,6 +33,7 @@ interface ApiEmployeeDetail {
   currentStatus?: string; // Activity status (e.g., "Online", "Offline")
   avatarUrl?: string;
   officeId?: string;
+  officeName?: string;
   hireDate?: string;
   address?: string;
 }
@@ -136,6 +137,7 @@ export async function fetchEmployeeById(id: string): Promise<FrontendEmployee | 
         currentStatus: apiDetail.currentStatus || undefined,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
+        officeName: apiDetail.officeName || undefined,
         hireDate: apiDetail.hireDate || undefined,
       };
     }
@@ -169,6 +171,7 @@ export async function updateEmployee(id: string, employeeData: Partial<Omit<Fron
         currentStatus: apiDetail.currentStatus || undefined,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
+        officeName: apiDetail.officeName || undefined,
         hireDate: apiDetail.hireDate || undefined,
     };
   } catch (error) {
@@ -237,6 +240,7 @@ export async function updateEmployeeActivityStatus(employeeId: string, activityS
         currentStatus: apiDetail.currentStatus || activityStatus,
         avatarUrl: apiDetail.avatarUrl || undefined,
         officeId: apiDetail.officeId || undefined,
+        officeName: apiDetail.officeName || undefined,
         hireDate: apiDetail.hireDate || undefined,
     };
 

@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchEmployeeById, type Employee } from '@/services/employee-service';
-import { fetchOfficeById, type Office } from '@/services/organization-service';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, User, Mail, Briefcase, Building2, ShieldAlert, AlertTriangle, CheckCircle, XCircle, CalendarDays } from 'lucide-react';
 import { UnauthorizedError, HttpError } from '@/services/api-client';
@@ -74,9 +73,7 @@ export default function EmployeeProfilePage() {
   const employeeId = params.employeeId as string;
 
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [office, setOffice] = useState<Office | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOfficeLoading, setIsOfficeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -113,27 +110,10 @@ export default function EmployeeProfilePage() {
 
     const loadEmployeeData = async () => {
       setIsLoading(true);
-      setIsOfficeLoading(false); 
       setError(null);
       try {
         const fetchedEmployee = await fetchEmployeeById(employeeId);
         setEmployee(fetchedEmployee);
-
-        if (fetchedEmployee && fetchedEmployee.officeId) {
-          setIsOfficeLoading(true);
-          try {
-            const fetchedOffice = await fetchOfficeById(fetchedEmployee.officeId);
-            setOffice(fetchedOffice);
-          } catch (officeErr) {
-            console.warn(`Failed to fetch office details for ID ${fetchedEmployee.officeId}:`, officeErr);
-            setOffice(null); 
-            toast({ variant: "destructive", title: "Office Data Error", description: "Could not load assigned office details."});
-          } finally {
-            setIsOfficeLoading(false);
-          }
-        } else {
-          setOffice(null); 
-        }
 
       } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -159,14 +139,6 @@ export default function EmployeeProfilePage() {
     if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
     return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
-
-  const officeDisplayValue = useMemo(() => {
-    if (isOfficeLoading && employee?.officeId) return 'Loading office...';
-    if (office?.name) return office.name;
-    if (employee?.officeId && !office?.name && !isOfficeLoading) return `Office ID: ${employee.officeId.substring(0,8)}... (Details N/A)`;
-    return 'N/A';
-  }, [employee, office, isOfficeLoading]);
-
 
   if (isRoleLoading || (!isClient && isLoading)) {
      return (
@@ -299,8 +271,8 @@ export default function EmployeeProfilePage() {
                 <InfoItem 
                     icon={<Building2 />} 
                     label="Office" 
-                    value={officeDisplayValue} 
-                    isLoading={isLoading || (isOfficeLoading && !!employee?.officeId)} 
+                    value={employee?.officeName || 'N/A'} 
+                    isLoading={isLoading} 
                 />
                 <InfoItem icon={<CalendarDays />} label="Hire Date" value={formatDate(employee?.hireDate)} isLoading={isLoading} />
             </div>

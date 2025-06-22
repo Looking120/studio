@@ -12,6 +12,7 @@ export interface Employee {
   longitude?: number;
   lastSeen?: string;
   officeId?: string;
+  officeName?: string;
   hireDate?: string;
 }
 
