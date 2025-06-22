@@ -29,12 +29,11 @@ export default function LocationsPage() {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [errorEmployees, setErrorEmployees] = useState<string | null>(null);
-  const [errorLocations, setErrorLocations] = useState<string | null>(null); // General location fetching errors
+  const [errorLocations, setErrorLocations] = useState<string | null>(null); 
 
   const [mapCenter, setMapCenter] = useState(GOMEL_COORDS); 
   const [mapZoom, setMapZoom] = useState(DEFAULT_CITY_ZOOM);
   const [fetchSummaryMessage, setFetchSummaryMessage] = useState<string | null>(null);
-
 
   const { toast } = useToast();
   const router = useRouter();
@@ -71,7 +70,6 @@ export default function LocationsPage() {
     return allEmployees.filter(emp => {
         const currentStatusLower = emp.currentStatus?.toLowerCase();
         if (filter === 'active') {
-            // Consider 'Available', 'Online', 'OnTask', 'InMeeting' etc. as active for map display
             return currentStatusLower && !['offline', 'onleave'].includes(currentStatusLower);
         }
         if (filter === 'inactive') {
@@ -80,68 +78,46 @@ export default function LocationsPage() {
         return false; 
     });
   }, [allEmployees, filter, isLoadingEmployees]);
-
-  const fetchAllLocations = useCallback(async () => {
-    if (employeesToFetchLocationsFor.length === 0 && !isLoadingEmployees) {
-        setLocationsData({});
-        setErrorLocations(null); 
-        setFetchSummaryMessage(null);
-        return;
-    }
-    if (employeesToFetchLocationsFor.length === 0) return;
-
-    setIsLoadingLocations(true);
-    setErrorLocations(null); 
-    setFetchSummaryMessage(null);
-    const newLocations: Record<string, EmployeeLocation | null> = {};
-    let successfulFetches = 0;
-    let unauthorizedEncountered = false;
-
-    console.log(`[LocationsPage] Starting to fetch locations for ${employeesToFetchLocationsFor.length} employees based on filter '${filter}'.`);
-
-    for (const emp of employeesToFetchLocationsFor) {
-      if (emp.id) {
-        try {
-          const loc = await getCurrentEmployeeLocation(emp.id); 
-          if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
-            newLocations[emp.id] = loc;
-            successfulFetches++;
-            console.log(`[LocationsPage] Successfully fetched location for ${emp.name} (ID: ${emp.id}): Lat ${loc.latitude}, Lng ${loc.longitude}`);
-          } else {
-            console.warn(`[LocationsPage] No valid location data (lat/lng) returned for employee ${emp.name || 'Unknown'} (ID: ${emp.id}). API response:`, loc);
-            newLocations[emp.id] = null; 
-          }
-        } catch (error) {
-          console.error(`[LocationsPage] Failed to fetch location for employee ${emp.name || 'Unknown'} (ID: ${emp.id}):`, error);
-          newLocations[emp.id] = null; 
-          if (error instanceof UnauthorizedError) {
-            unauthorizedEncountered = true; 
-          } else if (error instanceof HttpError && error.status !== 404) {
-            setErrorLocations(prev => prev ? `${prev}; ${error.message}` : error.message);
-          }
-        }
-      } else {
-        console.warn("[LocationsPage] Employee found in filter list with no ID:", emp);
-      }
-    }
-
-    if (unauthorizedEncountered) {
-        toast({ variant: "destructive", title: "Session Expired", description: "Please log in again."});
-        await signOut();
-        router.push('/');
-        setIsLoadingLocations(false);
-        return; 
-    }
-    
-    setLocationsData(newLocations);
-    setIsLoadingLocations(false);
-    console.log(`[LocationsPage] Location fetching complete. Successful: ${successfulFetches}, Failed/No Data: ${employeesToFetchLocationsFor.length - successfulFetches}`);
-
-  }, [employeesToFetchLocationsFor, toast, router, isLoadingEmployees, filter]);
-
+  
   useEffect(() => {
-    fetchAllLocations();
-  }, [fetchAllLocations]);
+    const fetchLocationsForList = async () => {
+        if (employeesToFetchLocationsFor.length === 0) {
+            setLocationsData({}); // Clear locations if list is empty
+            return;
+        }
+
+        setIsLoadingLocations(true);
+        setErrorLocations(null);
+        
+        const locationPromises = employeesToFetchLocationsFor.map(emp => {
+            if (!emp.id) {
+                console.warn("[LocationsPage] Employee found in filter list with no ID:", emp);
+                return Promise.resolve({ id: null, loc: null });
+            }
+            return getCurrentEmployeeLocation(emp.id)
+                .then(loc => ({ id: emp.id, loc }))
+                .catch(error => {
+                    console.error(`[LocationsPage] Failed to fetch location for employee ${emp.name || 'Unknown'} (ID: ${emp.id}):`, error);
+                    // Handle specific errors if needed, for now just fail silently for this employee
+                    return { id: emp.id, loc: null };
+                });
+        });
+
+        const results = await Promise.all(locationPromises);
+        
+        const newLocations: Record<string, EmployeeLocation | null> = {};
+        results.forEach(result => {
+            if (result.id) {
+                newLocations[result.id] = result.loc;
+            }
+        });
+        
+        setLocationsData(newLocations);
+        setIsLoadingLocations(false);
+    };
+
+    fetchLocationsForList();
+}, [employeesToFetchLocationsFor]);
 
 
   const displayableEmployeeLocations: MapMarkerData[] = useMemo(() => {
@@ -155,56 +131,66 @@ export default function LocationsPage() {
       })
       .filter((item): item is { emp: Employee; loc: EmployeeLocation } => !!item);
 
-    const coordinateCounts = new Map<string, number>();
-    validLocations.forEach(({ loc }) => {
-      const key = `${loc.latitude.toFixed(5)}_${loc.longitude.toFixed(5)}`;
-      coordinateCounts.set(key, (coordinateCounts.get(key) || 0) + 1);
-    });
-    
     const getInitials = (name: string | null | undefined) => {
         if (!name) return 'U';
         const nameParts = name.split(' ').filter(part => part.length > 0);
         if (nameParts.length === 1) return nameParts[0].substring(0, 2).toUpperCase();
         return nameParts.map(n => n[0]).join('').substring(0, 2).toUpperCase();
     };
+    
+    const coordinateGroups = new Map<string, { emp: Employee; loc: EmployeeLocation }[]>();
 
-    return validLocations.map(({ emp, loc }) => {
-      const key = `${loc.latitude.toFixed(5)}_${loc.longitude.toFixed(5)}`;
-      let displayLatitude = loc.latitude;
-      let displayLongitude = loc.longitude;
-
-      if ((coordinateCounts.get(key) || 0) > 1) {
-        // Apply a small random "jitter" to overlapping points
-        const jitter = (Math.random() - 0.5) * 0.0002; // Approx up to ~22 meters offset
-        displayLatitude += jitter;
-        displayLongitude += jitter;
+    validLocations.forEach(item => {
+      const key = `${item.loc.latitude.toFixed(5)}_${item.loc.longitude.toFixed(5)}`;
+      if (!coordinateGroups.has(key)) {
+        coordinateGroups.set(key, []);
       }
-      
-      const empName = emp.name || 'Unknown Employee';
-      const empJobTitle = emp.jobTitle || 'N/A';
-      const empActivityStatus = emp.currentStatus || 'N/A';
-      const locationType = loc.locationType || 'Unknown location type';
-      const lastSeen = loc.timestamp ? new Date(loc.timestamp).toLocaleString() : 'Timestamp N/A';
-
-      return {
-        id: emp.id!,
-        latitude: displayLatitude,
-        longitude: displayLongitude,
-        title: empName,
-        description: `${empJobTitle} - Status: ${empActivityStatus}. At: ${locationType}. Last seen: ${lastSeen}`,
-        icon: (
-          <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
-            <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
-              <AvatarImage src={emp.avatarUrl} alt={empName} data-ai-hint="person map" />
-              <AvatarFallback>{getInitials(empName)}</AvatarFallback>
-            </Avatar>
-            {emp.currentStatus && !['offline', 'onleave'].includes(emp.currentStatus.toLowerCase()) && (
-              <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
-            )}
-          </div>
-        )
-      };
+      coordinateGroups.get(key)!.push(item);
     });
+
+    const markers: MapMarkerData[] = [];
+    coordinateGroups.forEach((group) => {
+      const groupSize = group.length;
+      group.forEach(({ emp, loc }, index) => {
+        let displayLatitude = loc.latitude;
+        let displayLongitude = loc.longitude;
+
+        if (groupSize > 1) {
+          const angle = (index / groupSize) * 2 * Math.PI;
+          const offset = 0.0001 * Math.sqrt(groupSize); // Increase offset slightly for larger groups
+          displayLatitude += offset * Math.cos(angle);
+          displayLongitude += offset * Math.sin(angle);
+        }
+        
+        const empName = emp.name || 'Unknown Employee';
+        const empJobTitle = emp.jobTitle || 'N/A';
+        const empActivityStatus = emp.currentStatus || 'N/A';
+        const locationType = loc.locationType || 'Unknown location type';
+        const lastSeen = loc.timestamp ? new Date(loc.timestamp).toLocaleString() : 'Timestamp N/A';
+
+        markers.push({
+            id: emp.id!,
+            latitude: displayLatitude,
+            longitude: displayLongitude,
+            title: empName,
+            description: `${empJobTitle} - Status: ${empActivityStatus}. At: ${locationType}. Last seen: ${lastSeen}`,
+            icon: (
+              <div className="relative cursor-pointer transform hover:scale-110 transition-transform">
+                <Avatar className="h-10 w-10 border-2 border-background shadow-lg">
+                  <AvatarImage src={emp.avatarUrl} alt={empName} data-ai-hint="person map" />
+                  <AvatarFallback>{getInitials(empName)}</AvatarFallback>
+                </Avatar>
+                {emp.currentStatus && !['offline', 'onleave'].includes(emp.currentStatus.toLowerCase()) && (
+                  <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 ring-2 ring-background" />
+                )}
+              </div>
+            )
+        });
+      });
+    });
+
+    return markers;
+
   }, [employeesToFetchLocationsFor, locationsData]);
 
   useEffect(() => {
@@ -212,7 +198,7 @@ export default function LocationsPage() {
       const avgLat = displayableEmployeeLocations.reduce((sum, m) => sum + m.latitude, 0) / displayableEmployeeLocations.length;
       const avgLng = displayableEmployeeLocations.reduce((sum, m) => sum + m.longitude, 0) / displayableEmployeeLocations.length;
       setMapCenter({ lat: avgLat, lng: avgLng });
-      setMapZoom(displayableEmployeeLocations.length === 1 ? 13 : 10); 
+      setMapZoom(displayableEmployeeLocations.length === 1 ? 13 : 3); 
     } else if (!isLoadingEmployees && !isLoadingLocations) {
       setMapCenter(GOMEL_COORDS); 
       setMapZoom(DEFAULT_CITY_ZOOM); 
@@ -224,19 +210,15 @@ export default function LocationsPage() {
         const displayedCount = displayableEmployeeLocations.length;
         const totalInFilter = employeesToFetchLocationsFor.length;
         
-        if (totalInFilter > 0 && displayedCount < totalInFilter) {
-             setFetchSummaryMessage(`${totalInFilter - displayedCount} of ${totalInFilter} employees in the current filter could not be displayed on the map due to missing or invalid location data.`);
-        } else if (totalInFilter > 0 && displayedCount === totalInFilter) {
-            setFetchSummaryMessage(`${displayedCount} of ${totalInFilter} employees in filter displayed.`);
+        if (displayedCount < totalInFilter) {
+             setFetchSummaryMessage(`${totalInFilter - displayedCount} of ${totalInFilter} employees in the current filter could not be displayed due to missing or invalid location data.`);
         } else {
-             setFetchSummaryMessage(null); 
+            setFetchSummaryMessage(`${displayedCount} of ${totalInFilter} employees in filter displayed.`);
         }
-    } else if (!isLoadingEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all') {
-        setFetchSummaryMessage(null); 
     } else {
         setFetchSummaryMessage(null); 
     }
-  }, [displayableEmployeeLocations, employeesToFetchLocationsFor, isLoadingLocations, isLoadingEmployees, errorLocations, filter]);
+  }, [displayableEmployeeLocations, employeesToFetchLocationsFor, isLoadingLocations, isLoadingEmployees, filter]);
 
 
   const activeCount = useMemo(() => {
@@ -280,7 +262,7 @@ export default function LocationsPage() {
                 className="w-full sm:w-auto"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingEmployees || isLoadingLocations ? 'animate-spin' : ''}`} />
-              {isLoadingEmployees || isLoadingLocations ? 'Refreshing...' : 'Refresh Locations'}
+              {isLoadingEmployees || isLoadingLocations ? 'Refreshing...' : 'Refresh Data'}
             </Button>
           </div>
         </CardHeader>
@@ -296,7 +278,7 @@ export default function LocationsPage() {
       )}
 
       <div className="flex-grow rounded-lg overflow-hidden shadow-xl border relative">
-        { (isLoadingEmployees || (employeesToFetchLocationsFor.length > 0 && isLoadingLocations && displayableEmployeeLocations.length === 0)) && (
+        { (isLoadingEmployees || isLoadingLocations) && (
              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
                 <div className="flex flex-col items-center space-y-2 p-4 bg-card rounded-lg shadow-lg">
                     <RefreshCw className="h-8 w-8 animate-spin text-primary" />
@@ -313,15 +295,15 @@ export default function LocationsPage() {
             </div>
         )}
 
-        { !isLoadingEmployees && !errorEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all' && !fetchSummaryMessage && (
+        { !isLoadingEmployees && !errorEmployees && employeesToFetchLocationsFor.length === 0 && filter !== 'all' && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                 <Users className="h-12 w-12 mb-2 opacity-50"/>
                 <p className="font-semibold text-lg">No Employees to Display</p>
-                <p className="text-sm">There are no employees matching the filter '{filter}'. Active means not 'Offline' or 'OnLeave'.</p>
+                <p className="text-sm">There are no employees matching the filter '{filter}'.</p>
             </div>
         )}
         
-        { !isLoadingEmployees && !errorEmployees && allEmployees.length === 0 && !fetchSummaryMessage && (
+        { !isLoadingEmployees && !errorEmployees && allEmployees.length === 0 && (
              <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                 <Users className="h-12 w-12 mb-2 opacity-50"/>
                 <p className="font-semibold text-lg">No Employees Found</p>
@@ -331,7 +313,7 @@ export default function LocationsPage() {
 
         <MapComponent markers={displayableEmployeeLocations} center={mapCenter} zoom={mapZoom} />
 
-        { errorLocations && !fetchSummaryMessage && ( 
+        { errorLocations && ( 
              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg text-xs max-w-md text-center">
                 <AlertTriangle className="inline h-4 w-4 mr-1" />
                 {errorLocations}
