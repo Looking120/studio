@@ -82,17 +82,25 @@ export function AppClientLayout({ children }: { children: React.ReactNode }) {
   const [currentNavItems, setCurrentNavItems] = useState<NavItem[]>([]);
 
   useEffect(() => {
-    setMounted(true); // Indicate client-side mount
-    const name = localStorage.getItem('userName');
-    const role = localStorage.getItem('userRole');
-    const email = localStorage.getItem('userEmail');
-    
-    console.log('[AppClientLayout] Initial localStorage read - Name:', name, 'Role:', role, 'Email:', email);
-    
-    setLoggedInUserName(name);
-    setLoggedInUserRole(role);
-    setLoggedInUserEmail(email);
-  }, []); // Empty dependency array: runs once on mount
+    setMounted(true);
+  }, []);
+
+  // Effect to read from localStorage whenever the path changes.
+  // This ensures that after a login/logout and redirect, the state is fresh.
+  useEffect(() => {
+    if (mounted) {
+      const name = localStorage.getItem('userName');
+      const role = localStorage.getItem('userRole');
+      const email = localStorage.getItem('userEmail');
+      
+      console.log('[AppClientLayout] Reading user state on path change - Path:', pathname, 'Name:', name, 'Role:', role, 'Email:', email);
+      
+      setLoggedInUserName(name);
+      setLoggedInUserRole(role);
+      setLoggedInUserEmail(email);
+    }
+  }, [pathname, mounted]);
+
 
   const handleSignOut = useCallback(async (message?: string) => {
     console.log('[AppClientLayout] handleSignOut called with message:', message || "Signing out...");
