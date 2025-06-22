@@ -124,9 +124,7 @@ export default function ActivityLogsPage() {
           toast({ variant: "destructive", title: "Session Expired", description: "Please log in again." });
           signOut().finally(() => router.push('/'));
           return;
-        } else if (err instanceof HttpError) {
-          errorMessage = `Failed to load logs for the selected employee. ${err.message}`;
-        } else if (err instanceof Error) {
+        } else if (err instanceof Error) { // Catches HttpError as well since it extends Error
           errorMessage = err.message;
         }
         
